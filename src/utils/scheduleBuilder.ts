@@ -26,6 +26,13 @@ const POI_DURATIONS: Record<string, number> = {
   History: 50,
   Beach: 60,
   FreeCamping: 30,
+  HotSprings: 120,
+  FamilyAttractions: 90,
+  Markets: 60,
+  Cycling: 90,
+  Wineries: 75,
+  CraftBeer: 60,
+  Stargazing: 60,
 }
 
 const POI_EMOJI: Record<string, string> = {
@@ -37,6 +44,13 @@ const POI_EMOJI: Record<string, string> = {
   History: '🏛️',
   Beach: '🌊',
   FreeCamping: '⛺',
+  HotSprings: '♨️',
+  FamilyAttractions: '🎠',
+  Markets: '🛒',
+  Cycling: '🚵',
+  Wineries: '🍷',
+  CraftBeer: '🍺',
+  Stargazing: '🌌',
 }
 
 const MEAL_EMOJI: Record<string, string> = {
@@ -53,7 +67,9 @@ export function buildDaySchedule(
   pois: ScoredPOI[],
   diningPrefs: DiningPref[],
   departureHour = 7,
-  isLastDay = false
+  isLastDay = false,
+  hasKids = false,
+  isDayTrip = false,
 ): ScheduleItem[] {
   const items: ScheduleItem[] = []
   let h = departureHour
@@ -149,8 +165,8 @@ export function buildDaySchedule(
     h = after.h; m = after.m
   }
 
-  // 7. Arrive / camp (~17:30–18:00)
-  const arriveTarget = { h: 17, m: 30 }
+  // 7. Arrive / return home
+  const arriveTarget = { h: isDayTrip ? 16 : 17, m: 30 }
   const curMins2 = h * 60 + m
   const arriveMins = arriveTarget.h * 60 + arriveTarget.m
   if (curMins2 < arriveMins) {
@@ -160,12 +176,26 @@ export function buildDaySchedule(
   const lastWaypoint = day.waypoints[day.waypoints.length - 1]
   const arriveLabel = lastWaypoint?.label ?? 'Destination'
 
+  if (isDayTrip) {
+    items.push({
+      id: nextId(),
+      time: fmt(h, m),
+      emoji: '🏡',
+      title: 'Head home',
+      subtitle: `Depart ${arriveLabel} — great day out`,
+      duration_min: 0,
+      type: 'arrive',
+      is_highlight: false,
+    })
+    return items
+  }
+
   items.push({
     id: nextId(),
     time: fmt(h, m),
-    emoji: isLastDay ? '🏁' : '⛺',
-    title: isLastDay ? `Arrive ${arriveLabel}` : `Camp / Settle in at ${arriveLabel}`,
-    subtitle: isLastDay ? 'Road trip complete!' : 'Set up camp, rest and freshen up',
+    emoji: isLastDay ? '🏁' : (hasKids ? '🏨' : '⛺'),
+    title: isLastDay ? `Arrive ${arriveLabel}` : (hasKids ? `Check in at ${arriveLabel}` : `Camp / Settle in at ${arriveLabel}`),
+    subtitle: isLastDay ? 'Trip complete!' : (hasKids ? 'Get the kids settled, freshen up' : 'Set up camp, rest and freshen up'),
     duration_min: 60,
     type: isLastDay ? 'arrive' : 'camp',
     is_highlight: isLastDay,
@@ -175,15 +205,14 @@ export function buildDaySchedule(
     const after = addMinutes(h, m, 60)
     h = after.h; m = after.m
 
-    // 8. Sunset / stargazing
-    const sunset = addMinutes(17, 0, Math.floor(Math.random() * 60) + 30)
+    const sunset = addMinutes(17, 30, Math.floor(Math.random() * 30))
     items.push({
       id: nextId(),
       time: fmt(sunset.h, sunset.m),
       emoji: '🌅',
-      title: 'Golden hour & sunset',
-      subtitle: 'The best light of the day — camera ready',
-      duration_min: 45,
+      title: 'Golden hour',
+      subtitle: hasKids ? 'Great light for photos with the kids' : 'The best light of the day — camera ready',
+      duration_min: 30,
       type: 'sunset',
       is_highlight: true,
     })
@@ -197,25 +226,37 @@ export function buildDaySchedule(
       items.push({
         id: nextId(),
         time: fmt(dinnerH, 0),
-        emoji: '🔥',
-        title: 'Camp cook-up',
-        subtitle: 'Fire up the camp stove — you\'ve earned it',
-        duration_min: 60,
+        emoji: hasKids ? '🍕' : '🔥',
+        title: hasKids ? 'Dinner' : 'Camp cook-up',
+        subtitle: hasKids ? 'Find somewhere the kids will love' : "Fire up the camp stove — you've earned it",
+        duration_min: hasKids ? 60 : 75,
         type: 'dinner',
       })
     }
 
-    // Stargazing if dark sky rating is good
-    items.push({
-      id: nextId(),
-      time: fmt(dinnerH + 2, 0),
-      emoji: '🌌',
-      title: 'Stargazing',
-      subtitle: 'Away from city lights — Milky Way visible',
-      duration_min: 60,
-      type: 'stargazing',
-      is_highlight: true,
-    })
+    // Stargazing only when no kids
+    if (!hasKids) {
+      items.push({
+        id: nextId(),
+        time: fmt(dinnerH + 2, 0),
+        emoji: '🌌',
+        title: 'Stargazing',
+        subtitle: 'Away from city lights — Milky Way visible',
+        duration_min: 60,
+        type: 'stargazing',
+        is_highlight: true,
+      })
+    } else {
+      items.push({
+        id: nextId(),
+        time: fmt(dinnerH + 1, 0),
+        emoji: '🌙',
+        title: 'Early night',
+        subtitle: 'Rest up — another big day tomorrow',
+        duration_min: 0,
+        type: 'camp',
+      })
+    }
   }
 
   return items

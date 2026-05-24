@@ -1,0 +1,853 @@
+// Venue-level activities for Victorian sub-destinations
+// mapsUrl uses Google Maps search so no API key needed
+// Hidden gems are flagged with isHiddenGem: true
+
+export type ActivityCategory =
+  | 'nature'
+  | 'wildlife'
+  | 'food'
+  | 'drink'
+  | 'history'
+  | 'art'
+  | 'family'
+  | 'active'
+  | 'relaxation'
+  | 'markets'
+  | 'viewpoint'
+
+export interface Activity {
+  id: string
+  name: string
+  category: ActivityCategory
+  emoji: string
+  description: string
+  duration: string       // human label e.g. "1–2 hrs"
+  cost: 'free' | '$' | '$$' | '$$$'
+  kidsOk: boolean
+  isHiddenGem: boolean
+  mapsUrl: string        // deep-link to Google Maps
+  tags: string[]         // for interest matching
+}
+
+export interface SubDestActivities {
+  subDestId: string
+  activities: Activity[]
+}
+
+function mapsUrl(name: string, suburb: string): string {
+  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(name + ' ' + suburb + ' Victoria')}`
+}
+
+const ACTIVITIES: SubDestActivities[] = [
+  // ── YARRA VALLEY ──────────────────────────────────────────────────
+  {
+    subDestId: 'healesville',
+    activities: [
+      {
+        id: 'healesville-sanctuary',
+        name: 'Healesville Sanctuary',
+        category: 'wildlife',
+        emoji: '🦘',
+        description: 'World-class native wildlife park. Get up close with platypus, wombats, and wedge-tailed eagles.',
+        duration: '2–3 hrs',
+        cost: '$$',
+        kidsOk: true,
+        isHiddenGem: false,
+        mapsUrl: mapsUrl('Healesville Sanctuary', 'Healesville'),
+        tags: ['Wildlife', 'FamilyAttractions'],
+      },
+      {
+        id: 'healesville-hotel',
+        name: 'Healesville Hotel',
+        category: 'food',
+        emoji: '🍺',
+        description: 'Heritage pub with Yarra Valley taps and a beer garden families love. One of the Valley\'s most loved lunch spots.',
+        duration: '1–2 hrs',
+        cost: '$$',
+        kidsOk: true,
+        isHiddenGem: false,
+        mapsUrl: mapsUrl('Healesville Hotel', 'Healesville'),
+        tags: ['CraftBeer', 'Food'],
+      },
+      {
+        id: 'coombe-estate',
+        name: 'Coombe Estate Winery',
+        category: 'drink',
+        emoji: '🍷',
+        description: 'Dame Nellie Melba\'s former home turned vineyard. Stunning gardens and exceptional sparkling.',
+        duration: '1.5–2 hrs',
+        cost: '$$$',
+        kidsOk: false,
+        isHiddenGem: false,
+        mapsUrl: mapsUrl('Coombe Estate Winery', 'Coldstream'),
+        tags: ['Wineries'],
+      },
+      {
+        id: 'badger-weir',
+        name: 'Badger Weir Picnic Area',
+        category: 'nature',
+        emoji: '🌿',
+        description: 'Fernery walk through mountain ash forest to a historic weir. Stunning tree canopy, very peaceful.',
+        duration: '1–1.5 hrs',
+        cost: 'free',
+        kidsOk: true,
+        isHiddenGem: true,
+        mapsUrl: mapsUrl('Badger Weir Picnic Area', 'Healesville'),
+        tags: ['Hiking', 'Nature'],
+      },
+      {
+        id: 'four-pillars-gin',
+        name: 'Four Pillars Gin Cellar Door',
+        category: 'drink',
+        emoji: '🍸',
+        description: 'Australia\'s most awarded gin distillery. Free tour and tasting, excellent cocktails on the terrace.',
+        duration: '1 hr',
+        cost: '$',
+        kidsOk: false,
+        isHiddenGem: false,
+        mapsUrl: mapsUrl('Four Pillars Gin', 'Healesville'),
+        tags: ['CraftBeer'],
+      },
+    ],
+  },
+  {
+    subDestId: 'yarra-glen',
+    activities: [
+      {
+        id: 'gulf-station',
+        name: 'Gulf Station Historic Farm',
+        category: 'history',
+        emoji: '🏚️',
+        description: 'One of Australia\'s best-preserved 19th-century farming complexes. Heritage-listed with costumed guides.',
+        duration: '1.5 hrs',
+        cost: '$',
+        kidsOk: true,
+        isHiddenGem: true,
+        mapsUrl: mapsUrl('Gulf Station Historic Farm', 'Yering'),
+        tags: ['History', 'FamilyAttractions'],
+      },
+      {
+        id: 'tarrawarra-museum',
+        name: 'TarraWarra Museum of Art',
+        category: 'art',
+        emoji: '🎨',
+        description: 'World-class contemporary Australian art in a vineyard setting. Café and gallery shop on site.',
+        duration: '1.5–2 hrs',
+        cost: '$',
+        kidsOk: true,
+        isHiddenGem: false,
+        mapsUrl: mapsUrl('TarraWarra Museum of Art', 'Healesville'),
+        tags: ['Art', 'Photography'],
+      },
+      {
+        id: 'giant-steps-winery',
+        name: 'Giant Steps Winery',
+        category: 'drink',
+        emoji: '🍷',
+        description: 'Voted one of Australia\'s best wineries. Their pizza + pinot combo on the deck is unmissable.',
+        duration: '1.5 hrs',
+        cost: '$$',
+        kidsOk: true,
+        isHiddenGem: false,
+        mapsUrl: mapsUrl('Giant Steps Winery', 'Healesville'),
+        tags: ['Wineries', 'Food'],
+      },
+      {
+        id: 'yering-station-farmers',
+        name: 'Yering Station Farmers Market',
+        category: 'markets',
+        emoji: '🛒',
+        description: 'Monthly market at a beautiful historic station. Local produce, pastries, flowers, and crafts. (3rd Sunday)',
+        duration: '1–2 hrs',
+        cost: 'free',
+        kidsOk: true,
+        isHiddenGem: true,
+        mapsUrl: mapsUrl('Yering Station', 'Yering'),
+        tags: ['Markets', 'Food'],
+      },
+    ],
+  },
+  {
+    subDestId: 'warburton',
+    activities: [
+      {
+        id: 'oshannassy-aqueduct',
+        name: 'O\'Shannassy Aqueduct Trail',
+        category: 'active',
+        emoji: '🚵',
+        description: 'Flat, gentle rail-trail along a 1920s water supply aqueduct through stunning mountain ash forest.',
+        duration: '2–4 hrs',
+        cost: 'free',
+        kidsOk: true,
+        isHiddenGem: true,
+        mapsUrl: mapsUrl("O'Shannassy Aqueduct Trail", 'Warburton'),
+        tags: ['Cycling', 'Hiking'],
+      },
+      {
+        id: 'ada-tree',
+        name: 'The Ada Tree',
+        category: 'nature',
+        emoji: '🌳',
+        description: 'One of Victoria\'s largest mountain ash trees — 300+ years old, 76m tall. An easy 25-min return walk.',
+        duration: '1 hr',
+        cost: 'free',
+        kidsOk: true,
+        isHiddenGem: true,
+        mapsUrl: mapsUrl('Ada Tree Warburton', 'Warburton'),
+        tags: ['Hiking', 'Nature', 'Photography'],
+      },
+      {
+        id: 'warburton-bakery',
+        name: 'Warburton Bakery',
+        category: 'food',
+        emoji: '🥐',
+        description: 'Legendary country bakery. Their vanilla slice has been making the drive worth it for 30 years.',
+        duration: '30 min',
+        cost: '$',
+        kidsOk: true,
+        isHiddenGem: false,
+        mapsUrl: mapsUrl('Warburton Bakery', 'Warburton'),
+        tags: ['Food'],
+      },
+    ],
+  },
+
+  // ── MORNINGTON PENINSULA ─────────────────────────────────────────
+  {
+    subDestId: 'peninsula-hot-springs',
+    activities: [
+      {
+        id: 'peninsula-hot-springs-main',
+        name: 'Peninsula Hot Springs',
+        category: 'relaxation',
+        emoji: '♨️',
+        description: 'Australia\'s first natural hot spring. 60+ pools, cave baths, and a hilltop panoramic pool.',
+        duration: '2–4 hrs',
+        cost: '$$$',
+        kidsOk: true,
+        isHiddenGem: false,
+        mapsUrl: mapsUrl('Peninsula Hot Springs', 'Rye'),
+        tags: ['HotSprings', 'Relaxation'],
+      },
+      {
+        id: 'arthurs-seat-eagle',
+        name: 'Arthur\'s Seat Eagle Gondola',
+        category: 'viewpoint',
+        emoji: '🚡',
+        description: 'Gondola over native bushland with sweeping views of Port Phillip Bay. Kids love it.',
+        duration: '1.5 hrs',
+        cost: '$$',
+        kidsOk: true,
+        isHiddenGem: false,
+        mapsUrl: mapsUrl("Arthur's Seat Eagle", 'Dromana'),
+        tags: ['FamilyAttractions', 'Lookouts', 'Photography'],
+      },
+      {
+        id: 'olivers-hill',
+        name: 'Oliver\'s Hill Lookout',
+        category: 'viewpoint',
+        emoji: '👁️',
+        description: 'Free hilltop lookout with sweeping Port Phillip Bay views. Underrated and never crowded.',
+        duration: '20 min',
+        cost: 'free',
+        kidsOk: true,
+        isHiddenGem: true,
+        mapsUrl: mapsUrl("Oliver's Hill Lookout", 'Frankston'),
+        tags: ['Lookouts', 'Photography'],
+      },
+    ],
+  },
+  {
+    subDestId: 'sorrento',
+    activities: [
+      {
+        id: 'sorrento-back-beach',
+        name: 'Sorrento Back Beach',
+        category: 'nature',
+        emoji: '🌊',
+        description: 'Wild ocean beach with dramatic limestone cliffs and blowholes. Spectacular at high tide.',
+        duration: '1–2 hrs',
+        cost: 'free',
+        kidsOk: true,
+        isHiddenGem: false,
+        mapsUrl: mapsUrl('Sorrento Back Beach', 'Sorrento'),
+        tags: ['Beach', 'Photography'],
+      },
+      {
+        id: 'polperro-winery',
+        name: 'Polperro Winery',
+        category: 'drink',
+        emoji: '🍷',
+        description: 'Tiny, personal cellar door on the Nepean Hwy. Family-run, natural wines, and beautiful gardens.',
+        duration: '1.5 hrs',
+        cost: '$$',
+        kidsOk: false,
+        isHiddenGem: true,
+        mapsUrl: mapsUrl('Polperro Winery', 'Red Hill South'),
+        tags: ['Wineries'],
+      },
+      {
+        id: 'portsea-polo',
+        name: 'Portsea Polo (Jan–Feb)',
+        category: 'art',
+        emoji: '🐎',
+        description: 'Legendary summer polo event at Portsea with spectacular cliff-top ocean views as the backdrop.',
+        duration: '4 hrs',
+        cost: '$$',
+        kidsOk: true,
+        isHiddenGem: true,
+        mapsUrl: mapsUrl('Portsea Polo', 'Portsea'),
+        tags: ['History', 'Photography'],
+      },
+    ],
+  },
+
+  // ── DANDENONG RANGES ──────────────────────────────────────────────
+  {
+    subDestId: 'sherbrooke',
+    activities: [
+      {
+        id: 'sherbrooke-forest',
+        name: 'Sherbrooke Forest Walk',
+        category: 'nature',
+        emoji: '🌿',
+        description: 'Lush fern gully forest with lyrebirds heard (and sometimes seen) year-round. Very close to the city.',
+        duration: '1–3 hrs',
+        cost: 'free',
+        kidsOk: true,
+        isHiddenGem: false,
+        mapsUrl: mapsUrl('Sherbrooke Forest', 'Belgrave'),
+        tags: ['Hiking', 'Wildlife', 'Photography'],
+      },
+      {
+        id: 'puffing-billy',
+        name: 'Puffing Billy Railway',
+        category: 'family',
+        emoji: '🚂',
+        description: 'Australia\'s most-loved steam train. Ride with your legs dangling out the windows through mountain ash forest.',
+        duration: '2–4 hrs',
+        cost: '$$',
+        kidsOk: true,
+        isHiddenGem: false,
+        mapsUrl: mapsUrl('Puffing Billy Railway', 'Belgrave'),
+        tags: ['FamilyAttractions', 'History'],
+      },
+      {
+        id: 'grants-picnic-ground',
+        name: 'Grant\'s Picnic Ground',
+        category: 'wildlife',
+        emoji: '🦜',
+        description: 'Crimson rosellas eat from your hand here. Free, peaceful, and magical for kids of any age.',
+        duration: '1 hr',
+        cost: 'free',
+        kidsOk: true,
+        isHiddenGem: true,
+        mapsUrl: mapsUrl("Grant's Picnic Ground", 'Kallista'),
+        tags: ['Wildlife', 'FamilyAttractions'],
+      },
+      {
+        id: 'sassafras-miss-marple',
+        name: 'Miss Marple\'s Tea Room',
+        category: 'food',
+        emoji: '🫖',
+        description: 'Classic English-style tea room in Sassafras. Scones, jam, cream, and a fire in winter. A Ranges institution.',
+        duration: '1 hr',
+        cost: '$$',
+        kidsOk: true,
+        isHiddenGem: false,
+        mapsUrl: mapsUrl("Miss Marple's Tea Room", 'Sassafras'),
+        tags: ['Food'],
+      },
+    ],
+  },
+
+  // ── GREAT OCEAN ROAD ──────────────────────────────────────────────
+  {
+    subDestId: 'torquay',
+    activities: [
+      {
+        id: 'bells-beach',
+        name: 'Bells Beach',
+        category: 'nature',
+        emoji: '🏄',
+        description: 'World-famous surf break and natural amphitheatre. Even if you don\'t surf, watching the sets is spectacular.',
+        duration: '1 hr',
+        cost: 'free',
+        kidsOk: true,
+        isHiddenGem: false,
+        mapsUrl: mapsUrl('Bells Beach', 'Torquay'),
+        tags: ['Beach', 'Photography'],
+      },
+      {
+        id: 'surf-world-museum',
+        name: 'Surf World Museum',
+        category: 'history',
+        emoji: '🏄',
+        description: 'The world\'s largest surfing museum. History of the sport from early redwood boards to now.',
+        duration: '1.5 hrs',
+        cost: '$',
+        kidsOk: true,
+        isHiddenGem: true,
+        mapsUrl: mapsUrl('Surf World Museum', 'Torquay'),
+        tags: ['History', 'FamilyAttractions'],
+      },
+      {
+        id: 'torquay-farmers-market',
+        name: 'Torquay Farmers Market',
+        category: 'markets',
+        emoji: '🛒',
+        description: 'Brilliant Saturday morning market. Local produce, fresh bread, coffee, and coastal vibes.',
+        duration: '1 hr',
+        cost: 'free',
+        kidsOk: true,
+        isHiddenGem: true,
+        mapsUrl: mapsUrl('Torquay Farmers Market', 'Torquay'),
+        tags: ['Markets', 'Food'],
+      },
+    ],
+  },
+  {
+    subDestId: 'lorne',
+    activities: [
+      {
+        id: 'erskine-falls',
+        name: 'Erskine Falls',
+        category: 'nature',
+        emoji: '💧',
+        description: 'Victoria\'s most beautiful waterfall, a 30-min return walk from the car park. Magical after rain.',
+        duration: '1 hr',
+        cost: 'free',
+        kidsOk: true,
+        isHiddenGem: false,
+        mapsUrl: mapsUrl('Erskine Falls', 'Lorne'),
+        tags: ['Hiking', 'Photography', 'Nature'],
+      },
+      {
+        id: 'lorne-sea-baths',
+        name: 'Lorne Sea Baths',
+        category: 'relaxation',
+        emoji: '🏊',
+        description: 'Heated outdoor pool right on the beach. Open year-round — perfect after a walk.',
+        duration: '1.5 hrs',
+        cost: '$',
+        kidsOk: true,
+        isHiddenGem: true,
+        mapsUrl: mapsUrl('Lorne Sea Baths', 'Lorne'),
+        tags: ['Beach', 'Relaxation'],
+      },
+      {
+        id: 'lorne-pub',
+        name: 'The Lorne Hotel',
+        category: 'drink',
+        emoji: '🍺',
+        description: 'The GOR\'s most iconic pub. Cold beers, ocean views, and a crowd that ranges from tradies to tourists.',
+        duration: '1–2 hrs',
+        cost: '$$',
+        kidsOk: true,
+        isHiddenGem: false,
+        mapsUrl: mapsUrl('The Lorne Hotel', 'Lorne'),
+        tags: ['CraftBeer', 'Food'],
+      },
+    ],
+  },
+  {
+    subDestId: 'apollo-bay',
+    activities: [
+      {
+        id: 'apollo-bay-market',
+        name: 'Apollo Bay Saturday Market',
+        category: 'markets',
+        emoji: '🛒',
+        description: 'Small-town coastal market with local art, jam, honey, and the best sourdough on the GOR.',
+        duration: '1 hr',
+        cost: 'free',
+        kidsOk: true,
+        isHiddenGem: true,
+        mapsUrl: mapsUrl('Apollo Bay Saturday Market', 'Apollo Bay'),
+        tags: ['Markets', 'Food'],
+      },
+      {
+        id: 'cape-otway-lighthouse',
+        name: 'Cape Otway Lightstation',
+        category: 'history',
+        emoji: '🏛️',
+        description: 'Australia\'s oldest surviving lighthouse (1848). Koalas line the road on the way in — guaranteed.',
+        duration: '2 hrs',
+        cost: '$',
+        kidsOk: true,
+        isHiddenGem: false,
+        mapsUrl: mapsUrl('Cape Otway Lightstation', 'Cape Otway'),
+        tags: ['History', 'Wildlife', 'Photography'],
+      },
+      {
+        id: 'great-ocean-walk',
+        name: 'Great Ocean Walk (Marengo section)',
+        category: 'active',
+        emoji: '🥾',
+        description: 'Short section of the multi-day Great Ocean Walk starting at Apollo Bay. Stunning clifftop views, 5km return.',
+        duration: '2 hrs',
+        cost: 'free',
+        kidsOk: true,
+        isHiddenGem: true,
+        mapsUrl: mapsUrl('Great Ocean Walk Marengo', 'Apollo Bay'),
+        tags: ['Hiking', 'Photography'],
+      },
+    ],
+  },
+
+  // ── MACEDON RANGES ────────────────────────────────────────────────
+  {
+    subDestId: 'woodend',
+    activities: [
+      {
+        id: 'hanging-rock',
+        name: 'Hanging Rock Reserve',
+        category: 'nature',
+        emoji: '🪨',
+        description: 'Iconic volcanic rock formation that inspired Picnic at Hanging Rock. Climb to the summit for sweeping Ranges views.',
+        duration: '2 hrs',
+        cost: '$',
+        kidsOk: true,
+        isHiddenGem: false,
+        mapsUrl: mapsUrl('Hanging Rock Reserve', 'Woodend'),
+        tags: ['Hiking', 'History', 'Photography'],
+      },
+      {
+        id: 'mount-macedon-memorial-cross',
+        name: 'Mount Macedon Memorial Cross',
+        category: 'viewpoint',
+        emoji: '👁️',
+        description: 'Drive to this WWI memorial cross for panoramic views over Melbourne. Stunning at dusk.',
+        duration: '45 min',
+        cost: 'free',
+        kidsOk: true,
+        isHiddenGem: true,
+        mapsUrl: mapsUrl('Mount Macedon Memorial Cross', 'Mount Macedon'),
+        tags: ['Lookouts', 'Photography', 'History'],
+      },
+      {
+        id: 'bindi-bindi-organics',
+        name: 'Bindi Bindi Organics',
+        category: 'food',
+        emoji: '🥬',
+        description: 'Certified organic farm shop and café. Incredible produce platters and the best farm-fresh eggs you\'ll find.',
+        duration: '45 min',
+        cost: '$',
+        kidsOk: true,
+        isHiddenGem: true,
+        mapsUrl: mapsUrl('Bindi Bindi Organics', 'Woodend'),
+        tags: ['Food', 'Markets'],
+      },
+    ],
+  },
+  {
+    subDestId: 'kyneton',
+    activities: [
+      {
+        id: 'piper-st-kyneton',
+        name: 'Piper Street Food and Wine Strip',
+        category: 'food',
+        emoji: '🍽️',
+        description: 'One of regional Victoria\'s best dining streets. Boutique shops, artisan bakeries, and excellent wine bars.',
+        duration: '2 hrs',
+        cost: '$$',
+        kidsOk: true,
+        isHiddenGem: false,
+        mapsUrl: mapsUrl('Piper Street Kyneton', 'Kyneton'),
+        tags: ['Food', 'CraftBeer'],
+      },
+      {
+        id: 'kyneton-botanical-gardens',
+        name: 'Kyneton Botanical Gardens',
+        category: 'nature',
+        emoji: '🌺',
+        description: '1862 heritage-listed gardens with ancient trees and a duck pond. Free, peaceful, and wildly underrated.',
+        duration: '45 min',
+        cost: 'free',
+        kidsOk: true,
+        isHiddenGem: true,
+        mapsUrl: mapsUrl('Kyneton Botanical Gardens', 'Kyneton'),
+        tags: ['Nature', 'Chilling'],
+      },
+      {
+        id: 'passing-clouds',
+        name: 'Passing Clouds Winery',
+        category: 'drink',
+        emoji: '🍷',
+        description: 'Boutique Macedon Ranges winery with picnic grounds and sweeping vineyard views. Excellent Pinot and Shiraz.',
+        duration: '2 hrs',
+        cost: '$$',
+        kidsOk: false,
+        isHiddenGem: true,
+        mapsUrl: mapsUrl('Passing Clouds Winery', 'Musk'),
+        tags: ['Wineries'],
+      },
+    ],
+  },
+
+  // ── PHILLIP ISLAND ────────────────────────────────────────────────
+  {
+    subDestId: 'phillip-island',
+    activities: [
+      {
+        id: 'penguin-parade',
+        name: 'Penguin Parade',
+        category: 'wildlife',
+        emoji: '🐧',
+        description: 'Watch Little Penguins waddle up the beach at sunset. One of Australia\'s most iconic wildlife experiences.',
+        duration: '2 hrs',
+        cost: '$$',
+        kidsOk: true,
+        isHiddenGem: false,
+        mapsUrl: mapsUrl('Penguin Parade Phillip Island', 'Summerlands'),
+        tags: ['Wildlife', 'FamilyAttractions'],
+      },
+      {
+        id: 'koala-conservation',
+        name: 'Koala Conservation Reserve',
+        category: 'wildlife',
+        emoji: '🐨',
+        description: 'Elevated boardwalks through eucalyptus forest where koalas sleep in the treetops above you.',
+        duration: '1 hr',
+        cost: '$',
+        kidsOk: true,
+        isHiddenGem: false,
+        mapsUrl: mapsUrl('Koala Conservation Reserve Phillip Island', 'Cowes'),
+        tags: ['Wildlife', 'FamilyAttractions'],
+      },
+      {
+        id: 'nobbies-centre',
+        name: 'The Nobbies Boardwalk',
+        category: 'nature',
+        emoji: '🌊',
+        description: 'Boardwalk along dramatic volcanic cliffs above blowhole and fur seal colony. Free and spectacular.',
+        duration: '1 hr',
+        cost: 'free',
+        kidsOk: true,
+        isHiddenGem: false,
+        mapsUrl: mapsUrl('The Nobbies Phillip Island', 'Phillip Island'),
+        tags: ['Wildlife', 'Beach', 'Photography'],
+      },
+      {
+        id: 'phillip-island-chocolate-factory',
+        name: 'Phillip Island Chocolate Factory',
+        category: 'family',
+        emoji: '🍫',
+        description: 'Watch chocolatiers work and pick up handmade truffles. Kids go wild — it smells incredible inside.',
+        duration: '45 min',
+        cost: '$',
+        kidsOk: true,
+        isHiddenGem: true,
+        mapsUrl: mapsUrl('Phillip Island Chocolate Factory', 'Newhaven'),
+        tags: ['FamilyAttractions'],
+      },
+    ],
+  },
+
+  // ── GEELONG & SURF COAST ──────────────────────────────────────────
+  {
+    subDestId: 'geelong',
+    activities: [
+      {
+        id: 'geelong-waterfront',
+        name: 'Geelong Waterfront & Bollards',
+        category: 'art',
+        emoji: '🎨',
+        description: '104 hand-painted bollards along the bay, plus excellent restaurants and a carousel from 1892.',
+        duration: '1.5 hrs',
+        cost: 'free',
+        kidsOk: true,
+        isHiddenGem: false,
+        mapsUrl: mapsUrl('Geelong Waterfront Bollards', 'Geelong'),
+        tags: ['Art', 'FamilyAttractions', 'Photography'],
+      },
+      {
+        id: 'geelong-art-gallery',
+        name: 'Geelong Gallery',
+        category: 'art',
+        emoji: '🖼️',
+        description: 'Regional gallery with an outstanding permanent collection including Streeton and McCubbin. Free to enter.',
+        duration: '1.5 hrs',
+        cost: 'free',
+        kidsOk: true,
+        isHiddenGem: true,
+        mapsUrl: mapsUrl('Geelong Gallery', 'Geelong'),
+        tags: ['Art', 'History'],
+      },
+      {
+        id: 'little-creature-brewery',
+        name: 'Geelong Brewing Company',
+        category: 'drink',
+        emoji: '🍺',
+        description: 'Waterfront craft brewery with excellent seasonal taps and wood-fired pizza. Great outdoor tables.',
+        duration: '1.5 hrs',
+        cost: '$$',
+        kidsOk: true,
+        isHiddenGem: true,
+        mapsUrl: mapsUrl('Geelong Brewing Company', 'Geelong'),
+        tags: ['CraftBeer', 'Food'],
+      },
+    ],
+  },
+
+  // ── SPECIAL: HIDDEN GEMS NEAR MELBOURNE ──────────────────────────
+  {
+    subDestId: 'inner-north-hidden',
+    activities: [
+      {
+        id: 'altona-mini-railway',
+        name: 'Altona Miniature Railway',
+        category: 'family',
+        emoji: '🚂',
+        description: 'A hidden gem near the airport — a full miniature railway club running rides on Sunday mornings. Free to watch, tiny fare to ride. A total surprise for kids.',
+        duration: '1 hr',
+        cost: '$',
+        kidsOk: true,
+        isHiddenGem: true,
+        mapsUrl: mapsUrl('Altona Miniature Railway', 'Altona'),
+        tags: ['FamilyAttractions'],
+      },
+      {
+        id: 'williamstown-heritage',
+        name: 'Williamstown Heritage Walk',
+        category: 'history',
+        emoji: '⚓',
+        description: '1800s maritime heritage precinct 20 min from CBD. Ferries cross the bay, and the beach strip has excellent fish & chips.',
+        duration: '2 hrs',
+        cost: 'free',
+        kidsOk: true,
+        isHiddenGem: true,
+        mapsUrl: mapsUrl('Williamstown Heritage Walk', 'Williamstown'),
+        tags: ['History', 'Beach', 'Photography'],
+      },
+      {
+        id: 'scienceworks-spotswood',
+        name: 'Scienceworks Museum',
+        category: 'family',
+        emoji: '🔬',
+        description: 'World-class interactive science museum at Spotswood. Planetarium, hands-on exhibits, and a pumping station from 1897.',
+        duration: '3 hrs',
+        cost: '$$',
+        kidsOk: true,
+        isHiddenGem: false,
+        mapsUrl: mapsUrl('Scienceworks Museum', 'Spotswood'),
+        tags: ['FamilyAttractions', 'History'],
+      },
+    ],
+  },
+
+  // ── BALLARAT & GOLDFIELDS ─────────────────────────────────────────
+  {
+    subDestId: 'ballarat',
+    activities: [
+      {
+        id: 'sovereign-hill',
+        name: 'Sovereign Hill',
+        category: 'history',
+        emoji: '⛏️',
+        description: 'World-class recreation of an 1850s gold mining township. Pan for gold, watch blacksmiths, and ride the stagecoach.',
+        duration: '3–4 hrs',
+        cost: '$$$',
+        kidsOk: true,
+        isHiddenGem: false,
+        mapsUrl: mapsUrl('Sovereign Hill', 'Ballarat'),
+        tags: ['History', 'FamilyAttractions'],
+      },
+      {
+        id: 'ballarat-botanical',
+        name: 'Ballarat Botanical Gardens',
+        category: 'nature',
+        emoji: '🌺',
+        description: 'Gorgeous 1858 gardens with the Robert Clark Conservatory and statues of Australian prime ministers.',
+        duration: '1 hr',
+        cost: 'free',
+        kidsOk: true,
+        isHiddenGem: true,
+        mapsUrl: mapsUrl('Ballarat Botanical Gardens', 'Ballarat'),
+        tags: ['Nature', 'History'],
+      },
+      {
+        id: 'bridge-road-brewery',
+        name: 'Bridge Road Brewers',
+        category: 'drink',
+        emoji: '🍺',
+        description: 'One of regional Victoria\'s best craft breweries, in a heritage carriage works building. Exceptional food and beer.',
+        duration: '1.5 hrs',
+        cost: '$$',
+        kidsOk: true,
+        isHiddenGem: true,
+        mapsUrl: mapsUrl('Bridge Road Brewers', 'Beechworth'),
+        tags: ['CraftBeer', 'Food'],
+      },
+    ],
+  },
+
+  // ── HIGH COUNTRY ──────────────────────────────────────────────────
+  {
+    subDestId: 'beechworth',
+    activities: [
+      {
+        id: 'beechworth-historic-precinct',
+        name: 'Beechworth Historic Precinct',
+        category: 'history',
+        emoji: '🏛️',
+        description: 'Victoria\'s most intact gold rush town. Ned Kelly was tried here. The honey from this town is world-famous.',
+        duration: '2–3 hrs',
+        cost: 'free',
+        kidsOk: true,
+        isHiddenGem: false,
+        mapsUrl: mapsUrl('Beechworth Historic Precinct', 'Beechworth'),
+        tags: ['History', 'Photography'],
+      },
+      {
+        id: 'beechworth-honey',
+        name: 'Beechworth Honey Store',
+        category: 'food',
+        emoji: '🍯',
+        description: 'Sample 30+ varieties of raw honey and meet the bees (yes, really). Their honey cake is extraordinary.',
+        duration: '30 min',
+        cost: '$',
+        kidsOk: true,
+        isHiddenGem: true,
+        mapsUrl: mapsUrl('Beechworth Honey', 'Beechworth'),
+        tags: ['Food', 'Markets'],
+      },
+      {
+        id: 'lake-sambell',
+        name: 'Lake Sambell',
+        category: 'relaxation',
+        emoji: '🏊',
+        description: 'Pristine freshwater lake right in town with a swimming beach, canoes, and a BBQ area. Perfect after exploring.',
+        duration: '1.5 hrs',
+        cost: 'free',
+        kidsOk: true,
+        isHiddenGem: true,
+        mapsUrl: mapsUrl('Lake Sambell', 'Beechworth'),
+        tags: ['Beach', 'Chilling', 'FamilyAttractions'],
+      },
+    ],
+  },
+]
+
+// ── Lookup helpers ────────────────────────────────────────────────────
+
+export function getActivitiesForSubDest(subDestId: string): Activity[] {
+  return ACTIVITIES.find((a) => a.subDestId === subDestId)?.activities ?? []
+}
+
+export function getHiddenGems(subDestId: string): Activity[] {
+  return getActivitiesForSubDest(subDestId).filter((a) => a.isHiddenGem)
+}
+
+export function getActivitiesForKids(subDestId: string): Activity[] {
+  return getActivitiesForSubDest(subDestId).filter((a) => a.kidsOk)
+}
+
+export function filterActivitiesByTags(subDestId: string, tags: string[]): Activity[] {
+  if (tags.length === 0) return getActivitiesForSubDest(subDestId)
+  return getActivitiesForSubDest(subDestId).filter((a) =>
+    a.tags.some((t) => tags.includes(t))
+  )
+}
+
+export { ACTIVITIES }

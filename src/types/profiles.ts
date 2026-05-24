@@ -7,6 +7,14 @@ export type VibeTag =
   | 'Stargazing'
   | 'Photography'
   | 'Beach'
+  | 'HotSprings'
+  | 'FamilyAttractions'
+  | 'Markets'
+  | 'Cycling'
+  | 'Wineries'
+  | 'CraftBeer'
+
+export type KidsAge = 'toddler' | 'school' | 'teen' | 'mixed'
 
 export type HikingIntensity = 'Easy' | 'Moderate' | 'Hard' | 'Extreme'
 
@@ -44,6 +52,8 @@ export type DiningPref =
   | 'FineDining'
   | 'Roadhouses'
   | 'SelfCatering'
+  | 'CasualDining'
+  | 'Bakeries'
 
 export interface UserProfile {
   id: string
@@ -60,6 +70,7 @@ export interface UserProfile {
   trip_type: TripType
   crew_type: CrewType
   has_kids: boolean
+  kids_age?: KidsAge
   dining_prefs: DiningPref[]
 }
 

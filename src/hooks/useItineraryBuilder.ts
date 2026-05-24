@@ -1,12 +1,11 @@
 import { useCallback } from 'react'
 import { useAppStore } from '@/store/useAppStore'
-import { buildRouteFromCorridorId } from '@/modules/routing'
+import { buildRoute } from '@/modules/routing'
 import { detectNearbyPOIs } from '@/modules/poi'
 import { runGuardrailPipeline } from '@/modules/guardrails'
 import { validateRouteConstraints } from '@/modules/routing'
 import { saveItinerary, savePOIsCache } from '@/store/db'
 import type { Itinerary, ItineraryDay, DiningPref } from '@/types'
-import { CORRIDORS } from '@/data/corridors'
 import { buildDaySchedule } from '@/utils/scheduleBuilder'
 
 export function useItineraryBuilder() {
@@ -18,7 +17,9 @@ export function useItineraryBuilder() {
     (startDate: string, endDate?: string, tripName?: string, diningPrefs?: DiningPref[]) => {
       // Always read fresh state — avoids stale closure when called right after setUserProfile
       const {
-        userProfile, vehicleProfile, selectedCorridorId,
+        userProfile, vehicleProfile,
+        originCoord, destCoord,
+        tripType,
         originName: storeOriginName, diningPrefs: storeDiningPrefs,
       } = useAppStore.getState()
 
@@ -28,11 +29,10 @@ export function useItineraryBuilder() {
       }
 
       const prefs = diningPrefs ?? storeDiningPrefs
-      const route = buildRouteFromCorridorId(selectedCorridorId, vehicleProfile)
+      const route = buildRoute(originCoord, destCoord, true, vehicleProfile)
       const violations = validateRouteConstraints(route, vehicleProfile)
       setConstraintViolations(violations)
 
-      const corridor = CORRIDORS.find((c) => c.id === selectedCorridorId)
       const maxHoursPerDay = userProfile.max_daily_drive_time / 60
 
       let daysCount: number
@@ -75,12 +75,14 @@ export function useItineraryBuilder() {
 
         const schedule = buildDaySchedule(
           partialDay,
-          selectedCorridorId,
+          route.corridor_ids[0] ?? '',
           dayOriginLabel,
           dayPOIs,
           prefs,
-          7,
+          userProfile.has_kids ? 8 : 7,
           i === daysCount - 1,
+          userProfile.has_kids,
+          tripType === 'day',
         )
 
         return { ...partialDay, schedule }
@@ -88,7 +90,7 @@ export function useItineraryBuilder() {
 
       const baseItinerary: Itinerary = {
         id: `itin-${Date.now()}`,
-        name: tripName ?? corridor?.name ?? 'Road Trip',
+        name: tripName ?? 'Weekend Escape',
         start_date: startDate,
         end_date: endDate ?? undefined,
         total_km: route.total_distance_km,

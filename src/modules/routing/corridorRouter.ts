@@ -14,18 +14,32 @@ export function buildRoute(
     ? [...CORRIDORS].sort((a, b) => b.scenic_rating - a.scenic_rating)
     : CORRIDORS
 
-  // Find corridors whose bounding polygon covers origin or destination
+  // Both origin AND destination must be within 150km of the corridor path
   const relevantCorridors = sorted.filter((c) => {
-    const allCoords = c.path_coordinates
-    if (allCoords.length === 0) return false
-
-    // Check if origin or destination is within 200km of any path point
-    return allCoords.some(
-      (p) => distanceBetween(origin, p) < 200 || distanceBetween(destination, p) < 200
-    )
+    const coords = c.path_coordinates
+    if (coords.length === 0) return false
+    const originClose = coords.some((p) => distanceBetween(origin, p) < 150)
+    const destClose   = coords.some((p) => distanceBetween(destination, p) < 150)
+    return originClose && destClose
   })
 
-  const selected = relevantCorridors.length > 0 ? relevantCorridors.slice(0, 2) : sorted.slice(0, 1)
+  // No corridor matches → build a direct point-to-point route
+  if (relevantCorridors.length === 0) {
+    const directKm = distanceBetween(origin, destination) * 1.3
+    const directRoute: Route = {
+      id: `route-direct-${Date.now()}`,
+      corridor_ids: [],
+      waypoints: [
+        { id: 'start', label: 'Start', coord: origin,      is_fuel_stop: false, is_mandatory: true },
+        { id: 'end',   label: 'End',   coord: destination, is_fuel_stop: false, is_mandatory: true },
+      ],
+      total_distance_km: directKm,
+      estimated_drive_hours: directKm / 80,
+    }
+    return directRoute
+  }
+
+  const selected = relevantCorridors.slice(0, 2)
 
   const corridorIds = selected.map((c) => c.id)
 
