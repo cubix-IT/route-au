@@ -18,6 +18,11 @@ export interface PreselectedDest {
   destCoord: Coordinate
 }
 
+export interface AddedDiningStop {
+  foodId: string
+  dayNumber: number
+}
+
 interface AppState {
   // Profiles
   userProfile: UserProfile | null
@@ -29,8 +34,10 @@ interface AppState {
   tripType: TripType
   originId: string
   originName: string
+  originCoord: Coordinate
   destId: string
   destName: string
+  destCoord: Coordinate
   startDate: string
   endDate: string
   dailyDriveHours: number
@@ -39,7 +46,8 @@ interface AppState {
   diningPrefs: DiningPref[]
   selectedCorridorId: string
   setTripPlanState: (updates: Partial<Pick<AppState,
-    'tripType' | 'originId' | 'originName' | 'destId' | 'destName' |
+    'tripType' | 'originId' | 'originName' | 'originCoord' |
+    'destId' | 'destName' | 'destCoord' |
     'startDate' | 'endDate' | 'dailyDriveHours' | 'crewType' | 'hasKids' |
     'diningPrefs' | 'selectedCorridorId'
   >>) => void
@@ -63,6 +71,11 @@ interface AppState {
   setActiveItinerary: (i: Itinerary) => void
   clearItinerary: () => void
 
+  // User-chosen dining stops (interactive explorer)
+  addedDiningStops: AddedDiningStop[]
+  addDiningStop: (foodId: string, dayNumber: number) => void
+  removeDiningStop: (foodId: string) => void
+
   // UI state
   isWizardOpen: boolean
   setWizardOpen: (open: boolean) => void
@@ -72,7 +85,7 @@ interface AppState {
   isOffline: boolean
   setOffline: (offline: boolean) => void
 
-  activeTab: 'itinerary' | 'pois' | 'checklist'
+  activeTab: 'itinerary' | 'dining' | 'pois' | 'checklist'
   setActiveTab: (tab: AppState['activeTab']) => void
 }
 
@@ -87,15 +100,17 @@ export const useAppStore = create<AppState>()(
       tripType: 'day',
       originId: 'melbourne',
       originName: 'Melbourne',
+      originCoord: { lng: 144.9631, lat: -37.8136 },
       destId: 'twelve-apostles',
       destName: '12 Apostles',
+      destCoord: { lng: 142.996, lat: -38.663 },
       startDate: new Date().toISOString().split('T')[0],
       endDate: '',
       dailyDriveHours: 5,
       crewType: 'couple',
       hasKids: false,
       diningPrefs: ['Cafes', 'LocalPubs'],
-      selectedCorridorId: 'great-ocean-road',
+      selectedCorridorId: '',
       setTripPlanState: (updates) => set(updates),
 
       preselectedDest: null,
@@ -110,8 +125,21 @@ export const useAppStore = create<AppState>()(
       setSelectedPOI: (poi) => set({ selectedPOI: poi }),
 
       activeItinerary: null,
-      setActiveItinerary: (i) => set({ activeItinerary: i }),
-      clearItinerary: () => set({ activeItinerary: null }),
+      setActiveItinerary: (i) => set({ activeItinerary: i, addedDiningStops: [] }),
+      clearItinerary: () => set({ activeItinerary: null, addedDiningStops: [] }),
+
+      addedDiningStops: [],
+      addDiningStop: (foodId, dayNumber) =>
+        set((s) => ({
+          addedDiningStops: [
+            ...s.addedDiningStops.filter((x) => x.foodId !== foodId),
+            { foodId, dayNumber },
+          ],
+        })),
+      removeDiningStop: (foodId) =>
+        set((s) => ({
+          addedDiningStops: s.addedDiningStops.filter((x) => x.foodId !== foodId),
+        })),
 
       isWizardOpen: false,
       setWizardOpen: (open) => set({ isWizardOpen: open }),
@@ -136,11 +164,14 @@ export const useAppStore = create<AppState>()(
         mapZoom: state.mapZoom,
         originId: state.originId,
         originName: state.originName,
+        originCoord: state.originCoord,
         destId: state.destId,
         destName: state.destName,
+        destCoord: state.destCoord,
         selectedCorridorId: state.selectedCorridorId,
         diningPrefs: state.diningPrefs,
         activeItinerary: state.activeItinerary,
+        addedDiningStops: state.addedDiningStops,
       }),
     }
   )

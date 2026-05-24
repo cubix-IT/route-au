@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useAppStore } from '@/store/useAppStore'
 import { DayCard } from './DayCard'
 import { GuardrailBanner } from './GuardrailBanner'
+import { DiningExplorer } from './DiningExplorer'
 import { exportGPX } from '@/utils/gpxExport'
 import type { Itinerary, RouteConstraintViolation, ScoredPOI } from '@/types'
 
@@ -26,6 +27,7 @@ export function ItineraryPanel() {
       }}>
         {([
           ['itinerary', '📅', 'Itinerary'],
+          ['dining', '🍽️', 'Dining'],
           ['pois', '📍', 'Nearby'],
           ['checklist', '✓', 'Checklist'],
         ] as const).map(([tab, icon, label]) => (
@@ -65,6 +67,7 @@ export function ItineraryPanel() {
             onNewTrip={() => setWizardOpen(true)}
           />
         )}
+        {activeTab === 'dining' && <DiningExplorer />}
         {activeTab === 'pois' && <NearbyTab pois={nearbyPOIs} />}
         {activeTab === 'checklist' && <ChecklistTab />}
       </div>
