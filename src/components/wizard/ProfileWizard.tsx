@@ -1,11 +1,48 @@
 import { useState, useRef, useEffect } from 'react'
 import { useAppStore } from '@/store/useAppStore'
 import { useItineraryBuilder } from '@/hooks/useItineraryBuilder'
-import { searchDestinations, POPULAR_ROUTES } from '@/data/destinations'
+import { POPULAR_ROUTES } from '@/data/destinations'
 import type {
   TripType, CrewType, VehicleType, FuelType,
-  AccommodationPreference, VibeTag, DiningPref,
+  AccommodationPreference, VibeTag, DiningPref, Coordinate,
 } from '@/types'
+
+// ── Photon geocoder types ────────────────────────────────────────
+interface PhotonFeature {
+  type: 'Feature'
+  geometry: { type: 'Point'; coordinates: [number, number] }
+  properties: {
+    name?: string
+    city?: string
+    county?: string
+    state?: string
+    country?: string
+    countrycode?: string
+    osm_id: number
+    osm_type: string
+    postcode?: string
+  }
+}
+
+interface GeoResult {
+  id: string
+  name: string
+  detail: string
+  coord: Coordinate
+}
+
+const DEFAULT_PLACES: GeoResult[] = [
+  { id: 'melbourne',  name: 'Melbourne',  detail: 'Victoria',              coord: { lng: 144.9631, lat: -37.8136 } },
+  { id: 'sydney',     name: 'Sydney',     detail: 'New South Wales',       coord: { lng: 151.2093, lat: -33.8688 } },
+  { id: 'brisbane',   name: 'Brisbane',   detail: 'Queensland',            coord: { lng: 153.0260, lat: -27.4698 } },
+  { id: 'adelaide',   name: 'Adelaide',   detail: 'South Australia',       coord: { lng: 138.6007, lat: -34.9285 } },
+  { id: 'perth',      name: 'Perth',      detail: 'Western Australia',     coord: { lng: 115.8605, lat: -31.9505 } },
+  { id: 'darwin',     name: 'Darwin',     detail: 'Northern Territory',    coord: { lng: 130.8456, lat: -12.4634 } },
+  { id: 'uluru',      name: 'Uluru',      detail: 'Northern Territory',    coord: { lng: 131.0369, lat: -25.3444 } },
+  { id: 'cairns',     name: 'Cairns',     detail: 'Queensland',            coord: { lng: 145.7753, lat: -16.9186 } },
+  { id: 'gold-coast', name: 'Gold Coast', detail: 'Queensland',            coord: { lng: 153.4000, lat: -28.0167 } },
+  { id: 'hobart',     name: 'Hobart',     detail: 'Tasmania',              coord: { lng: 147.3272, lat: -42.8821 } },
+]
 
 // ── Logo ────────────────────────────────────────────────────────
 function RouteAULogo({ size = 36 }: { size?: number }) {
@@ -21,49 +58,122 @@ function RouteAULogo({ size = 36 }: { size?: number }) {
   )
 }
 
-// ── Destination search input ────────────────────────────────────
+// ── Live Photon geocoder input ───────────────────────────────────
 function DestinationInput({
-  label, value, onChange, placeholder
-}: { label: string; value: string; onChange: (id: string, name: string) => void; placeholder: string }) {
+  label, value, onChange, placeholder,
+}: {
+  label: string
+  value: string
+  onChange: (id: string, name: string, coord: Coordinate) => void
+  placeholder: string
+}) {
   const [query, setQuery] = useState(value)
   const [open, setOpen] = useState(false)
-  const [results, setResults] = useState(() => searchDestinations(''))
-  const ref = useRef<HTMLDivElement>(null)
+  const [results, setResults] = useState<GeoResult[]>(DEFAULT_PLACES)
+  const [loading, setLoading] = useState(false)
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const containerRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    setResults(searchDestinations(query))
+    if (debounceRef.current) clearTimeout(debounceRef.current)
+
+    if (!query.trim() || query.length < 2) {
+      setResults(DEFAULT_PLACES)
+      setLoading(false)
+      return
+    }
+
+    setLoading(true)
+    debounceRef.current = setTimeout(async () => {
+      try {
+        const url = `https://photon.komoot.io/api/?q=${encodeURIComponent(query)}&lang=en&limit=10&bbox=112,-44,154,-10`
+        const res = await fetch(url)
+        const data = await res.json() as { features: PhotonFeature[] }
+        const mapped: GeoResult[] = (data.features ?? [])
+          .filter((f) => {
+            const cc = f.properties.countrycode?.toUpperCase()
+            const country = f.properties.country
+            return cc === 'AU' || country === 'Australia'
+          })
+          .map((f) => {
+            const p = f.properties
+            const [lng, lat] = f.geometry.coordinates
+            const parts = [p.city ?? p.county, p.state].filter(Boolean)
+            const detail = parts.join(', ') || 'Australia'
+            return {
+              id: `osm-${p.osm_id}`,
+              name: p.name || p.city || p.county || 'Place',
+              detail,
+              coord: { lng, lat },
+            }
+          })
+        setResults(mapped.length > 0 ? mapped : DEFAULT_PLACES)
+      } catch {
+        setResults(DEFAULT_PLACES)
+      } finally {
+        setLoading(false)
+      }
+    }, 350)
+
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current)
+    }
   }, [query])
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setOpen(false)
+      }
     }
     document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
   }, [])
 
   return (
-    <div ref={ref} style={{ position: 'relative' }}>
-      <div style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 6, fontWeight: 600 }}>{label}</div>
-      <input
-        className="input-field"
-        value={query}
-        placeholder={placeholder}
-        onChange={(e) => { setQuery(e.target.value); setOpen(true) }}
-        onFocus={() => setOpen(true)}
-      />
+    <div ref={containerRef} style={{ position: 'relative' }}>
+      <div style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 6, fontWeight: 600 }}>
+        {label}
+      </div>
+      <div style={{ position: 'relative' }}>
+        <input
+          className="input-field"
+          value={query}
+          placeholder={placeholder}
+          onChange={(e) => { setQuery(e.target.value); setOpen(true) }}
+          onFocus={() => setOpen(true)}
+          style={{ paddingRight: loading ? 40 : undefined }}
+        />
+        {loading && (
+          <div style={{
+            position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)',
+            width: 16, height: 16,
+            border: '2px solid var(--amber)', borderTopColor: 'transparent',
+            borderRadius: '50%', animation: 'spin-slow 0.7s linear infinite',
+          }} />
+        )}
+      </div>
       {open && results.length > 0 && (
         <div className="dest-dropdown">
-          {results.map((d) => (
-            <div key={d.id} className="dest-item" onMouseDown={() => {
-              onChange(d.id, d.name)
-              setQuery(d.name)
-              setOpen(false)
-            }}>
-              <span style={{ fontSize: 18 }}>{destEmoji(d.type)}</span>
+          {!query.trim() && (
+            <div style={{ padding: '6px 14px 4px', fontSize: 10, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 700 }}>
+              Popular cities
+            </div>
+          )}
+          {results.map((r) => (
+            <div
+              key={r.id}
+              className="dest-item"
+              onMouseDown={() => {
+                onChange(r.id, r.name, r.coord)
+                setQuery(r.name)
+                setOpen(false)
+              }}
+            >
+              <span style={{ fontSize: 16 }}>📍</span>
               <div>
-                <div style={{ fontSize: 14, color: 'var(--text-primary)', fontWeight: 500 }}>{d.name}</div>
-                <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{d.state}</div>
+                <div style={{ fontSize: 14, color: 'var(--text-primary)', fontWeight: 500 }}>{r.name}</div>
+                <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{r.detail}</div>
               </div>
             </div>
           ))}
@@ -71,11 +181,6 @@ function DestinationInput({
       )}
     </div>
   )
-}
-
-function destEmoji(type: string) {
-  const m: Record<string, string> = { city: '🏙', town: '🏘', landmark: '📍', national_park: '🌿', beach: '🏖', region: '🗺' }
-  return m[type] ?? '📍'
 }
 
 // ── Step progress bar ───────────────────────────────────────────
@@ -97,7 +202,7 @@ function ProgressDots({ total, current }: { total: number; current: number }) {
 
 // ── Main wizard ─────────────────────────────────────────────────
 export function ProfileWizard() {
-  const { isWizardOpen, setWizardOpen, setUserProfile, setVehicleProfile, setTripPlanState } = useAppStore()
+  const { isWizardOpen, setWizardOpen, setUserProfile, setVehicleProfile, setTripPlanState, setMapView } = useAppStore()
   const { buildItinerary } = useItineraryBuilder()
   const [step, setStep] = useState(0)
   const [generating, setGenerating] = useState(false)
@@ -109,8 +214,10 @@ export function ProfileWizard() {
   // Step 1
   const [originId, setOriginId] = useState('melbourne')
   const [originName, setOriginName] = useState('Melbourne')
+  const [_originCoord, setOriginCoord] = useState<Coordinate>({ lng: 144.9631, lat: -37.8136 })
   const [destId, setDestId] = useState('twelve-apostles')
   const [destName, setDestName] = useState('12 Apostles')
+  const [destCoord, setDestCoord] = useState<Coordinate>({ lng: 142.9960, lat: -38.6631 })
   const [startDate, setStartDate] = useState(new Date().toISOString().split('T')[0])
   const [endDate, setEndDate] = useState('')
   const [dailyDriveHours, setDailyDriveHours] = useState(5)
@@ -179,8 +286,8 @@ export function ProfileWizard() {
     setUserProfile(user)
     setVehicleProfile(vehicle)
     setTripPlanState({
-      tripType, originId, destId, startDate, endDate,
-      dailyDriveHours, crewType, hasKids, diningPrefs,
+      tripType, originId, destId, originName, destName,
+      startDate, endDate, dailyDriveHours, crewType, hasKids, diningPrefs,
     })
 
     buildItinerary(startDate, endDate, `${originName} → ${destName}`, diningPrefs)
@@ -188,6 +295,8 @@ export function ProfileWizard() {
     await new Promise((r) => setTimeout(r, 300))
     setGenerating(false)
     setWizardOpen(false)
+    // Fly map to destination
+    setMapView(destCoord, 8)
   }
 
   const canContinue = [
@@ -226,9 +335,9 @@ export function ProfileWizard() {
                 <StepRoute
                   tripType={tripType}
                   originId={originId} originName={originName}
-                  setOrigin={(id, name) => { setOriginId(id); setOriginName(name) }}
+                  setOrigin={(id, name, coord) => { setOriginId(id); setOriginName(name); setOriginCoord(coord) }}
                   destId={destId} destName={destName}
-                  setDest={(id, name) => { setDestId(id); setDestName(name) }}
+                  setDest={(id, name, coord) => { setDestId(id); setDestName(name); setDestCoord(coord) }}
                   startDate={startDate} setStartDate={setStartDate}
                   endDate={endDate} setEndDate={setEndDate}
                   dailyDriveHours={dailyDriveHours} setDailyDriveHours={setDailyDriveHours}
@@ -342,8 +451,8 @@ function StepTripType({ tripType, setTripType }: { tripType: TripType; setTripTy
 // ── Step 1: Route ───────────────────────────────────────────────
 function StepRoute({ tripType, originId: _originId, originName, setOrigin, destId: _destId, destName, setDest, startDate, setStartDate, endDate, setEndDate, dailyDriveHours, setDailyDriveHours }: {
   tripType: TripType
-  originId: string; originName: string; setOrigin: (id: string, name: string) => void
-  destId: string; destName: string; setDest: (id: string, name: string) => void
+  originId: string; originName: string; setOrigin: (id: string, name: string, coord: Coordinate) => void
+  destId: string; destName: string; setDest: (id: string, name: string, coord: Coordinate) => void
   startDate: string; setStartDate: (d: string) => void
   endDate: string; setEndDate: (d: string) => void
   dailyDriveHours: number; setDailyDriveHours: (h: number) => void

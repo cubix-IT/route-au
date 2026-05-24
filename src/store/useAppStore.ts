@@ -22,7 +22,9 @@ interface AppState {
   // Trip planning state (collected by wizard)
   tripType: TripType
   originId: string
+  originName: string
   destId: string
+  destName: string
   startDate: string
   endDate: string
   dailyDriveHours: number
@@ -31,8 +33,9 @@ interface AppState {
   diningPrefs: DiningPref[]
   selectedCorridorId: string
   setTripPlanState: (updates: Partial<Pick<AppState,
-    'tripType' | 'originId' | 'destId' | 'startDate' | 'endDate' |
-    'dailyDriveHours' | 'crewType' | 'hasKids' | 'diningPrefs' | 'selectedCorridorId'
+    'tripType' | 'originId' | 'originName' | 'destId' | 'destName' |
+    'startDate' | 'endDate' | 'dailyDriveHours' | 'crewType' | 'hasKids' |
+    'diningPrefs' | 'selectedCorridorId'
   >>) => void
 
   // Routing
@@ -73,7 +76,9 @@ export const useAppStore = create<AppState>()(
 
       tripType: 'day',
       originId: 'melbourne',
+      originName: 'Melbourne',
       destId: 'twelve-apostles',
+      destName: '12 Apostles',
       startDate: new Date().toISOString().split('T')[0],
       endDate: '',
       dailyDriveHours: 5,
@@ -117,7 +122,9 @@ export const useAppStore = create<AppState>()(
         mapCenter: state.mapCenter,
         mapZoom: state.mapZoom,
         originId: state.originId,
+        originName: state.originName,
         destId: state.destId,
+        destName: state.destName,
         selectedCorridorId: state.selectedCorridorId,
         diningPrefs: state.diningPrefs,
       }),

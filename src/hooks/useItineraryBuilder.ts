@@ -7,11 +7,10 @@ import { validateRouteConstraints } from '@/modules/routing'
 import { saveItinerary, savePOIsCache } from '@/store/db'
 import type { Itinerary, ItineraryDay, DiningPref } from '@/types'
 import { CORRIDORS } from '@/data/corridors'
-import { DESTINATIONS } from '@/data/destinations'
 import { buildDaySchedule } from '@/utils/scheduleBuilder'
 
 export function useItineraryBuilder() {
-  const { userProfile, vehicleProfile, selectedCorridorId, originId } = useAppStore()
+  const { userProfile, vehicleProfile, selectedCorridorId, originName: storeOriginName } = useAppStore()
   const storeDiningPrefs = useAppStore((s) => s.diningPrefs)
   const setActiveItinerary = useAppStore((s) => s.setActiveItinerary)
   const setNearbyPOIs = useAppStore((s) => s.setNearbyPOIs)
@@ -37,8 +36,7 @@ export function useItineraryBuilder() {
         daysCount = Math.max(1, Math.ceil(route.estimated_drive_hours / maxHoursPerDay))
       }
 
-      const originDest = DESTINATIONS.find((d) => d.id === originId)
-      const originLabel = originDest?.name ?? 'Origin'
+      const originLabel = storeOriginName || 'Origin'
 
       const allPOIs = detectNearbyPOIs(route, userProfile)
       setNearbyPOIs(allPOIs)
@@ -102,7 +100,7 @@ export function useItineraryBuilder() {
 
       return itinerary
     },
-    [userProfile, vehicleProfile, selectedCorridorId, originId, storeDiningPrefs,
+    [userProfile, vehicleProfile, selectedCorridorId, storeOriginName, storeDiningPrefs,
      setActiveItinerary, setNearbyPOIs, setConstraintViolations]
   )
 
