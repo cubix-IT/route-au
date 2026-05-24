@@ -108,12 +108,14 @@ export function ProfileWizard() {
 
     // Step 1 in discovery mode → compute suggestions, advance
     if (!isPreselected && step === 1) {
+      const { originCoord: currentOriginCoord } = useAppStore.getState()
       const matches = matchDestinations({
         maxDriveHours,
         interests,
         hasKids,
         isOvernight: tripType === 'multiday',
         season,
+        originCoord: currentOriginCoord,
       })
       setSuggestions(matches)
       setStep(2)

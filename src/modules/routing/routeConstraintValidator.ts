@@ -37,9 +37,7 @@ export function validateRouteConstraints(
       }
     }
 
-    if (vehicleProfile.clearance_height_meters > 0 && vehicleProfile.clearance_height_meters < segment.max_vehicle_height_meters) {
-      // Only flag if vehicle height exceeds clearance restrictions on this route
-      // (segment max_vehicle_height_meters here means the vehicle must NOT exceed it)
+    if (vehicleProfile.clearance_height_meters > 0 && vehicleProfile.clearance_height_meters > segment.max_vehicle_height_meters) {
       violations.push({
         segment_id: segment.id,
         segment_name: segment.name,

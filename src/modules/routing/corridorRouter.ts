@@ -10,16 +10,32 @@ export function buildRoute(
   preferScenic: boolean,
   vehicleProfile: VehicleProfile
 ): Route {
+  // Short trips (< 150km as-the-crow-flies) never need scenic corridor routing
+  const directDistKm = distanceBetween(origin, destination)
+  if (directDistKm < 150) {
+    const roadKm = directDistKm * 1.3
+    return {
+      id: `route-direct-${Date.now()}`,
+      corridor_ids: [],
+      waypoints: [
+        { id: 'start', label: 'Start', coord: origin,      is_fuel_stop: false, is_mandatory: true },
+        { id: 'end',   label: 'End',   coord: destination, is_fuel_stop: false, is_mandatory: true },
+      ],
+      total_distance_km: roadKm,
+      estimated_drive_hours: roadKm / 80,
+    }
+  }
+
   const sorted = preferScenic
     ? [...CORRIDORS].sort((a, b) => b.scenic_rating - a.scenic_rating)
     : CORRIDORS
 
-  // Both origin AND destination must be within 150km of the corridor path
+  // Both origin AND destination must be within 120km of the corridor path
   const relevantCorridors = sorted.filter((c) => {
     const coords = c.path_coordinates
     if (coords.length === 0) return false
-    const originClose = coords.some((p) => distanceBetween(origin, p) < 150)
-    const destClose   = coords.some((p) => distanceBetween(destination, p) < 150)
+    const originClose = coords.some((p) => distanceBetween(origin, p) < 120)
+    const destClose   = coords.some((p) => distanceBetween(destination, p) < 120)
     return originClose && destClose
   })
 

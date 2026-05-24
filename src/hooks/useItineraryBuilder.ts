@@ -20,7 +20,7 @@ export function useItineraryBuilder() {
         userProfile, vehicleProfile,
         originCoord, destCoord,
         tripType,
-        originName: storeOriginName, diningPrefs: storeDiningPrefs,
+        originName: storeOriginName, destName: storeDestName, diningPrefs: storeDiningPrefs,
       } = useAppStore.getState()
 
       if (!userProfile || !vehicleProfile) {
@@ -30,20 +30,27 @@ export function useItineraryBuilder() {
 
       const prefs = diningPrefs ?? storeDiningPrefs
       const route = buildRoute(originCoord, destCoord, true, vehicleProfile)
+
+      // Fix waypoint labels to use real place names instead of generic Start/End
+      const destLabel = storeDestName || 'Destination'
+      const originLabel = storeOriginName || 'Origin'
+      if (route.waypoints.length >= 1) route.waypoints[0].label = originLabel
+      if (route.waypoints.length >= 2) route.waypoints[route.waypoints.length - 1].label = destLabel
+
       const violations = validateRouteConstraints(route, vehicleProfile)
       setConstraintViolations(violations)
 
       const maxHoursPerDay = userProfile.max_daily_drive_time / 60
 
       let daysCount: number
-      if (endDate && endDate > startDate) {
+      if (tripType === 'day') {
+        daysCount = 1
+      } else if (endDate && endDate > startDate) {
         const diffMs = new Date(endDate).getTime() - new Date(startDate).getTime()
         daysCount = Math.max(1, Math.round(diffMs / 86400000) + 1)
       } else {
         daysCount = Math.max(1, Math.ceil(route.estimated_drive_hours / maxHoursPerDay))
       }
-
-      const originLabel = storeOriginName || 'Origin'
       const allPOIs = detectNearbyPOIs(route, userProfile)
       setNearbyPOIs(allPOIs)
 

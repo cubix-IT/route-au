@@ -582,24 +582,40 @@ export interface MatchedDest {
   matchReasons: string[]  // why we picked it (shown to user)
 }
 
+// Inline haversine so this data file doesn't import from modules
+function haversineKm(a: Coordinate, b: Coordinate): number {
+  const R = 6371
+  const dLat = ((b.lat - a.lat) * Math.PI) / 180
+  const dLng = ((b.lng - a.lng) * Math.PI) / 180
+  const s = Math.sin(dLat / 2) ** 2 +
+    Math.cos((a.lat * Math.PI) / 180) * Math.cos((b.lat * Math.PI) / 180) * Math.sin(dLng / 2) ** 2
+  return R * 2 * Math.atan2(Math.sqrt(s), Math.sqrt(1 - s))
+}
+
 export function matchDestinations(opts: {
   maxDriveHours: number
   interests: TripInterest[]
   hasKids: boolean
   isOvernight: boolean
   season: Season
+  originCoord?: Coordinate   // if provided, drive times are calculated from this point
 }): MatchedDest[] {
-  const { maxDriveHours, interests, hasKids, isOvernight, season } = opts
+  const { maxDriveHours, interests, hasKids, isOvernight, season, originCoord } = opts
   const results: MatchedDest[] = []
 
   for (const cluster of VICTORIAN_CLUSTERS) {
     const seasonScore = cluster.seasonalScores[season]
 
     for (const sub of cluster.subDests) {
+      // Compute actual drive time from origin if provided, else fall back to Melbourne-relative
+      const actualDriveHours = originCoord
+        ? (haversineKm(originCoord, sub.coord) * 1.3) / 80
+        : sub.driveTimeHours
+
       // Hard filter: must be within drive time limit
       // For overnight trips we allow up to 30% more than the day-trip limit
       const effectiveMax = isOvernight ? maxDriveHours * 1.3 : maxDriveHours
-      if (sub.driveTimeHours > effectiveMax) continue
+      if (actualDriveHours > effectiveMax) continue
 
       // Score it
       let score = 0
@@ -633,13 +649,12 @@ export function matchDestinations(opts: {
       }
 
       // Drive-time sweet spot: reward trips that feel like a real getaway
-      // (at least 60% of max drive time, otherwise it barely counts)
-      const ratio = sub.driveTimeHours / effectiveMax
+      const ratio = actualDriveHours / effectiveMax
       if (ratio >= 0.6) score += 8
       else if (ratio >= 0.3) score += 3
 
       // Overnight reward: further destinations score better for multi-night
-      if (isOvernight && sub.driveTimeHours >= 2) score += 5
+      if (isOvernight && actualDriveHours >= 2) score += 5
 
       results.push({ sub, cluster, score, matchReasons })
     }

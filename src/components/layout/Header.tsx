@@ -36,8 +36,12 @@ export function Header() {
       borderBottom: '1px solid var(--border)',
       zIndex: 10, flexShrink: 0,
     }}>
-      {/* Logo + wordmark */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+      {/* Logo + wordmark — clicking goes home */}
+      <button
+        onClick={clearItinerary}
+        style={{ display: 'flex', alignItems: 'center', gap: 10, background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
+        title="Back to home"
+      >
         <LogoMark size={38} />
         <div>
           <div style={{
@@ -57,7 +61,7 @@ export function Header() {
             Victoria
           </div>
         </div>
-      </div>
+      </button>
 
       {/* Right controls */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>

@@ -4,7 +4,9 @@ import { DayCard } from './DayCard'
 import { GuardrailBanner } from './GuardrailBanner'
 import { DiningExplorer } from './DiningExplorer'
 import { exportGPX } from '@/utils/gpxExport'
+import { useWeather } from '@/hooks/useWeather'
 import type { Itinerary, RouteConstraintViolation, ScoredPOI } from '@/types'
+import type { DayForecast } from '@/hooks/useWeather'
 
 export function ItineraryPanel() {
   const {
@@ -137,6 +139,15 @@ function ItineraryTab({
   const totalKm = Math.round(itinerary.total_km)
   const totalHrs = Math.round(itinerary.route.estimated_drive_hours)
 
+  // Get destination coord from last waypoint for weather
+  const waypoints = itinerary.route.waypoints
+  const destCoord = waypoints.length > 0 ? waypoints[waypoints.length - 1].coord : null
+  const weather = useWeather(destCoord)
+
+  // Filter forecast to trip dates only
+  const tripDates = itinerary.days.map((d) => d.date)
+  const relevantForecast = weather?.forecast.filter((f) => tripDates.includes(f.date)) ?? []
+
   return (
     <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
       {/* Trip summary card */}
@@ -177,6 +188,15 @@ function ItineraryTab({
           <Stat value={`${itinerary.days.reduce((n, d) => n + d.schedule.length, 0)}`} label="Stops" />
         </div>
       </div>
+
+      {/* Weather strip */}
+      {(weather || relevantForecast.length > 0) && (
+        <WeatherStrip
+          destName={waypoints[waypoints.length - 1]?.label ?? 'Destination'}
+          current={weather ? { temp: weather.currentTemp, emoji: weather.currentEmoji, label: weather.currentLabel } : null}
+          forecast={relevantForecast}
+        />
+      )}
 
       {/* Constraint violations */}
       {violations.length > 0 && (
@@ -412,6 +432,68 @@ function ChecklistTab() {
           </div>
         </div>
       ))}
+    </div>
+  )
+}
+
+// ── Weather strip ──────────────────────────────────────────────────
+
+function WeatherStrip({
+  destName, current, forecast,
+}: {
+  destName: string
+  current: { temp: number; emoji: string; label: string } | null
+  forecast: DayForecast[]
+}) {
+  const formatDay = (dateStr: string) => {
+    const d = new Date(dateStr + 'T00:00:00')
+    return d.toLocaleDateString('en-AU', { weekday: 'short' })
+  }
+
+  return (
+    <div style={{
+      background: 'var(--bg-card)',
+      border: '1px solid var(--border)',
+      borderRadius: 14, padding: '12px 14px',
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+        <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+          Weather at {destName}
+        </div>
+        {current && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+            <span style={{ fontSize: 16 }}>{current.emoji}</span>
+            <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)' }}>{current.temp}°</span>
+            <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{current.label}</span>
+          </div>
+        )}
+      </div>
+
+      {forecast.length > 0 ? (
+        <div style={{ display: 'flex', gap: 6, overflowX: 'auto', paddingBottom: 2 }}>
+          {forecast.map((day) => (
+            <div key={day.date} style={{
+              flexShrink: 0, textAlign: 'center',
+              background: 'var(--bg-muted)', borderRadius: 10,
+              padding: '8px 10px', minWidth: 56,
+            }}>
+              <div style={{ fontSize: 10, color: 'var(--text-muted)', fontWeight: 600, marginBottom: 4 }}>
+                {formatDay(day.date)}
+              </div>
+              <div style={{ fontSize: 20, marginBottom: 4 }}>{day.emoji}</div>
+              <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-primary)' }}>{day.maxTemp}°</div>
+              <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>{day.minTemp}°</div>
+              {day.precipMm > 0 && (
+                <div style={{ fontSize: 9, color: '#4d9fff', marginTop: 2 }}>{day.precipMm}mm</div>
+              )}
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+          {current ? 'Forecast not yet available for trip dates.' : 'Loading forecast…'}
+        </div>
+      )}
     </div>
   )
 }
