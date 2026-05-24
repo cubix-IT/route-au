@@ -168,12 +168,15 @@ export function ProfileWizard() {
       is_towing: vehicleType === '4WD_WithCaravan',
     }
 
-    const melbCoord: Coordinate = { lng: 144.9631, lat: -37.8136 }
+    // Read origin from store — user may have set it on the landing page
+    const { originCoord: storedOriginCoord, originName: storedOriginName } = useAppStore.getState()
+
     setUserProfile(user)
     setVehicleProfile(vehicle)
     setTripPlanState({
       tripType,
-      originId: 'melbourne', originName: 'Melbourne', originCoord: melbCoord,
+      originName: storedOriginName,
+      originCoord: storedOriginCoord,
       destId: effectiveDest.clusterId, destName: effectiveDest.name, destCoord: effectiveDest.coord,
       startDate,
       endDate: tripType === 'multiday' ? endDate : '',
@@ -183,7 +186,7 @@ export function ProfileWizard() {
     })
 
     buildItinerary(startDate, tripType === 'multiday' ? endDate : undefined,
-      `Melbourne → ${effectiveDest.name}`, diningPrefs)
+      `${storedOriginName} → ${effectiveDest.name}`, diningPrefs)
 
     await new Promise((r) => setTimeout(r, 300))
     setGenerating(false)
