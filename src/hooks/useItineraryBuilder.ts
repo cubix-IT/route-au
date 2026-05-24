@@ -10,15 +10,22 @@ import { CORRIDORS } from '@/data/corridors'
 import { buildDaySchedule } from '@/utils/scheduleBuilder'
 
 export function useItineraryBuilder() {
-  const { userProfile, vehicleProfile, selectedCorridorId, originName: storeOriginName } = useAppStore()
-  const storeDiningPrefs = useAppStore((s) => s.diningPrefs)
   const setActiveItinerary = useAppStore((s) => s.setActiveItinerary)
   const setNearbyPOIs = useAppStore((s) => s.setNearbyPOIs)
   const setConstraintViolations = useAppStore((s) => s.setConstraintViolations)
 
   const buildItinerary = useCallback(
     (startDate: string, endDate?: string, tripName?: string, diningPrefs?: DiningPref[]) => {
-      if (!userProfile || !vehicleProfile) return
+      // Always read fresh state — avoids stale closure when called right after setUserProfile
+      const {
+        userProfile, vehicleProfile, selectedCorridorId,
+        originName: storeOriginName, diningPrefs: storeDiningPrefs,
+      } = useAppStore.getState()
+
+      if (!userProfile || !vehicleProfile) {
+        console.warn('[RouteAU] buildItinerary called before profiles were set')
+        return
+      }
 
       const prefs = diningPrefs ?? storeDiningPrefs
       const route = buildRouteFromCorridorId(selectedCorridorId, vehicleProfile)
@@ -37,7 +44,6 @@ export function useItineraryBuilder() {
       }
 
       const originLabel = storeOriginName || 'Origin'
-
       const allPOIs = detectNearbyPOIs(route, userProfile)
       setNearbyPOIs(allPOIs)
 
@@ -100,8 +106,7 @@ export function useItineraryBuilder() {
 
       return itinerary
     },
-    [userProfile, vehicleProfile, selectedCorridorId, storeOriginName, storeDiningPrefs,
-     setActiveItinerary, setNearbyPOIs, setConstraintViolations]
+    [setActiveItinerary, setNearbyPOIs, setConstraintViolations]
   )
 
   return { buildItinerary }

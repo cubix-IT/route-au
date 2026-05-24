@@ -8,6 +8,15 @@ export type VibeTag =
   | 'Photography'
   | 'Beach'
 
+export type HikingIntensity = 'Easy' | 'Moderate' | 'Hard' | 'Extreme'
+
+export type DietaryReq =
+  | 'Vegetarian'
+  | 'Vegan'
+  | 'GlutenFree'
+  | 'Halal'
+  | 'DairyFree'
+
 export type AccommodationPreference =
   | 'FreeCamping'
   | 'CaravanPark'
@@ -40,6 +49,8 @@ export interface UserProfile {
   id: string
   max_daily_drive_time: number
   preferred_vibe: VibeTag[]
+  hiking_intensity: HikingIntensity
+  dietary_requirements: DietaryReq[]
   accommodation_preference: AccommodationPreference
   off_grid_capability: {
     water_capacity_liters: number

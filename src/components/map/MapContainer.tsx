@@ -1,95 +1,116 @@
-import { useState, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import maplibregl from 'maplibre-gl'
 import { MapView } from './MapView'
 import { useAppStore } from '@/store/useAppStore'
 
 export function MapContainer() {
   const [map, setMap] = useState<maplibregl.Map | null>(null)
+  const markersRef = useRef<maplibregl.Marker[]>([])
   const { activeItinerary, nearbyPOIs, setSelectedPOI } = useAppStore()
 
   const handleMapReady = useCallback((m: maplibregl.Map) => {
     setMap(m)
-    addRouteLayers(m, activeItinerary?.route.waypoints.map((w) => [w.coord.lng, w.coord.lat]) ?? [])
-    addPOIMarkers(m, nearbyPOIs, setSelectedPOI)
-  }, [activeItinerary, nearbyPOIs, setSelectedPOI])
+  }, [])
 
-  void map
+  // Update route line whenever itinerary changes
+  useEffect(() => {
+    if (!map) return
+    const coords = activeItinerary?.route.waypoints.map(
+      (w) => [w.coord.lng, w.coord.lat] as [number, number]
+    ) ?? []
+    setRouteLine(map, coords)
+
+    // Fit map to route bounds if we have waypoints
+    if (coords.length >= 2) {
+      const bounds = coords.reduce(
+        (b, c) => b.extend(c),
+        new maplibregl.LngLatBounds(coords[0], coords[0])
+      )
+      map.fitBounds(bounds, { padding: 60, duration: 1400, maxZoom: 10 })
+    }
+  }, [map, activeItinerary])
+
+  // Re-render POI markers whenever nearbyPOIs changes
+  useEffect(() => {
+    if (!map) return
+
+    // Remove existing markers
+    markersRef.current.forEach((m) => m.remove())
+    markersRef.current = []
+
+    for (const poi of nearbyPOIs) {
+      const el = document.createElement('div')
+      el.className = 'poi-marker'
+      el.textContent = categoryEmoji(poi.category)
+      el.addEventListener('click', () => setSelectedPOI(poi))
+
+      const marker = new maplibregl.Marker({ element: el })
+        .setLngLat([poi.coord.lng, poi.coord.lat])
+        .setPopup(
+          new maplibregl.Popup({ offset: 20, closeButton: false }).setHTML(
+            `<strong style="color:var(--text-primary)">${poi.name}</strong><br>
+             <span style="font-size:12px;color:var(--text-muted)">${poi.description.slice(0, 80)}…</span>`
+          )
+        )
+        .addTo(map)
+
+      markersRef.current.push(marker)
+    }
+  }, [map, nearbyPOIs, setSelectedPOI])
 
   return <MapView onMapReady={handleMapReady} />
 }
 
-function addRouteLayers(map: maplibregl.Map, coords: [number, number][]) {
-  if (coords.length < 2) return
+function setRouteLine(map: maplibregl.Map, coords: [number, number][]) {
+  const geojson: GeoJSON.Feature<GeoJSON.LineString> = {
+    type: 'Feature',
+    geometry: { type: 'LineString', coordinates: coords },
+    properties: {},
+  }
 
   if (map.getSource('route')) {
-    (map.getSource('route') as maplibregl.GeoJSONSource).setData({
-      type: 'Feature',
-      geometry: { type: 'LineString', coordinates: coords },
-      properties: {},
-    })
+    ;(map.getSource('route') as maplibregl.GeoJSONSource).setData(geojson)
     return
   }
 
-  map.addSource('route', {
-    type: 'geojson',
-    data: {
-      type: 'Feature',
-      geometry: { type: 'LineString', coordinates: coords },
-      properties: {},
+  if (!map.isStyleLoaded()) {
+    map.once('load', () => setRouteLine(map, coords))
+    return
+  }
+
+  map.addSource('route', { type: 'geojson', data: geojson })
+
+  // Glow layer (wide, dim)
+  map.addLayer({
+    id: 'route-glow',
+    type: 'line',
+    source: 'route',
+    paint: {
+      'line-color': '#f59e0b',
+      'line-width': 10,
+      'line-opacity': 0.15,
+      'line-blur': 4,
     },
   })
 
+  // Main amber line
   map.addLayer({
     id: 'route-line',
     type: 'line',
     source: 'route',
     paint: {
       'line-color': '#b45309',
-      'line-width': 4,
+      'line-width': 3.5,
       'line-opacity': 0.9,
     },
   })
 }
 
-function addPOIMarkers(
-  map: maplibregl.Map,
-  pois: ReturnType<typeof useAppStore.getState>['nearbyPOIs'],
-  onSelect: (poi: ReturnType<typeof useAppStore.getState>['nearbyPOIs'][0]) => void
-) {
-  for (const poi of pois) {
-    const el = document.createElement('div')
-    el.className = 'poi-marker'
-    el.style.cssText = `
-      width: 32px; height: 32px; cursor: pointer;
-      display: flex; align-items: center; justify-content: center;
-      background: #1e293b; border: 2px solid #b45309; border-radius: 50%;
-      font-size: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.4);
-    `
-    el.textContent = categoryEmoji(poi.category)
-    el.addEventListener('click', () => onSelect(poi))
-
-    new maplibregl.Marker({ element: el })
-      .setLngLat([poi.coord.lng, poi.coord.lat])
-      .setPopup(
-        new maplibregl.Popup({ offset: 20 }).setHTML(
-          `<div style="color:#0f172a;font-family:sans-serif">
-            <strong>${poi.name}</strong><br>
-            <span style="font-size:12px">${poi.description.slice(0, 80)}…</span>
-          </div>`
-        )
-      )
-      .addTo(map)
-  }
-}
-
 function categoryEmoji(cat: string): string {
-  const map: Record<string, string> = {
-    Hiking: '🥾',
-    Chilling: '🏖',
-    Lookouts: '👁',
-    Photography: '📷',
-    FreeCamping: '⛺',
-    History: '🏛',
+  const m: Record<string, string> = {
+    Hiking: '🥾', Chilling: '🏖', Lookouts: '👁',
+    Photography: '📷', FreeCamping: '⛺', History: '🏛',
+    Wildlife: '🦘', Beach: '🌊',
   }
-  return map[cat] ?? '📍'
+  return m[cat] ?? '📍'
 }

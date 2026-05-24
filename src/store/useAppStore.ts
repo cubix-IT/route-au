@@ -12,6 +12,12 @@ import type {
   VehicleProfile,
 } from '@/types'
 
+export interface PreselectedDest {
+  corridorId: string
+  destName: string
+  destCoord: Coordinate
+}
+
 interface AppState {
   // Profiles
   userProfile: UserProfile | null
@@ -37,6 +43,10 @@ interface AppState {
     'startDate' | 'endDate' | 'dailyDriveHours' | 'crewType' | 'hasKids' |
     'diningPrefs' | 'selectedCorridorId'
   >>) => void
+
+  // Preselected destination (from landing page card click)
+  preselectedDest: PreselectedDest | null
+  setPreselectedDest: (d: PreselectedDest | null) => void
 
   // Routing
   constraintViolations: RouteConstraintViolation[]
@@ -88,6 +98,9 @@ export const useAppStore = create<AppState>()(
       selectedCorridorId: 'great-ocean-road',
       setTripPlanState: (updates) => set(updates),
 
+      preselectedDest: null,
+      setPreselectedDest: (d) => set({ preselectedDest: d }),
+
       constraintViolations: [],
       setConstraintViolations: (v) => set({ constraintViolations: v }),
 
@@ -100,7 +113,7 @@ export const useAppStore = create<AppState>()(
       setActiveItinerary: (i) => set({ activeItinerary: i }),
       clearItinerary: () => set({ activeItinerary: null }),
 
-      isWizardOpen: true,
+      isWizardOpen: false,
       setWizardOpen: (open) => set({ isWizardOpen: open }),
 
       mapCenter: { lng: 134.49, lat: -25.73 },
@@ -114,7 +127,7 @@ export const useAppStore = create<AppState>()(
       setActiveTab: (tab) => set({ activeTab: tab }),
     }),
     {
-      name: 'route-au-v2',
+      name: 'route-au-v3',
       storage: createJSONStorage(() => localStorage),
       partialize: (state) => ({
         userProfile: state.userProfile,
@@ -127,6 +140,7 @@ export const useAppStore = create<AppState>()(
         destName: state.destName,
         selectedCorridorId: state.selectedCorridorId,
         diningPrefs: state.diningPrefs,
+        activeItinerary: state.activeItinerary,
       }),
     }
   )
