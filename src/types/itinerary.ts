@@ -37,11 +37,38 @@ export interface CampSite {
   notes?: string
 }
 
+export type ScheduleItemType =
+  | 'depart'
+  | 'drive'
+  | 'breakfast'
+  | 'lunch'
+  | 'dinner'
+  | 'drinks'
+  | 'poi'
+  | 'fuel'
+  | 'camp'
+  | 'arrive'
+  | 'sunset'
+  | 'stargazing'
+
+export interface ScheduleItem {
+  id: string
+  time: string
+  emoji: string
+  title: string
+  subtitle?: string
+  duration_min: number
+  type: ScheduleItemType
+  is_highlight?: boolean
+  poi?: ScoredPOI
+}
+
 export interface ItineraryDay {
   day_number: number
   date: string
   waypoints: Waypoint[]
   pois: ScoredPOI[]
+  schedule: ScheduleItem[]
   drive_km: number
   drive_hours: number
   weather?: DayWeather
@@ -53,7 +80,10 @@ export interface Itinerary {
   id: string
   name: string
   start_date: string
+  end_date?: string
   route: Route
   days: ItineraryDay[]
   all_warnings: GuardrailWarning[]
+  total_km: number
+  total_days: number
 }

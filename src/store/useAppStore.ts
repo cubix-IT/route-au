@@ -2,9 +2,12 @@ import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
 import type {
   Coordinate,
+  DiningPref,
   Itinerary,
   RouteConstraintViolation,
   ScoredPOI,
+  TripType,
+  CrewType,
   UserProfile,
   VehicleProfile,
 } from '@/types'
@@ -16,7 +19,23 @@ interface AppState {
   setUserProfile: (p: UserProfile) => void
   setVehicleProfile: (p: VehicleProfile) => void
 
-  // Constraint violations from routing
+  // Trip planning state (collected by wizard)
+  tripType: TripType
+  originId: string
+  destId: string
+  startDate: string
+  endDate: string
+  dailyDriveHours: number
+  crewType: CrewType
+  hasKids: boolean
+  diningPrefs: DiningPref[]
+  selectedCorridorId: string
+  setTripPlanState: (updates: Partial<Pick<AppState,
+    'tripType' | 'originId' | 'destId' | 'startDate' | 'endDate' |
+    'dailyDriveHours' | 'crewType' | 'hasKids' | 'diningPrefs' | 'selectedCorridorId'
+  >>) => void
+
+  // Routing
   constraintViolations: RouteConstraintViolation[]
   setConstraintViolations: (v: RouteConstraintViolation[]) => void
 
@@ -29,22 +48,18 @@ interface AppState {
   // Itinerary
   activeItinerary: Itinerary | null
   setActiveItinerary: (i: Itinerary) => void
+  clearItinerary: () => void
 
   // UI state
   isWizardOpen: boolean
   setWizardOpen: (open: boolean) => void
-  selectedCorridorId: string
-  setSelectedCorridorId: (id: string) => void
   mapCenter: Coordinate
   mapZoom: number
   setMapView: (center: Coordinate, zoom: number) => void
   isOffline: boolean
   setOffline: (offline: boolean) => void
-  activeLayers: Set<string>
-  toggleLayer: (layerId: string) => void
 
-  // Active panel tab
-  activeTab: 'itinerary' | 'pois' | 'checklist' | 'community'
+  activeTab: 'itinerary' | 'pois' | 'checklist'
   setActiveTab: (tab: AppState['activeTab']) => void
 }
 
@@ -56,6 +71,18 @@ export const useAppStore = create<AppState>()(
       setUserProfile: (p) => set({ userProfile: p }),
       setVehicleProfile: (p) => set({ vehicleProfile: p }),
 
+      tripType: 'day',
+      originId: 'melbourne',
+      destId: 'twelve-apostles',
+      startDate: new Date().toISOString().split('T')[0],
+      endDate: '',
+      dailyDriveHours: 5,
+      crewType: 'couple',
+      hasKids: false,
+      diningPrefs: ['Cafes', 'LocalPubs'],
+      selectedCorridorId: 'great-ocean-road',
+      setTripPlanState: (updates) => set(updates),
+
       constraintViolations: [],
       setConstraintViolations: (v) => set({ constraintViolations: v }),
 
@@ -66,41 +93,33 @@ export const useAppStore = create<AppState>()(
 
       activeItinerary: null,
       setActiveItinerary: (i) => set({ activeItinerary: i }),
+      clearItinerary: () => set({ activeItinerary: null }),
 
       isWizardOpen: true,
       setWizardOpen: (open) => set({ isWizardOpen: open }),
-      selectedCorridorId: 'great-ocean-road',
-      setSelectedCorridorId: (id) => set({ selectedCorridorId: id }),
 
-      mapCenter: { lng: 134.49, lat: -25.73 }, // Geographic centre of Australia
+      mapCenter: { lng: 134.49, lat: -25.73 },
       mapZoom: 4,
       setMapView: (center, zoom) => set({ mapCenter: center, mapZoom: zoom }),
 
       isOffline: false,
       setOffline: (offline) => set({ isOffline: offline }),
 
-      activeLayers: new Set(['corridors', 'pois']),
-      toggleLayer: (layerId) =>
-        set((s) => {
-          const next = new Set(s.activeLayers)
-          if (next.has(layerId)) next.delete(layerId)
-          else next.add(layerId)
-          return { activeLayers: next }
-        }),
-
       activeTab: 'itinerary',
       setActiveTab: (tab) => set({ activeTab: tab }),
     }),
     {
-      name: 'route-au-store',
+      name: 'route-au-v2',
       storage: createJSONStorage(() => localStorage),
       partialize: (state) => ({
         userProfile: state.userProfile,
         vehicleProfile: state.vehicleProfile,
         mapCenter: state.mapCenter,
         mapZoom: state.mapZoom,
+        originId: state.originId,
+        destId: state.destId,
         selectedCorridorId: state.selectedCorridorId,
-        isWizardOpen: state.isWizardOpen,
+        diningPrefs: state.diningPrefs,
       }),
     }
   )

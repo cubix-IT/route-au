@@ -5,7 +5,7 @@ import { useAppStore } from '@/store/useAppStore'
 
 export function MapContainer() {
   const [map, setMap] = useState<maplibregl.Map | null>(null)
-  const { activeItinerary, nearbyPOIs, setSelectedPOI, activeLayers } = useAppStore()
+  const { activeItinerary, nearbyPOIs, setSelectedPOI } = useAppStore()
 
   const handleMapReady = useCallback((m: maplibregl.Map) => {
     setMap(m)
@@ -14,7 +14,6 @@ export function MapContainer() {
   }, [activeItinerary, nearbyPOIs, setSelectedPOI])
 
   void map
-  void activeLayers
 
   return <MapView onMapReady={handleMapReady} />
 }

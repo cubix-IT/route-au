@@ -24,6 +24,18 @@ export type VehicleType =
 
 export type FuelType = 'Unleaded95' | 'Unleaded98' | 'Diesel' | 'Electric'
 
+export type TripType = 'day' | 'multiday'
+
+export type CrewType = 'solo' | 'couple' | 'family' | 'group'
+
+export type DiningPref =
+  | 'Cafes'
+  | 'LocalPubs'
+  | 'Wineries'
+  | 'FineDining'
+  | 'Roadhouses'
+  | 'SelfCatering'
+
 export interface UserProfile {
   id: string
   max_daily_drive_time: number
@@ -34,6 +46,10 @@ export interface UserProfile {
     auxiliary_battery_days: number
   }
   party_size: number
+  trip_type: TripType
+  crew_type: CrewType
+  has_kids: boolean
+  dining_prefs: DiningPref[]
 }
 
 export interface VehicleProfile {

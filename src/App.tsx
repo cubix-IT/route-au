@@ -20,7 +20,11 @@ function App() {
   }, [userProfile])
 
   return (
-    <div className="flex flex-col h-screen bg-slate-900 text-white overflow-hidden">
+    <div style={{
+      display: 'flex', flexDirection: 'column', height: '100vh',
+      background: 'var(--bg-deep)', color: 'var(--text-primary)',
+      overflow: 'hidden',
+    }}>
       <Header />
       <SplitLayout
         mapSlot={<MapContainer />}
@@ -30,7 +34,12 @@ function App() {
       <Toaster
         position="bottom-left"
         toastOptions={{
-          style: { background: '#1e293b', color: '#f1f5f9', border: '1px solid #475569' },
+          style: {
+            background: 'var(--bg-card)',
+            color: 'var(--text-primary)',
+            border: '1px solid var(--border)',
+            borderRadius: 12,
+          },
         }}
       />
     </div>
