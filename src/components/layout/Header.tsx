@@ -1,66 +1,75 @@
 import { useAppStore } from '@/store/useAppStore'
 
-function RouteAULogo({ size = 36 }: { size?: number }) {
+// ── Logo mark ─────────────────────────────────────────────────────
+// A winding path from an origin dot (green) to a destination
+// point (copper) — reads as a spontaneous, unplanned journey.
+
+export function LogoMark({ size = 36 }: { size?: number }) {
   return (
-    <svg width={size} height={size} viewBox="0 0 48 48" fill="none">
-      <circle cx="24" cy="8" r="5" fill="#f59e0b" />
+    <svg width={size} height={size} viewBox="0 0 36 36" fill="none" aria-hidden>
+      {/* Origin — city you're leaving */}
+      <circle cx="6" cy="29" r="3.5" fill="var(--green)" />
+      {/* Winding road — the unplanned route */}
       <path
-        d="M8 46 L24 8 L40 46"
-        stroke="#f59e0b" strokeWidth="3"
-        strokeLinecap="round" strokeLinejoin="round"
-        fill="none" opacity="0.9"
+        d="M 6 29 C 8 20 16 22 18 14 C 20 6 28 8 30 7"
+        stroke="var(--green)"
+        strokeWidth="2.2"
+        strokeLinecap="round"
+        fill="none"
       />
-      <path
-        d="M24 8 L24 46"
-        stroke="rgba(255,255,255,0.2)" strokeWidth="1.5" strokeDasharray="3 4"
-      />
-      <line x1="11" y1="38" x2="37" y2="38" stroke="rgba(255,255,255,0.08)" strokeWidth="1.5" />
-      <line x1="14" y1="28" x2="34" y2="28" stroke="rgba(255,255,255,0.06)" strokeWidth="1.5" />
-      <line x1="18" y1="18" x2="30" y2="18" stroke="rgba(255,255,255,0.04)" strokeWidth="1.5" />
+      {/* Destination — somewhere new */}
+      <circle cx="30" cy="7" r="3" fill="var(--warm)" />
+      <circle cx="30" cy="7" r="1.2" fill="white" />
     </svg>
   )
 }
 
 export function Header() {
-  const { isOffline, setWizardOpen, userProfile } = useAppStore()
+  const { isOffline, setWizardOpen, activeItinerary, clearItinerary, userProfile } = useAppStore()
 
   return (
     <header style={{
       display: 'flex', alignItems: 'center', justifyContent: 'space-between',
       padding: '10px 20px',
-      background: 'var(--bg-surface)',
+      background: 'var(--bg-card)',
       borderBottom: '1px solid var(--border)',
+      boxShadow: 'var(--shadow-sm)',
       zIndex: 10, flexShrink: 0,
     }}>
       {/* Logo + wordmark */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-        <RouteAULogo size={36} />
+        <LogoMark size={36} />
         <div>
           <div style={{
-            fontSize: 18, fontWeight: 800, color: 'var(--text-primary)',
-            lineHeight: 1, letterSpacing: '-0.02em',
+            fontFamily: "'Fraunces', Georgia, serif",
+            fontSize: 17, fontWeight: 700,
+            color: 'var(--text-primary)',
+            lineHeight: 1.1, letterSpacing: '-0.01em',
           }}>
-            RouteAU
+            Unplanned<span style={{ color: 'var(--green)' }}> Escapes</span>
           </div>
-          <div style={{ fontSize: 10, color: 'var(--amber-dim)', lineHeight: 1, marginTop: 2, letterSpacing: '0.04em' }}>
-            AUSTRALIA'S ROAD TRIP PLANNER
+          <div style={{
+            fontSize: 10, color: 'var(--text-muted)',
+            lineHeight: 1, marginTop: 2,
+            letterSpacing: '0.06em', textTransform: 'uppercase',
+          }}>
+            Victorian weekend getaways
           </div>
         </div>
       </div>
 
       {/* Right controls */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
         {/* Online / offline pill */}
         <div style={{
           display: 'flex', alignItems: 'center', gap: 5,
           padding: '4px 10px', borderRadius: 20,
-          background: isOffline ? 'rgba(239,68,68,0.12)' : 'rgba(16,185,129,0.1)',
-          border: `1px solid ${isOffline ? 'rgba(239,68,68,0.3)' : 'rgba(16,185,129,0.2)'}`,
+          background: isOffline ? 'var(--red-light)' : 'var(--green-light)',
+          border: `1px solid ${isOffline ? 'rgba(220,38,38,0.2)' : 'rgba(58,107,79,0.2)'}`,
         }}>
           <div style={{
             width: 6, height: 6, borderRadius: '50%',
             background: isOffline ? 'var(--red)' : 'var(--green)',
-            ...(isOffline ? {} : { animation: 'none' }),
           }} />
           <span style={{
             fontSize: 11, fontWeight: 600,
@@ -70,19 +79,44 @@ export function Header() {
           </span>
         </div>
 
-        {/* Edit / start button */}
+        {/* Start Over — only shown when an itinerary exists */}
+        {activeItinerary && (
+          <button
+            onClick={() => clearItinerary()}
+            style={{
+              padding: '7px 14px', borderRadius: 9,
+              background: 'var(--bg-muted)',
+              border: '1px solid var(--border)',
+              color: 'var(--text-secondary)',
+              fontSize: 13, fontWeight: 500, cursor: 'pointer',
+              transition: 'all 0.15s',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = 'var(--bg-subtle)'
+              e.currentTarget.style.color = 'var(--text-primary)'
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = 'var(--bg-muted)'
+              e.currentTarget.style.color = 'var(--text-secondary)'
+            }}
+          >
+            ← Start Over
+          </button>
+        )}
+
+        {/* Edit / plan button */}
         <button
           onClick={() => setWizardOpen(true)}
           style={{
             padding: '8px 16px', borderRadius: 10,
-            background: userProfile ? 'rgba(245,158,11,0.15)' : 'var(--amber)',
-            border: userProfile ? '1px solid var(--amber-dim)' : 'none',
-            color: userProfile ? 'var(--amber)' : '#000',
-            fontSize: 13, fontWeight: 700, cursor: 'pointer',
+            background: userProfile ? 'var(--green-light)' : 'var(--green)',
+            border: userProfile ? '1px solid var(--border-active)' : 'none',
+            color: userProfile ? 'var(--green)' : '#fff',
+            fontSize: 13, fontWeight: 600, cursor: 'pointer',
             transition: 'all 0.15s',
           }}
         >
-          {userProfile ? '⚙ Edit Trip' : 'Plan a Trip →'}
+          {userProfile ? 'Change Trip' : 'Plan an Escape →'}
         </button>
       </div>
     </header>

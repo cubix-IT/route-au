@@ -144,8 +144,8 @@ export const useAppStore = create<AppState>()(
       isWizardOpen: false,
       setWizardOpen: (open) => set({ isWizardOpen: open }),
 
-      mapCenter: { lng: 134.49, lat: -25.73 },
-      mapZoom: 4,
+      mapCenter: { lng: 144.96, lat: -37.81 },
+      mapZoom: 8,
       setMapView: (center, zoom) => set({ mapCenter: center, mapZoom: zoom }),
 
       isOffline: false,
