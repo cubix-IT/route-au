@@ -165,8 +165,8 @@ export function buildDaySchedule(
     h = after.h; m = after.m
   }
 
-  // 7. Arrive / return home
-  const arriveTarget = { h: isDayTrip ? 16 : 17, m: 30 }
+  // 7. Arrive at destination
+  const arriveTarget = { h: isDayTrip ? 13 : 17, m: 0 }
   const curMins2 = h * 60 + m
   const arriveMins = arriveTarget.h * 60 + arriveTarget.m
   if (curMins2 < arriveMins) {
@@ -176,30 +176,54 @@ export function buildDaySchedule(
   const lastWaypoint = day.waypoints[day.waypoints.length - 1]
   const arriveLabel = lastWaypoint?.label ?? 'Destination'
 
+  // Always show arrival at the destination first
+  items.push({
+    id: nextId(),
+    time: fmt(h, m),
+    emoji: isDayTrip ? '📍' : (isLastDay ? '🏁' : (hasKids ? '🏨' : '⛺')),
+    title: isDayTrip
+      ? `Arrive at ${arriveLabel}`
+      : isLastDay
+        ? `Arrive ${arriveLabel}`
+        : (hasKids ? `Check in at ${arriveLabel}` : `Camp / Settle in at ${arriveLabel}`),
+    subtitle: isDayTrip
+      ? `You made it! Time to explore ${arriveLabel}`
+      : isLastDay
+        ? 'Trip complete!'
+        : (hasKids ? 'Get the kids settled, freshen up' : 'Set up camp, rest and freshen up'),
+    duration_min: isDayTrip ? 120 : 60,
+    type: isDayTrip ? 'poi' : (isLastDay ? 'arrive' : 'camp'),
+    is_highlight: true,
+  })
+
   if (isDayTrip) {
+    // Afternoon at destination — add a couple of explore items
+    const after = addMinutes(h, m, 120)
+    h = after.h; m = after.m
+
+    // Head back home at ~4:30pm
+    const leaveTarget = { h: 16, m: 30 }
+    const curMins3 = h * 60 + m
+    if (curMins3 < leaveTarget.h * 60 + leaveTarget.m) {
+      h = leaveTarget.h; m = leaveTarget.m
+    }
+
     items.push({
       id: nextId(),
       time: fmt(h, m),
-      emoji: '🏡',
-      title: 'Head home',
-      subtitle: `Depart ${arriveLabel} — great day out`,
+      emoji: '🚗',
+      title: `Head back to ${originLabel}`,
+      subtitle: `Departing ${arriveLabel} — what a great day`,
       duration_min: 0,
-      type: 'arrive',
+      type: 'depart',
       is_highlight: false,
     })
     return items
   }
 
-  items.push({
-    id: nextId(),
-    time: fmt(h, m),
-    emoji: isLastDay ? '🏁' : (hasKids ? '🏨' : '⛺'),
-    title: isLastDay ? `Arrive ${arriveLabel}` : (hasKids ? `Check in at ${arriveLabel}` : `Camp / Settle in at ${arriveLabel}`),
-    subtitle: isLastDay ? 'Trip complete!' : (hasKids ? 'Get the kids settled, freshen up' : 'Set up camp, rest and freshen up'),
-    duration_min: 60,
-    type: isLastDay ? 'arrive' : 'camp',
-    is_highlight: isLastDay,
-  })
+  // Advance time past the arrival block before evening activities
+  const arrAfter = addMinutes(h, m, 60)
+  h = arrAfter.h; m = arrAfter.m
 
   if (!isLastDay) {
     const after = addMinutes(h, m, 60)
