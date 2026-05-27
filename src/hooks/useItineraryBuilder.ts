@@ -20,7 +20,10 @@ export function useItineraryBuilder() {
         userProfile, vehicleProfile,
         originCoord, destCoord,
         tripType,
-        originName: storeOriginName, destName: storeDestName, diningPrefs: storeDiningPrefs,
+        originName: storeOriginName, destName: storeDestName,
+        destId: storeDestId,
+        diningPrefs: storeDiningPrefs,
+        departureHour: storeDepartureHour,
       } = useAppStore.getState()
 
       if (!userProfile || !vehicleProfile) {
@@ -83,10 +86,11 @@ export function useItineraryBuilder() {
         const schedule = buildDaySchedule(
           partialDay,
           route.corridor_ids[0] ?? '',
+          storeDestId,
           dayOriginLabel,
           dayPOIs,
           prefs,
-          userProfile.has_kids ? 8 : 7,
+          storeDepartureHour ?? (userProfile.has_kids ? 8 : 7),
           i === daysCount - 1,
           userProfile.has_kids,
           tripType === 'day',

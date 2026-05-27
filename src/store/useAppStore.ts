@@ -14,12 +14,17 @@ import type {
 
 export interface PreselectedDest {
   corridorId: string
+  destId: string         // sub-destination ID (e.g. 'lorne', 'healesville')
   destName: string
   destCoord: Coordinate
 }
 
 export interface AddedDiningStop {
   foodId: string
+  stopName: string
+  stopLat: number
+  stopLng: number
+  timeOfDay: 'morning' | 'afternoon'
   dayNumber: number
 }
 
@@ -45,12 +50,17 @@ interface AppState {
   hasKids: boolean
   diningPrefs: DiningPref[]
   selectedCorridorId: string
+  departureHour: number     // 0-23, what time to start driving
   setTripPlanState: (updates: Partial<Pick<AppState,
     'tripType' | 'originId' | 'originName' | 'originCoord' |
     'destId' | 'destName' | 'destCoord' |
     'startDate' | 'endDate' | 'dailyDriveHours' | 'crewType' | 'hasKids' |
-    'diningPrefs' | 'selectedCorridorId'
+    'diningPrefs' | 'selectedCorridorId' | 'departureHour'
   >>) => void
+
+  // Whether user has explicitly set their origin (not just default Melbourne)
+  originSet: boolean
+  setOriginSet: (v: boolean) => void
 
   // Preselected destination (from landing page card click)
   preselectedDest: PreselectedDest | null
@@ -69,11 +79,12 @@ interface AppState {
   // Itinerary
   activeItinerary: Itinerary | null
   setActiveItinerary: (i: Itinerary) => void
+  patchRouteDistances: (distKm: number, durHours: number) => void
   clearItinerary: () => void
 
   // User-chosen dining stops (interactive explorer)
   addedDiningStops: AddedDiningStop[]
-  addDiningStop: (foodId: string, dayNumber: number) => void
+  addDiningStop: (stop: AddedDiningStop) => void
   removeDiningStop: (foodId: string) => void
 
   // UI state
@@ -85,7 +96,7 @@ interface AppState {
   isOffline: boolean
   setOffline: (offline: boolean) => void
 
-  activeTab: 'itinerary' | 'dining' | 'pois' | 'checklist'
+  activeTab: 'itinerary' | 'dining' | 'pois'
   setActiveTab: (tab: AppState['activeTab']) => void
 }
 
@@ -111,7 +122,11 @@ export const useAppStore = create<AppState>()(
       hasKids: false,
       diningPrefs: ['Cafes', 'LocalPubs'],
       selectedCorridorId: '',
+      departureHour: 8,
       setTripPlanState: (updates) => set(updates),
+
+      originSet: false,
+      setOriginSet: (v) => set({ originSet: v }),
 
       preselectedDest: null,
       setPreselectedDest: (d) => set({ preselectedDest: d }),
@@ -126,14 +141,31 @@ export const useAppStore = create<AppState>()(
 
       activeItinerary: null,
       setActiveItinerary: (i) => set({ activeItinerary: i, addedDiningStops: [] }),
+      patchRouteDistances: (distKm, durHours) => set((s) => {
+        const itin = s.activeItinerary
+        if (!itin) return {}
+        const perDay = itin.total_days
+        return {
+          activeItinerary: {
+            ...itin,
+            total_km: distKm,
+            route: { ...itin.route, total_distance_km: distKm, estimated_drive_hours: durHours },
+            days: itin.days.map((d) => ({
+              ...d,
+              drive_km: Math.round(distKm / perDay),
+              drive_hours: Math.round((durHours / perDay) * 10) / 10,
+            })),
+          },
+        }
+      }),
       clearItinerary: () => set({ activeItinerary: null, addedDiningStops: [] }),
 
       addedDiningStops: [],
-      addDiningStop: (foodId, dayNumber) =>
+      addDiningStop: (stop) =>
         set((s) => ({
           addedDiningStops: [
-            ...s.addedDiningStops.filter((x) => x.foodId !== foodId),
-            { foodId, dayNumber },
+            ...s.addedDiningStops.filter((x) => x.foodId !== stop.foodId),
+            stop,
           ],
         })),
       removeDiningStop: (foodId) =>
@@ -151,7 +183,7 @@ export const useAppStore = create<AppState>()(
       isOffline: false,
       setOffline: (offline) => set({ isOffline: offline }),
 
-      activeTab: 'itinerary',
+      activeTab: 'itinerary' as const,
       setActiveTab: (tab) => set({ activeTab: tab }),
     }),
     {

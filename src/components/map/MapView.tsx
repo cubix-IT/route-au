@@ -1,19 +1,10 @@
 import { useEffect, useRef } from 'react'
 import maplibregl from 'maplibre-gl'
-import { Protocol } from 'pmtiles'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import { useAppStore } from '@/store/useAppStore'
 
 interface Props {
   onMapReady?: (map: maplibregl.Map) => void
-}
-
-let protocolRegistered = false
-function registerPMTiles() {
-  if (protocolRegistered) return
-  const protocol = new Protocol()
-  maplibregl.addProtocol('pmtiles', protocol.tile.bind(protocol))
-  protocolRegistered = true
 }
 
 export function MapView({ onMapReady }: Props) {
@@ -25,14 +16,16 @@ export function MapView({ onMapReady }: Props) {
   // Initialise map once
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return
-    registerPMTiles()
-
     const map = new maplibregl.Map({
       container: containerRef.current,
-      style: DARK_STYLE,
+      style: DARK_STYLE as string,
       center: [mapCenter.lng, mapCenter.lat],
       zoom: mapZoom,
       attributionControl: false,
+      // Aggressive tile caching — reduces Mapbox API calls on pan/zoom
+      maxTileCacheSize: 500,
+      // Only fetch tiles visible on screen (no over-fetch)
+      renderWorldCopies: false,
     })
 
     map.addControl(new maplibregl.NavigationControl(), 'top-right')
@@ -79,29 +72,5 @@ export function MapView({ onMapReady }: Props) {
   )
 }
 
-// CartoDB Positron — light tiles, no API key required
-const DARK_STYLE: maplibregl.StyleSpecification = {
-  version: 8,
-  glyphs: 'https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf',
-  sources: {
-    'carto-dark': {
-      type: 'raster',
-      tiles: [
-        'https://a.basemaps.cartocdn.com/light_all/{z}/{x}/{y}@2x.png',
-        'https://b.basemaps.cartocdn.com/light_all/{z}/{x}/{y}@2x.png',
-        'https://c.basemaps.cartocdn.com/light_all/{z}/{x}/{y}@2x.png',
-      ],
-      tileSize: 512,
-      attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> © <a href="https://carto.com/attributions">CARTO</a>',
-      maxzoom: 19,
-    },
-  },
-  layers: [
-    {
-      id: 'carto-dark-layer',
-      type: 'raster',
-      source: 'carto-dark',
-      paint: { 'raster-opacity': 0.92 },
-    },
-  ],
-}
+// Free, no-key-needed style — works natively with MapLibre GL JS
+const DARK_STYLE = 'https://tiles.openfreemap.org/styles/liberty'

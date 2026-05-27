@@ -3,28 +3,42 @@ import maplibregl from 'maplibre-gl'
 import { MapView } from './MapView'
 import { useAppStore } from '@/store/useAppStore'
 
-// Fetch real road geometry from OSRM public demo server
-async function fetchRoadRoute(waypoints: [number, number][]): Promise<[number, number][]> {
-  if (waypoints.length < 2) return waypoints
+interface OsrmResult {
+  coords: [number, number][]
+  distKm: number | null
+  durHours: number | null
+}
+
+// Fetch real road geometry + distance from OSRM public demo server
+async function fetchRoadRoute(waypoints: [number, number][]): Promise<OsrmResult> {
+  if (waypoints.length < 2) return { coords: waypoints, distKm: null, durHours: null }
   try {
-    const coords = waypoints.map((c) => `${c[0]},${c[1]}`).join(';')
+    // Use only origin + destination for routing — intermediate corridor waypoints
+    // cause detours through wrong road networks
+    const endpoints = [waypoints[0], waypoints[waypoints.length - 1]]
+    const coords = endpoints.map((c) => `${c[0]},${c[1]}`).join(';')
     const url = `https://router.project-osrm.org/route/v1/driving/${coords}?overview=full&geometries=geojson`
-    const res = await fetch(url)
+    const res = await fetch(url, { signal: AbortSignal.timeout(8000) })
     const json = await res.json()
-    if (json.routes?.[0]?.geometry?.coordinates) {
-      return json.routes[0].geometry.coordinates as [number, number][]
+    const route = json.routes?.[0]
+    if (route?.geometry?.coordinates) {
+      return {
+        coords: route.geometry.coordinates as [number, number][],
+        distKm: Math.round(route.distance / 100) / 10,   // metres → km, 1dp
+        durHours: Math.round((route.duration / 3600) * 10) / 10, // s → hrs, 1dp
+      }
     }
   } catch {
-    // Fallback to straight line if offline or API unavailable
+    // Offline or API unavailable — fall back to two-point straight line
   }
-  return waypoints
+  return { coords: waypoints, distKm: null, durHours: null }
 }
 
 export function MapContainer() {
   const [map, setMap] = useState<maplibregl.Map | null>(null)
   const markersRef = useRef<maplibregl.Marker[]>([])
   const pinMarkersRef = useRef<maplibregl.Marker[]>([])
-  const { activeItinerary, nearbyPOIs, setSelectedPOI } = useAppStore()
+  const { activeItinerary, nearbyPOIs, setSelectedPOI, patchRouteDistances } = useAppStore()
 
   const handleMapReady = useCallback((m: maplibregl.Map) => {
     setMap(m)
@@ -85,8 +99,12 @@ export function MapContainer() {
     map.fitBounds(bounds, { padding: 80, duration: 1000, maxZoom: 11 })
 
     // Fetch real road route and draw it
-    fetchRoadRoute(rawCoords).then((roadCoords) => {
+    fetchRoadRoute(rawCoords).then(({ coords: roadCoords, distKm, durHours }) => {
       setRouteLine(map, roadCoords)
+
+      if (distKm !== null && durHours !== null) {
+        patchRouteDistances(distKm, durHours)
+      }
 
       // Re-fit to road geometry (may differ from straight-line bounds)
       if (roadCoords.length >= 2) {

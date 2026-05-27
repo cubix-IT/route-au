@@ -13,6 +13,16 @@ import type {
 const GREEN = '#3A6B4F'
 const season = getCurrentSeason()
 
+function getMinDate(tripType: TripType): string {
+  const now = new Date()
+  if (tripType === 'day' && now.getHours() >= 18) {
+    const d = new Date(now)
+    d.setDate(d.getDate() + 1)
+    return d.toISOString().split('T')[0]
+  }
+  return now.toISOString().split('T')[0]
+}
+
 function haversinKm(a: Coordinate, b: Coordinate): number {
   const R = 6371
   const dLat = ((b.lat - a.lat) * Math.PI) / 180
@@ -70,10 +80,11 @@ export function ProfileWizard() {
   const isPreselected = !!preselectedDest
 
   // ── Step 3: Dates + food + vehicle ──
-  const [startDate, setStartDate] = useState(new Date().toISOString().split('T')[0])
+  const [startDate, setStartDate] = useState('')   // empty = user must pick
   const [endDate, setEndDate] = useState('')
   const [dailyDriveHours, setDailyDriveHours] = useState(3)
-  const [diningPrefs, setDiningPrefs] = useState<DiningPref[]>(['Cafes', 'CasualDining'])
+  const [departureHour, setDepartureHour] = useState(8)
+  const [diningPrefs, setDiningPrefs] = useState<DiningPref[]>([])
   const [dietary, setDietary] = useState<DietaryReq[]>([])
   const [vehicleType, setVehicleType] = useState<VehicleType>('AWD')
   const [accommodation, setAccommodation] = useState<AccommodationPreference>('Any')
@@ -84,9 +95,9 @@ export function ProfileWizard() {
 
   // ── Derived dest info ──
   const effectiveDest = isPreselected
-    ? { name: preselectedDest.destName, coord: preselectedDest.destCoord, clusterId: preselectedDest.corridorId }
+    ? { name: preselectedDest.destName, coord: preselectedDest.destCoord, clusterId: preselectedDest.corridorId, destId: preselectedDest.destId }
     : pickedDest
-      ? { name: pickedDest.sub.name, coord: pickedDest.sub.coord, clusterId: pickedDest.cluster.id }
+      ? { name: pickedDest.sub.name, coord: pickedDest.sub.coord, clusterId: pickedDest.cluster.id, destId: pickedDest.sub.id }
       : null
 
   const toggleInterest = (id: TripInterest) =>
@@ -106,7 +117,7 @@ export function ProfileWizard() {
   const handleNext = async () => {
     const lastStep = isPreselected ? 1 : 3
 
-    // Step 1 in discovery mode → compute suggestions, advance
+    // Step 1 in discovery mode → compute suggestions, derive dining prefs, advance
     if (!isPreselected && step === 1) {
       const { originCoord: currentOriginCoord } = useAppStore.getState()
       const matches = matchDestinations({
@@ -118,6 +129,14 @@ export function ProfileWizard() {
         originCoord: currentOriginCoord,
       })
       setSuggestions(matches)
+
+      // Pre-select dining prefs based on interests (user can still change in preferences step)
+      const derived = new Set<DiningPref>()
+      if (interests.includes('Wine')) derived.add('Wineries')
+      if (interests.includes('Food')) { derived.add('Cafes'); derived.add('CasualDining') }
+      // No fallback — empty = no food stops wanted
+      setDiningPrefs(Array.from(derived))
+
       setStep(2)
       return
     }
@@ -177,12 +196,15 @@ export function ProfileWizard() {
       tripType,
       originName: storedOriginName,
       originCoord: storedOriginCoord,
-      destId: effectiveDest.clusterId, destName: effectiveDest.name, destCoord: effectiveDest.coord,
+      destId: effectiveDest.destId,
+      destName: effectiveDest.name,
+      destCoord: effectiveDest.coord,
       startDate,
       endDate: tripType === 'multiday' ? endDate : '',
       dailyDriveHours: tripType === 'day' ? maxDriveHours : dailyDriveHours,
       crewType, hasKids, diningPrefs,
       selectedCorridorId: effectiveDest.clusterId,
+      departureHour,
     })
 
     buildItinerary(startDate, tripType === 'multiday' ? endDate : undefined,
@@ -203,6 +225,7 @@ export function ProfileWizard() {
     if (step === 0) return crewType !== null && (!hasKids || !!kidsAge)
     if (step === 1) return interests.length > 0
     if (step === 2) return !!pickedDest
+    // Final step: date required
     return !!startDate && (tripType === 'day' || !!endDate)
   })()
 
@@ -258,6 +281,7 @@ export function ProfileWizard() {
                   kidsAge={kidsAge} setKidsAge={setKidsAge}
                   startDate={startDate} setStartDate={setStartDate}
                   endDate={endDate} setEndDate={setEndDate}
+                  departureHour={departureHour} setDepartureHour={setDepartureHour}
                 />
               )}
               {step === 1 && (
@@ -269,6 +293,7 @@ export function ProfileWizard() {
                   vehicleType={vehicleType} setVehicleType={setVehicleType}
                   accommodation={accommodation} setAccommodation={setAccommodation}
                   dailyDriveHours={dailyDriveHours} setDailyDriveHours={setDailyDriveHours}
+                  departureHour={departureHour} setDepartureHour={setDepartureHour}
                 />
               )}
             </>
@@ -305,6 +330,7 @@ export function ProfileWizard() {
                   vehicleType={vehicleType} setVehicleType={setVehicleType}
                   accommodation={accommodation} setAccommodation={setAccommodation}
                   dailyDriveHours={dailyDriveHours} setDailyDriveHours={setDailyDriveHours}
+                  departureHour={departureHour} setDepartureHour={setDepartureHour}
                   startDate={startDate} setStartDate={setStartDate}
                   endDate={endDate} setEndDate={setEndDate}
                 />
@@ -699,6 +725,7 @@ function StepPreferences({
   vehicleType, setVehicleType,
   accommodation, setAccommodation,
   dailyDriveHours, setDailyDriveHours,
+  departureHour, setDepartureHour,
   startDate, setStartDate,
   endDate, setEndDate,
 }: {
@@ -708,9 +735,11 @@ function StepPreferences({
   vehicleType: VehicleType; setVehicleType: (v: VehicleType) => void
   accommodation: AccommodationPreference; setAccommodation: (a: AccommodationPreference) => void
   dailyDriveHours?: number; setDailyDriveHours?: (n: number) => void
+  departureHour: number; setDepartureHour: (h: number) => void
   startDate?: string; setStartDate?: (d: string) => void
   endDate?: string; setEndDate?: (d: string) => void
 }) {
+  const minDate = getMinDate(tripType)
   const visibleDining = ALL_DINING.filter((d) => {
     if (!hasKids) return true
     if (!d.kidsOk && kidsAge !== 'teen') return false
@@ -749,7 +778,7 @@ function StepPreferences({
           <div style={{ display: 'grid', gridTemplateColumns: tripType === 'multiday' ? '1fr 1fr' : '1fr', gap: 10, marginTop: 10 }}>
             <div>
               <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 4 }}>{tripType === 'multiday' ? 'Departing' : 'Date'}</div>
-              <input type="date" value={startDate} onChange={(e) => setStartDate!(e.target.value)}
+              <input type="date" value={startDate} min={minDate} onChange={(e) => setStartDate!(e.target.value)}
                 className="input-field" />
             </div>
             {tripType === 'multiday' && (
@@ -779,9 +808,34 @@ function StepPreferences({
         </div>
       )}
 
+      {/* Departure time */}
+      <div>
+        <Label>What time do you want to leave?</Label>
+        <div style={{ display: 'flex', gap: 6, marginTop: 10, flexWrap: 'wrap' }}>
+          {[
+            [6, '6:00 AM'], [7, '7:00 AM'], [8, '8:00 AM'], [9, '9:00 AM'], [10, '10:00 AM'],
+          ].map(([h, label]) => (
+            <button
+              key={h}
+              onClick={() => setDepartureHour(h as number)}
+              style={{
+                padding: '9px 13px', borderRadius: 9, cursor: 'pointer',
+                background: departureHour === h ? 'var(--green-light)' : 'var(--bg-muted)',
+                border: `1.5px solid ${departureHour === h ? 'var(--border-active)' : 'var(--border)'}`,
+                color: departureHour === h ? GREEN : 'var(--text-muted)',
+                fontSize: 12, fontWeight: departureHour === h ? 700 : 500,
+                transition: 'all 0.15s',
+              }}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
+
       {/* Food */}
       <div>
-        <Label>Food & drink <span style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 400 }}>pick all that apply</span></Label>
+        <Label>Food stops <span style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 400 }}>leave blank for no stops</span></Label>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginTop: 10 }}>
           {visibleDining.map((d) => (
             <div key={d.pref} className={`option-card ${diningPrefs.includes(d.pref) ? 'selected' : ''}`}
@@ -853,6 +907,7 @@ function StepPlanningDetails({
   tripType, setTripType, crewType, setCrewType,
   hasKids, setHasKids, kidsAge, setKidsAge,
   startDate, setStartDate, endDate, setEndDate,
+  departureHour, setDepartureHour,
 }: {
   preselectedDest: { corridorId: string; destName: string; destCoord: Coordinate }
   onClearPreselect: () => void
@@ -862,8 +917,10 @@ function StepPlanningDetails({
   kidsAge: KidsAge | null; setKidsAge: (a: KidsAge) => void
   startDate: string; setStartDate: (d: string) => void
   endDate: string; setEndDate: (d: string) => void
+  departureHour: number; setDepartureHour: (h: number) => void
 }) {
   const showKids = crewType === 'family' || crewType === 'group'
+  const minDate = getMinDate(tripType)
   const originCoord = useAppStore((s) => s.originCoord)
   const originName = useAppStore((s) => s.originName)
 
@@ -919,7 +976,7 @@ function StepPlanningDetails({
       <div style={{ display: 'grid', gridTemplateColumns: tripType === 'multiday' ? '1fr 1fr' : '1fr', gap: 10 }}>
         <div>
           <Label>{tripType === 'multiday' ? 'Departing' : 'Date'}</Label>
-          <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)}
+          <input type="date" value={startDate} min={minDate} onChange={(e) => setStartDate(e.target.value)}
             className="input-field" style={{ marginTop: 6 }} />
         </div>
         {tripType === 'multiday' && (
@@ -929,6 +986,29 @@ function StepPlanningDetails({
               className="input-field" style={{ marginTop: 6 }} />
           </div>
         )}
+      </div>
+
+      {/* Departure time */}
+      <div>
+        <Label>What time do you want to leave?</Label>
+        <div style={{ display: 'flex', gap: 6, marginTop: 10, flexWrap: 'wrap' }}>
+          {([6, 7, 8, 9, 10] as const).map((h) => (
+            <button
+              key={h}
+              onClick={() => setDepartureHour(h)}
+              style={{
+                padding: '9px 13px', borderRadius: 9, cursor: 'pointer',
+                background: departureHour === h ? 'var(--green-light)' : 'var(--bg-muted)',
+                border: `1.5px solid ${departureHour === h ? 'var(--border-active)' : 'var(--border)'}`,
+                color: departureHour === h ? GREEN : 'var(--text-muted)',
+                fontSize: 12, fontWeight: departureHour === h ? 700 : 500,
+                transition: 'all 0.15s',
+              }}
+            >
+              {h}:00 {h < 12 ? 'AM' : 'PM'}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* Who */}

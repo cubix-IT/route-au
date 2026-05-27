@@ -8,6 +8,7 @@
 :root {
   /* Backgrounds */
   --bg-base:         #F8F7F4;
+  --bg-surface:      #FFFFFF;
   --bg-card:         #FFFFFF;
   --bg-muted:        #F0EEE9;
   --bg-subtle:       #EAE8E2;

@@ -2,17 +2,17 @@ import { useState, useRef, useEffect } from 'react'
 import { useAppStore } from '@/store/useAppStore'
 import type { PreselectedDest } from '@/store/useAppStore'
 import { getCurrentSeason, SEASON_META } from '@/utils/season'
-import { getClustersBySeason } from '@/data/victorianClusters'
 import type { VicCluster, SubDest } from '@/data/victorianClusters'
-import { getActivitiesForSubDest } from '@/data/victorianActivities'
 import type { Activity } from '@/data/victorianActivities'
+import { useClusters } from '@/hooks/useClusters'
+import { useActivities } from '@/hooks/useActivities'
 import { LogoMark } from '@/components/layout/Header'
+import { fetchLivePOIs, fetchWikipediaSummary, type LivePOI } from '@/lib/overpass'
 
 const GREEN = '#3A6B4F'
 
 const season = getCurrentSeason()
 const seasonMeta = SEASON_META[season]
-const clusters = getClustersBySeason(season)
 
 // ── Photon autocomplete ───────────────────────────────────────────────
 
@@ -82,49 +82,42 @@ function OriginSearchBox({
     onSelect(label, { lng, lat })
   }
 
-  const displayQuery = chosen ? query : query || originName
-
   return (
-    <div ref={ref} style={{ position: 'relative', width: '100%', maxWidth: 440 }}>
+    <div ref={ref} style={{ position: 'relative', width: '100%', maxWidth: 480 }}>
       <div style={{
         display: 'flex', alignItems: 'stretch',
-        borderRadius: 12,
+        borderRadius: 14,
         background: '#fff',
-        border: '1.5px solid var(--border)',
-        boxShadow: '0 4px 24px rgba(0,0,0,0.08)',
+        border: '2px solid rgba(255,255,255,0.6)',
+        boxShadow: '0 8px 32px rgba(0,0,0,0.15)',
         overflow: 'hidden',
       }}>
-        {/* Icon */}
         <div style={{
-          display: 'flex', alignItems: 'center', paddingLeft: 14,
-          color: '#8C8A87', fontSize: 16, flexShrink: 0,
+          display: 'flex', alignItems: 'center', paddingLeft: 16,
+          color: '#8C8A87', fontSize: 18, flexShrink: 0,
         }}>
           📍
         </div>
-
-        {/* Input */}
         <input
           type="text"
           placeholder={`Travelling from ${originName}…`}
-          value={displayQuery === originName && !chosen ? '' : query}
+          value={chosen ? query : query}
           onChange={(e) => onChange(e.target.value)}
           onFocus={() => { if (query.length >= 2) searchOrigin(query).then(setSuggestions) }}
           style={{
-            flex: 1, padding: '14px 12px',
+            flex: 1, padding: '16px 14px',
             border: 'none', outline: 'none',
-            fontSize: 14, color: '#1C1C1A',
+            fontSize: 15, color: '#1C1C1A',
             background: 'transparent',
           }}
         />
-
-        {/* CTA button */}
         <button
           onClick={onOpenWizard}
           style={{
             flexShrink: 0,
-            padding: '0 20px',
+            padding: '0 22px',
             background: GREEN, border: 'none',
-            color: '#fff', fontSize: 13, fontWeight: 700,
+            color: '#fff', fontSize: 14, fontWeight: 700,
             cursor: 'pointer', letterSpacing: '-0.01em',
             transition: 'background 0.15s',
           }}
@@ -135,13 +128,12 @@ function OriginSearchBox({
         </button>
       </div>
 
-      {/* Dropdown */}
       {suggestions.length > 0 && (
         <div style={{
           position: 'absolute', top: '100%', left: 0, right: 0,
-          marginTop: 4, borderRadius: 10,
+          marginTop: 6, borderRadius: 12,
           background: '#fff', border: '1px solid var(--border)',
-          boxShadow: '0 8px 32px rgba(0,0,0,0.12)',
+          boxShadow: '0 12px 40px rgba(0,0,0,0.15)',
           zIndex: 100, overflow: 'hidden',
         }}>
           {suggestions.map((f, i) => (
@@ -149,10 +141,10 @@ function OriginSearchBox({
               key={i}
               onClick={() => pick(f)}
               style={{
-                width: '100%', padding: '10px 16px',
+                width: '100%', padding: '11px 18px',
                 background: 'none', border: 'none',
                 textAlign: 'left', cursor: 'pointer',
-                fontSize: 13, color: '#1C1C1A',
+                fontSize: 14, color: '#1C1C1A',
                 borderBottom: i < suggestions.length - 1 ? '1px solid var(--border)' : 'none',
                 transition: 'background 0.1s',
               }}
@@ -161,7 +153,7 @@ function OriginSearchBox({
             >
               <span style={{ fontWeight: 600 }}>{f.properties.name}</span>
               {f.properties.city && (
-                <span style={{ color: '#8C8A87', marginLeft: 6 }}>
+                <span style={{ color: '#8C8A87', marginLeft: 8 }}>
                   {[f.properties.city, f.properties.state].filter(Boolean).join(', ')}
                 </span>
               )}
@@ -176,11 +168,15 @@ function OriginSearchBox({
 // ── Main landing page ─────────────────────────────────────────────────
 
 export function LandingPage() {
-  const { setWizardOpen, setPreselectedDest, setTripPlanState } = useAppStore()
-  const [expandedCluster, setExpandedCluster] = useState<string | null>(null)
+  const { clusters: rawClusters } = useClusters()
+  const clusters = [...rawClusters].sort(
+    (a, b) => (b.seasonalScores[season] ?? 0) - (a.seasonalScores[season] ?? 0)
+  )
+  const { setWizardOpen, setPreselectedDest, setTripPlanState, setOriginSet } = useAppStore()
 
   const handleOriginSelect = (name: string, coord: { lng: number; lat: number }) => {
     setTripPlanState({ originName: name, originCoord: coord })
+    setOriginSet(true)
   }
 
   const openWizard = () => {
@@ -191,6 +187,7 @@ export function LandingPage() {
   const planSubDest = (cluster: VicCluster, sub: SubDest) => {
     const preset: PreselectedDest = {
       corridorId: cluster.id,
+      destId: sub.id,
       destName: sub.name,
       destCoord: sub.coord,
     }
@@ -204,9 +201,6 @@ export function LandingPage() {
     setWizardOpen(true)
   }
 
-  const toggleCluster = (id: string) =>
-    setExpandedCluster((prev) => (prev === id ? null : id))
-
   return (
     <div style={{
       minHeight: '100vh',
@@ -215,12 +209,11 @@ export function LandingPage() {
       overflowX: 'hidden',
     }}>
 
-      {/* ── Nav ───────────────────────────────────────── */}
+      {/* ── Nav ─────────────────────────── */}
       <nav style={{
         position: 'sticky', top: 0, zIndex: 50,
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: '0 28px',
-        height: 56,
+        padding: '0 28px', height: 56,
         background: 'rgba(248,247,244,0.92)',
         backdropFilter: 'blur(12px)',
         borderBottom: '1px solid var(--border)',
@@ -231,8 +224,7 @@ export function LandingPage() {
             <div style={{
               fontFamily: "'Fraunces', Georgia, serif",
               fontSize: 15, fontWeight: 700,
-              color: '#1C1C1A', lineHeight: 1.15,
-              letterSpacing: '-0.02em',
+              color: '#1C1C1A', lineHeight: 1.15, letterSpacing: '-0.02em',
             }}>
               Unplanned<span style={{ color: GREEN }}> Escapes</span>
             </div>
@@ -251,24 +243,20 @@ export function LandingPage() {
         </button>
       </nav>
 
-      {/* ── Seasonal hero ─────────────────────────────── */}
+      {/* ── Hero ──────────────────────────── */}
       <section style={{
-        position: 'relative',
-        padding: '64px 24px 52px',
+        padding: '72px 24px 60px',
         textAlign: 'center',
-        overflow: 'hidden',
-        background: `linear-gradient(170deg, ${seasonMeta.palette.from}12 0%, transparent 60%)`,
+        background: `linear-gradient(170deg, ${seasonMeta.palette.from}14 0%, transparent 60%)`,
         borderBottom: '1px solid var(--border)',
       }}>
-        {/* Brand lockup */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 14, marginBottom: 32 }}>
-          <LogoMark size={52} />
+          <LogoMark size={56} />
           <div style={{ textAlign: 'left' }}>
             <div style={{
               fontFamily: "'Fraunces', Georgia, serif",
-              fontSize: 'clamp(24px, 4vw, 36px)', fontWeight: 700,
-              color: '#1C1C1A', lineHeight: 1.1,
-              letterSpacing: '-0.03em',
+              fontSize: 'clamp(26px, 4vw, 40px)', fontWeight: 700,
+              color: '#1C1C1A', lineHeight: 1.1, letterSpacing: '-0.03em',
             }}>
               Unplanned<span style={{ color: GREEN }}> Escapes</span>
             </div>
@@ -278,49 +266,36 @@ export function LandingPage() {
           </div>
         </div>
 
-        {/* Season badge */}
         <div style={{
           display: 'inline-flex', alignItems: 'center', gap: 6,
           padding: '5px 14px', borderRadius: 20,
           background: `${seasonMeta.palette.from}12`,
           border: `1px solid ${seasonMeta.palette.from}30`,
-          fontSize: 12, fontWeight: 600,
-          color: seasonMeta.palette.from,
-          letterSpacing: '0.04em',
-          marginBottom: 20,
+          fontSize: 11, fontWeight: 700, color: seasonMeta.palette.from,
+          letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 20,
         }}>
-          {seasonMeta.emoji} {seasonMeta.label} in Victoria
+          {seasonMeta.label} in Victoria
         </div>
 
         <h1 style={{
           fontFamily: "'Fraunces', Georgia, serif",
           fontSize: 'clamp(28px, 5vw, 56px)',
-          fontWeight: 700,
-          letterSpacing: '-0.03em',
-          lineHeight: 1.1,
-          color: '#1C1C1A',
-          maxWidth: 640,
-          margin: '0 auto 16px',
+          fontWeight: 700, letterSpacing: '-0.03em', lineHeight: 1.1,
+          color: '#1C1C1A', maxWidth: 640, margin: '0 auto 16px',
         }}>
           {seasonMeta.headline}
         </h1>
 
         <p style={{
           fontSize: 'clamp(14px, 1.8vw, 17px)',
-          color: '#4A4948',
-          lineHeight: 1.7,
-          maxWidth: 500,
-          margin: '0 auto 32px',
+          color: '#4A4948', lineHeight: 1.7,
+          maxWidth: 500, margin: '0 auto 36px',
         }}>
           {seasonMeta.sub}
         </p>
 
-        {/* Origin search + plan CTA */}
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
-          <OriginSearchBox
-            onSelect={handleOriginSelect}
-            onOpenWizard={openWizard}
-          />
+          <OriginSearchBox onSelect={handleOriginSelect} onOpenWizard={openWizard} />
           <button
             onClick={() => document.getElementById('clusters')?.scrollIntoView({ behavior: 'smooth' })}
             style={{
@@ -329,58 +304,59 @@ export function LandingPage() {
               textDecoration: 'underline', textDecorationColor: 'var(--border)',
               padding: '4px 8px',
             }}>
-            or browse destinations first ↓
+            or browse destinations ↓
           </button>
         </div>
 
-        <div style={{ display: 'flex', gap: 28, justifyContent: 'center', marginTop: 44, flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', gap: 32, justifyContent: 'center', marginTop: 48, flexWrap: 'wrap' }}>
           {[
             { val: '12', label: 'regions' },
-            { val: '35+', label: 'specific destinations' },
-            { val: '< 4 hrs', label: 'from Melbourne' },
+            { val: '35+', label: 'specific spots' },
+            { val: '60+', label: 'local experiences' },
           ].map(({ val, label }) => (
             <div key={label} style={{ textAlign: 'center' }}>
-              <div style={{ fontFamily: "'Fraunces', Georgia, serif", fontSize: 22, fontWeight: 700, color: GREEN }}>{val}</div>
+              <div style={{ fontFamily: "'Fraunces', Georgia, serif", fontSize: 24, fontWeight: 700, color: GREEN }}>{val}</div>
               <div style={{ fontSize: 11, color: '#8C8A87', marginTop: 2, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{label}</div>
             </div>
           ))}
         </div>
       </section>
 
-      {/* ── Cluster cards ────────────────────────────── */}
-      <section id="clusters" style={{ padding: '56px 24px 80px', maxWidth: 960, margin: '0 auto' }}>
-        <div style={{ marginBottom: 32 }}>
+      {/* ── Cluster cards grid ────────────── */}
+      <section id="clusters" style={{ padding: '56px 24px 100px', maxWidth: 1440, margin: '0 auto' }}>
+        <div style={{ marginBottom: 40 }}>
           <div style={{ fontSize: 10, fontWeight: 700, color: GREEN, letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 8 }}>
-            Where to go this {seasonMeta.label.toLowerCase()}
+            {seasonMeta.label} recommendations
           </div>
           <h2 style={{
             fontFamily: "'Fraunces', Georgia, serif",
-            fontSize: 'clamp(20px, 3vw, 28px)',
-            fontWeight: 700, letterSpacing: '-0.02em', color: '#1C1C1A',
-            marginBottom: 8,
+            fontSize: 'clamp(22px, 3vw, 30px)',
+            fontWeight: 700, letterSpacing: '-0.02em', color: '#1C1C1A', marginBottom: 8,
           }}>
-            Pick a region, then choose your spot
+            Choose a region, then select your destination
           </h2>
           <p style={{ fontSize: 13, color: '#8C8A87', lineHeight: 1.6 }}>
-            Tap any region to see specific places inside it — real drive times and what each one is actually good for.
+            Drive times are calculated from your location. Select any destination to view what's there and start planning.
           </p>
         </div>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))',
+          gap: 24,
+        }}>
           {clusters.map((cluster) => (
-            <ClusterRow
+            <ClusterCard
               key={cluster.id}
               cluster={cluster}
               season={season}
-              expanded={expandedCluster === cluster.id}
-              onToggle={() => toggleCluster(cluster.id)}
               onPlan={planSubDest}
             />
           ))}
         </div>
       </section>
 
-      {/* ── Footer ─────────────────────────────────── */}
+      {/* ── Footer ─────────────────────── */}
       <footer style={{
         borderTop: '1px solid var(--border)',
         padding: '20px 28px',
@@ -394,273 +370,588 @@ export function LandingPage() {
         </div>
         <div style={{ fontSize: 11, color: '#8C8A87' }}>Maps © OpenStreetMap · © CARTO</div>
       </footer>
-
     </div>
   )
 }
 
-// ── Cluster row (collapsible) ───────────────────────────────────────
+// ── From-where modal ─────────────────────────────────────────────────
 
-function ClusterRow({
-  cluster, season, expanded, onToggle, onPlan,
+function FromWhereModal({
+  onConfirm,
+  onClose,
 }: {
-  cluster: VicCluster
-  season: string
-  expanded: boolean
-  onToggle: () => void
-  onPlan: (cluster: VicCluster, sub: SubDest) => void
+  onConfirm: (name: string, coord: { lng: number; lat: number }) => void
+  onClose: () => void
 }) {
-  const score = cluster.seasonalScores[season as keyof typeof cluster.seasonalScores]
-  const isGreat = score >= 9
-  const isGood = score >= 7
+  const [query, setQuery] = useState('')
+  const [suggestions, setSuggestions] = useState<PhotonFeature[]>([])
+  const [chosen, setChosen] = useState<{ name: string; coord: { lng: number; lat: number } } | null>(null)
+  const debounce = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const onChange = (val: string) => {
+    setQuery(val)
+    setChosen(null)
+    if (debounce.current) clearTimeout(debounce.current)
+    debounce.current = setTimeout(async () => {
+      const results = await searchOrigin(val)
+      setSuggestions(results)
+    }, 280)
+  }
+
+  const pick = (f: PhotonFeature) => {
+    const label = featureLabel(f)
+    const [lng, lat] = f.geometry.coordinates
+    setQuery(label)
+    setSuggestions([])
+    setChosen({ name: label, coord: { lng, lat } })
+  }
 
   return (
-    <div style={{
-      borderRadius: 14,
-      background: '#fff',
-      border: `1px solid ${expanded ? 'var(--border-strong)' : 'var(--border)'}`,
-      overflow: 'hidden',
-      transition: 'border-color 0.2s',
-    }}>
-      {/* Row header — always visible */}
-      <button
-        onClick={onToggle}
-        style={{
-          width: '100%', display: 'flex', alignItems: 'center',
-          padding: '16px 20px', gap: 16,
-          background: 'transparent', border: 'none', cursor: 'pointer',
-          textAlign: 'left',
-        }}
-      >
-        {/* Gradient swatch */}
+    <div
+      style={{
+        position: 'fixed', inset: 0, zIndex: 300,
+        background: 'rgba(0,0,0,0.55)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        padding: 24,
+      }}
+      onClick={(e) => { if (e.target === e.currentTarget) onClose() }}
+    >
+      <div style={{
+        background: '#fff', borderRadius: 20, padding: '32px 28px',
+        width: '100%', maxWidth: 460,
+        boxShadow: '0 24px 80px rgba(0,0,0,0.3)',
+      }}>
         <div style={{
-          width: 44, height: 44, borderRadius: 10, flexShrink: 0,
-          background: `linear-gradient(135deg, ${cluster.gradientFrom}, ${cluster.gradientTo})`,
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          fontSize: 20,
+          fontFamily: "'Fraunces', Georgia, serif",
+          fontSize: 22, fontWeight: 700, color: '#1C1C1A',
+          marginBottom: 6, letterSpacing: '-0.02em',
         }}>
-          {cluster.image}
+          Where are you starting from?
         </div>
+        <p style={{ fontSize: 13, color: '#8C8A87', marginBottom: 22, lineHeight: 1.6, margin: '6px 0 22px' }}>
+          Enter your suburb or town so we can calculate drive times and tailor your trip.
+        </p>
 
-        {/* Name + meta */}
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-            <span style={{ fontSize: 15, fontWeight: 700, color: '#1C1C1A', letterSpacing: '-0.02em' }}>
-              {cluster.name}
-            </span>
-            {isGreat && (
-              <span style={{
-                fontSize: 10, fontWeight: 700, color: GREEN,
-                background: `${GREEN}12`, border: `1px solid ${GREEN}25`,
-                padding: '1px 7px', borderRadius: 6, letterSpacing: '0.03em',
-              }}>
-                ✦ Perfect now
-              </span>
-            )}
-            {!isGreat && isGood && (
-              <span style={{
-                fontSize: 10, fontWeight: 600, color: '#8C8A87',
-                background: 'var(--bg-muted)', padding: '1px 7px', borderRadius: 6,
-              }}>
-                Good now
-              </span>
+        <div style={{ position: 'relative', marginBottom: 18 }}>
+          <div style={{
+            display: 'flex', alignItems: 'center',
+            border: `2px solid ${chosen ? GREEN : 'var(--border)'}`,
+            borderRadius: 12, background: '#FAFAF9', overflow: 'visible',
+            transition: 'border-color 0.15s',
+          }}>
+            <span style={{ padding: '0 12px', fontSize: 16, flexShrink: 0 }}>📍</span>
+            <input
+              autoFocus
+              type="text"
+              placeholder="e.g. Fitzroy, Carlton, Geelong…"
+              value={query}
+              onChange={(e) => onChange(e.target.value)}
+              style={{
+                flex: 1, padding: '13px 0',
+                border: 'none', outline: 'none',
+                fontSize: 15, color: '#1C1C1A', background: 'transparent',
+              }}
+            />
+            {chosen && (
+              <span style={{ padding: '0 14px', color: GREEN, fontSize: 18 }}>✓</span>
             )}
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 3, flexWrap: 'wrap' }}>
-            <span style={{ fontSize: 12, color: '#8C8A87' }}>
-              🚗 {cluster.driveTimeRange} from Melbourne
-            </span>
-            <span style={{ fontSize: 12, color: '#C8C4BD' }}>·</span>
-            <span style={{ fontSize: 12, color: '#8C8A87' }}>
-              {cluster.subDests.length} places to explore
-            </span>
-          </div>
-        </div>
 
-        {/* Theme pills — desktop only */}
-        <div style={{ display: 'flex', gap: 5, flexShrink: 0, flexWrap: 'wrap', maxWidth: 240 }}>
-          {cluster.themes.slice(0, 3).map((t) => (
-            <span key={t} style={{
-              fontSize: 11, color: '#8C8A87',
-              background: 'var(--bg-muted)',
-              padding: '3px 8px', borderRadius: 6, fontWeight: 500,
+          {suggestions.length > 0 && (
+            <div style={{
+              position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: 0,
+              background: '#fff', border: '1px solid var(--border)', borderRadius: 10,
+              boxShadow: '0 8px 24px rgba(0,0,0,0.12)', zIndex: 10, overflow: 'hidden',
             }}>
-              {t}
-            </span>
-          ))}
+              {suggestions.map((f, i) => (
+                <button
+                  key={i}
+                  onClick={() => pick(f)}
+                  style={{
+                    width: '100%', padding: '10px 16px',
+                    background: 'none', border: 'none', textAlign: 'left',
+                    cursor: 'pointer', fontSize: 14, color: '#1C1C1A',
+                    borderBottom: i < suggestions.length - 1 ? '1px solid var(--border)' : 'none',
+                  }}
+                  onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--bg-muted)')}
+                  onMouseLeave={(e) => (e.currentTarget.style.background = 'none')}
+                >
+                  <span style={{ fontWeight: 600 }}>{f.properties.name}</span>
+                  {f.properties.city && (
+                    <span style={{ color: '#8C8A87', marginLeft: 8 }}>
+                      {[f.properties.city, f.properties.state].filter(Boolean).join(', ')}
+                    </span>
+                  )}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
-        {/* Chevron */}
+        <button
+          disabled={!chosen}
+          onClick={() => chosen && onConfirm(chosen.name, chosen.coord)}
+          style={{
+            width: '100%', padding: '13px', borderRadius: 12, border: 'none',
+            background: chosen ? GREEN : 'var(--bg-muted)',
+            color: chosen ? '#fff' : '#C8C4BD',
+            fontSize: 15, fontWeight: 700,
+            cursor: chosen ? 'pointer' : 'not-allowed',
+            transition: 'all 0.15s', letterSpacing: '-0.01em',
+          }}
+          onMouseEnter={(e) => { if (chosen) e.currentTarget.style.background = '#2d5440' }}
+          onMouseLeave={(e) => { if (chosen) e.currentTarget.style.background = GREEN }}
+        >
+          Continue to trip planner →
+        </button>
+      </div>
+    </div>
+  )
+}
+
+// ── Live POI section (Overpass + Wikipedia) ────────────────────────
+
+const POI_CFG: Record<LivePOI['type'], { label: string; emoji: string }> = {
+  cafe: { label: 'Cafes', emoji: '☕' },
+  restaurant: { label: 'Restaurants', emoji: '🍽' },
+  pub: { label: 'Pubs & Bars', emoji: '🍺' },
+  viewpoint: { label: 'Viewpoints & Peaks', emoji: '👁' },
+  attraction: { label: 'Attractions', emoji: '🏛' },
+  hiking: { label: 'Hiking routes', emoji: '🥾' },
+}
+
+function LivePOISection({ pois, wikiSummary }: { pois: LivePOI[]; wikiSummary: string | null }) {
+  const byType: Partial<Record<LivePOI['type'], LivePOI[]>> = {}
+  for (const poi of pois) {
+    if (!byType[poi.type]) byType[poi.type] = []
+    if ((byType[poi.type]!).length < 5) byType[poi.type]!.push(poi)
+  }
+
+  const order: LivePOI['type'][] = ['cafe', 'restaurant', 'pub', 'hiking', 'viewpoint', 'attraction']
+  const hasAny = order.some((t) => (byType[t]?.length ?? 0) > 0)
+
+  return (
+    <div>
+      {wikiSummary && (
         <div style={{
-          color: '#8C8A87', fontSize: 16, flexShrink: 0,
-          transform: expanded ? 'rotate(180deg)' : 'none',
-          transition: 'transform 0.2s',
+          padding: '10px 12px', borderRadius: 8, marginBottom: 10,
+          background: '#F0F4F1', border: '1px solid rgba(58,107,79,0.15)',
         }}>
-          ↓
-        </div>
-      </button>
-
-      {/* Expanded sub-destinations */}
-      {expanded && (
-        <div style={{ borderTop: '1px solid var(--border)' }}>
-          {/* Tagline */}
-          <div style={{ padding: '12px 20px 0', fontSize: 13, color: '#4A4948', lineHeight: 1.6 }}>
-            {cluster.tagline}
+          <div style={{ fontSize: 10, fontWeight: 700, color: GREEN, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 4 }}>
+            About this area
           </div>
-
-          {/* Sub-destination cards */}
-          <div style={{ padding: '12px 20px 20px', display: 'flex', flexDirection: 'column', gap: 10 }}>
-            {cluster.subDests.map((sub) => (
-              <SubDestCard key={sub.id} sub={sub} onPlan={() => onPlan(cluster, sub)} />
-            ))}
-          </div>
+          <p style={{ fontSize: 12, color: '#4A4948', lineHeight: 1.65, margin: 0 }}>{wikiSummary}</p>
         </div>
+      )}
+
+      {hasAny ? (
+        <>
+          <div style={{ fontSize: 10, fontWeight: 700, color: '#8C8A87', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 8 }}>
+            Real places nearby · OpenStreetMap
+          </div>
+          {order.map((type) => {
+            const items = byType[type]
+            if (!items?.length) return null
+            const cfg = POI_CFG[type]
+            return (
+              <div key={type} style={{ marginBottom: 10 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: '#4A4948', marginBottom: 4 }}>
+                  {cfg.emoji} {cfg.label}
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                  {items.map((poi) => (
+                    <div key={poi.id} style={{
+                      display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between',
+                      padding: '7px 10px', borderRadius: 7,
+                      background: '#fff', border: '1px solid var(--border)',
+                    }}>
+                      <div style={{ minWidth: 0 }}>
+                        <span style={{ fontSize: 12, fontWeight: 600, color: '#1C1C1A' }}>{poi.name}</span>
+                        {poi.cuisine && (
+                          <span style={{ fontSize: 11, color: '#8C8A87', marginLeft: 6 }}>{poi.cuisine}</span>
+                        )}
+                        {poi.routeLength && (
+                          <span style={{ fontSize: 11, color: '#8C8A87', marginLeft: 6 }}>{poi.routeLength}</span>
+                        )}
+                        {poi.openingHours && (
+                          <div style={{ fontSize: 11, color: '#8C8A87', marginTop: 1 }}>
+                            {poi.openingHours.split(';')[0]}
+                          </div>
+                        )}
+                      </div>
+                      {poi.website && (
+                        <a
+                          href={poi.website.startsWith('http') ? poi.website : `https://${poi.website}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          style={{
+                            fontSize: 11, color: '#4285F4', fontWeight: 600,
+                            textDecoration: 'none', flexShrink: 0, marginLeft: 8, marginTop: 1,
+                          }}
+                        >
+                          Website ↗
+                        </a>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )
+          })}
+        </>
+      ) : (
+        !wikiSummary && (
+          <p style={{ fontSize: 12, color: '#8C8A87', margin: 0, lineHeight: 1.6 }}>
+            No OpenStreetMap listings found nearby — OSM coverage varies in regional areas.
+          </p>
+        )
       )}
     </div>
   )
 }
 
-// ── Sub-destination card ────────────────────────────────────────────
+// ── Big cluster card with backdrop image ────────────────────────────
 
-function SubDestCard({ sub, onPlan }: { sub: SubDest; onPlan: () => void }) {
+function ClusterCard({
+  cluster, season, onPlan,
+}: {
+  cluster: VicCluster
+  season: string
+  onPlan: (cluster: VicCluster, sub: SubDest) => void
+}) {
+  const [selectedSubIdx, setSelectedSubIdx] = useState(0)
+  const [imgError, setImgError] = useState(false)
+  const score = cluster.seasonalScores[season as keyof typeof cluster.seasonalScores]
+  const isGreat = score >= 9
+  const isGood = score >= 7
+  const selectedSub = cluster.subDests[selectedSubIdx]
+
+  return (
+    <div style={{
+      borderRadius: 18,
+      overflow: 'hidden',
+      background: '#fff',
+      border: '1px solid var(--border)',
+      boxShadow: '0 2px 16px rgba(0,0,0,0.06)',
+      display: 'flex', flexDirection: 'column',
+    }}>
+      {/* Image header */}
+      <div style={{ position: 'relative', height: 210, overflow: 'hidden', flexShrink: 0 }}>
+        {!imgError ? (
+          <img
+            src={`${cluster.imageUrl}?auto=format&fit=crop&w=800&q=80`}
+            alt={cluster.name}
+            onError={() => setImgError(true)}
+            style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+          />
+        ) : (
+          <div style={{
+            width: '100%', height: '100%',
+            background: `linear-gradient(135deg, ${cluster.gradientFrom}, ${cluster.gradientTo})`,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: 64,
+          }}>
+            {cluster.image}
+          </div>
+        )}
+
+        {/* Gradient overlay */}
+        <div style={{
+          position: 'absolute', inset: 0,
+          background: 'linear-gradient(to bottom, rgba(0,0,0,0.08) 0%, rgba(0,0,0,0.72) 100%)',
+        }} />
+
+        {/* Season badge — top left */}
+        {(isGreat || isGood) && (
+          <div style={{
+            position: 'absolute', top: 14, left: 14,
+            padding: '4px 10px', borderRadius: 20,
+            background: isGreat ? 'rgba(58,107,79,0.92)' : 'rgba(0,0,0,0.45)',
+            backdropFilter: 'blur(6px)',
+            fontSize: 11, fontWeight: 700,
+            color: '#fff', letterSpacing: '0.05em', textTransform: 'uppercase',
+          }}>
+            {isGreat ? 'Ideal now' : 'Good now'}
+          </div>
+        )}
+
+        {/* Drive time badge — top right */}
+        <div style={{
+          position: 'absolute', top: 14, right: 14,
+          padding: '4px 10px', borderRadius: 20,
+          background: 'rgba(0,0,0,0.45)',
+          backdropFilter: 'blur(6px)',
+          fontSize: 11, fontWeight: 600, color: '#fff',
+        }}>
+          {cluster.driveTimeRange} from Melbourne
+        </div>
+
+        {/* Text overlay — bottom */}
+        <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: '16px 20px' }}>
+          <div style={{
+            fontFamily: "'Fraunces', Georgia, serif",
+            fontSize: 22, fontWeight: 700, color: '#fff',
+            letterSpacing: '-0.02em', lineHeight: 1.2, marginBottom: 5,
+          }}>
+            {cluster.name}
+          </div>
+          <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.82)', lineHeight: 1.5 }}>
+            {cluster.tagline}
+          </div>
+        </div>
+      </div>
+
+      {/* Theme pills */}
+      <div style={{
+        display: 'flex', gap: 6, padding: '10px 18px',
+        borderBottom: '1px solid var(--border)',
+        flexWrap: 'wrap',
+      }}>
+        {cluster.themes.map((t) => (
+          <span key={t} style={{
+            fontSize: 11, color: '#6B6966',
+            background: 'var(--bg-muted)',
+            padding: '3px 9px', borderRadius: 6, fontWeight: 500,
+          }}>
+            {t}
+          </span>
+        ))}
+      </div>
+
+      {/* Sub-destination tabs */}
+      <div style={{
+        display: 'flex', gap: 8, padding: '14px 18px',
+        borderBottom: '1px solid var(--border)',
+        flexWrap: 'wrap',
+      }}>
+        {cluster.subDests.map((sub, i) => (
+          <button
+            key={sub.id}
+            onClick={() => setSelectedSubIdx(i)}
+            style={{
+              padding: '6px 13px', borderRadius: 8,
+              background: i === selectedSubIdx ? GREEN : 'var(--bg-base)',
+              color: i === selectedSubIdx ? '#fff' : '#4A4948',
+              border: `1.5px solid ${i === selectedSubIdx ? GREEN : 'var(--border)'}`,
+              fontSize: 12, fontWeight: i === selectedSubIdx ? 700 : 500,
+              cursor: 'pointer', transition: 'all 0.15s',
+            }}
+          >
+            {sub.name}
+          </button>
+        ))}
+      </div>
+
+      {/* Selected sub-destination detail */}
+      <SubDestDetail
+        key={selectedSub.id}
+        sub={selectedSub}
+        onPlan={() => onPlan(cluster, selectedSub)}
+      />
+    </div>
+  )
+}
+
+// ── Sub-destination detail panel ─────────────────────────────────────
+
+function SubDestDetail({ sub, onPlan }: { sub: SubDest; onPlan: () => void }) {
   const [showActivities, setShowActivities] = useState(false)
+  const [showFromWhere, setShowFromWhere] = useState(false)
+  const [livePOIs, setLivePOIs] = useState<LivePOI[] | null>(null)
+  const [livePOIsLoading, setLivePOIsLoading] = useState(false)
+  const [wikiSummary, setWikiSummary] = useState<string | null | undefined>(undefined)
+
   const originCoord = useAppStore((s) => s.originCoord)
   const originName = useAppStore((s) => s.originName)
+  const originSet = useAppStore((s) => s.originSet)
+  const setTripPlanState = useAppStore((s) => s.setTripPlanState)
+  const setOriginSet = useAppStore((s) => s.setOriginSet)
 
   const { distanceBetween } = useDriveDist()
   const driveKm = Math.round(distanceBetween(originCoord, sub.coord) * 1.3)
   const driveHrs = driveKm / 80
   const driveLabel = driveHrs < 1
-    ? `${Math.round(driveHrs * 60)} min from ${originName}`
+    ? `${Math.round(driveHrs * 60)} min`
     : driveHrs < 2
-      ? `${driveHrs.toFixed(1)} hr from ${originName}`
-      : `${driveHrs.toFixed(1)} hrs from ${originName}`
+      ? `${driveHrs.toFixed(1)} hr`
+      : `${driveHrs.toFixed(1)} hrs`
 
-  const hrsNum = driveHrs
-  const displayHrs = hrsNum < 1
-    ? `${Math.round(hrsNum * 60)}`
-    : hrsNum.toFixed(hrsNum === Math.floor(hrsNum) ? 0 : 1)
+  const { activities } = useActivities(sub.id)
+  const hiddenGems = activities.filter((a) => a.isHiddenGem)
 
-  const activities = getActivitiesForSubDest(sub.id)
-  const hasActivities = activities.length > 0
+  // Fetch live POIs + Wikipedia when panel opens
+  useEffect(() => {
+    if (!showActivities || livePOIs !== null) return
+    setLivePOIsLoading(true)
+    Promise.all([
+      fetchLivePOIs(sub.id, sub.coord.lat, sub.coord.lng),
+      fetchWikipediaSummary(sub.id, sub.name),
+    ]).then(([pois, wiki]) => {
+      setLivePOIs(pois)
+      setWikiSummary(wiki)
+      setLivePOIsLoading(false)
+    }).catch(() => {
+      setLivePOIs([])
+      setLivePOIsLoading(false)
+    })
+  }, [showActivities, sub.id, sub.coord, sub.name, livePOIs])
+
+  const handlePlanClick = () => {
+    if (!originSet) {
+      setShowFromWhere(true)
+    } else {
+      onPlan()
+    }
+  }
+
+  const handleFromWhereConfirm = (name: string, coord: { lng: number; lat: number }) => {
+    setTripPlanState({ originName: name, originCoord: coord })
+    setOriginSet(true)
+    setShowFromWhere(false)
+    onPlan()
+  }
 
   return (
-    <div style={{
-      borderRadius: 10,
-      background: 'var(--bg-base)',
-      border: '1px solid var(--border)',
-      overflow: 'hidden',
-    }}>
-      <div style={{ padding: '14px 16px', display: 'flex', gap: 14, alignItems: 'flex-start' }}>
+    <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+      {showFromWhere && (
+        <FromWhereModal
+          onConfirm={handleFromWhereConfirm}
+          onClose={() => setShowFromWhere(false)}
+        />
+      )}
+
+      {/* Summary row */}
+      <div style={{ padding: '16px 18px', display: 'flex', gap: 14, alignItems: 'flex-start' }}>
         {/* Drive time badge */}
         <div style={{
-          flexShrink: 0,
-          minWidth: 70, textAlign: 'center',
-          padding: '8px 6px',
-          borderRadius: 8,
-          background: '#fff',
+          flexShrink: 0, textAlign: 'center',
+          minWidth: 64, padding: '8px 8px',
+          borderRadius: 10, background: 'var(--bg-base)',
           border: '1px solid var(--border)',
         }}>
-          <div style={{ fontSize: 14, fontWeight: 800, color: '#1C1C1A', letterSpacing: '-0.03em', lineHeight: 1.1 }}>
-            {displayHrs}
+          <div style={{ fontSize: 18, fontWeight: 800, color: '#1C1C1A', letterSpacing: '-0.03em', lineHeight: 1 }}>
+            {driveHrs < 1 ? Math.round(driveHrs * 60) : driveHrs.toFixed(driveHrs === Math.floor(driveHrs) ? 0 : 1)}
           </div>
-          <div style={{ fontSize: 9, color: '#8C8A87', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600 }}>
-            {hrsNum < 1 ? 'min' : 'hrs'}
+          <div style={{ fontSize: 9, color: '#8C8A87', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600, marginTop: 2 }}>
+            {driveHrs < 1 ? 'min' : 'hrs'}
           </div>
-          <div style={{ fontSize: 9, color: '#C8C4BD', marginTop: 2 }}>{driveKm} km</div>
+          <div style={{ fontSize: 9, color: '#C8C4BD', marginTop: 1 }}>from {originName.split(',')[0]}</div>
         </div>
 
-        {/* Content */}
+        {/* Highlights */}
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 6, flexWrap: 'wrap' }}>
-            <span style={{ fontSize: 14, fontWeight: 700, color: '#1C1C1A', letterSpacing: '-0.01em' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, flexWrap: 'wrap' }}>
+            <span style={{ fontSize: 15, fontWeight: 700, color: '#1C1C1A', letterSpacing: '-0.01em' }}>
               {sub.name}
             </span>
-            <span style={{ fontSize: 11, color: '#8C8A87' }}>{driveLabel}</span>
+            <span style={{ fontSize: 12, color: '#8C8A87' }}>· {driveLabel} drive</span>
           </div>
-
-          {/* Highlights (shown when activities not expanded) */}
-          {!showActivities && (
-            <ul style={{ margin: 0, padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 3 }}>
-              {sub.highlights.map((h) => (
-                <li key={h} style={{ display: 'flex', gap: 6, fontSize: 12, color: '#4A4948', lineHeight: 1.5 }}>
-                  <span style={{ color: GREEN, flexShrink: 0, marginTop: 1 }}>·</span>
-                  {h}
-                </li>
-              ))}
-            </ul>
-          )}
-
-          {/* Theme pills + activities toggle */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginTop: 10, flexWrap: 'wrap' }}>
-            {sub.themes.map((t) => (
-              <span key={t} style={{
-                fontSize: 10, color: '#8C8A87',
-                background: '#fff', border: '1px solid var(--border)',
-                padding: '2px 7px', borderRadius: 5, fontWeight: 500,
-              }}>{t}</span>
+          <ul style={{ margin: 0, padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 4 }}>
+            {sub.highlights.map((h) => (
+              <li key={h} style={{ display: 'flex', gap: 7, fontSize: 13, color: '#4A4948', lineHeight: 1.5 }}>
+                <span style={{ color: GREEN, flexShrink: 0, marginTop: 1 }}>·</span>
+                {h}
+              </li>
             ))}
-            {hasActivities && (
-              <button
-                onClick={() => setShowActivities((v) => !v)}
-                style={{
-                  background: 'none', border: 'none',
-                  fontSize: 11, color: GREEN, cursor: 'pointer',
-                  fontWeight: 600, padding: '2px 0', marginLeft: 'auto',
-                  textDecoration: 'underline', textDecorationColor: `${GREEN}50`,
-                }}>
-                {showActivities ? 'Hide' : `What's here →`}
-              </button>
-            )}
-          </div>
-        </div>
+          </ul>
 
-        {/* CTA */}
-        <button
-          onClick={onPlan}
-          style={{
-            flexShrink: 0, alignSelf: 'flex-start',
-            padding: '8px 14px', borderRadius: 8,
-            background: `${GREEN}12`,
-            border: `1px solid ${GREEN}30`,
-            color: GREEN, fontSize: 12, fontWeight: 600,
-            cursor: 'pointer', transition: 'background 0.15s',
-            whiteSpace: 'nowrap',
-          }}
-          onMouseEnter={(e) => (e.currentTarget.style.background = `${GREEN}22`)}
-          onMouseLeave={(e) => (e.currentTarget.style.background = `${GREEN}12`)}
-        >
-          Let's plan →
-        </button>
+          {hiddenGems.length > 0 && !showActivities && (
+            <div style={{
+              display: 'inline-flex', alignItems: 'center', gap: 5,
+              marginTop: 10, padding: '3px 9px', borderRadius: 6,
+              background: '#FFF8F0', border: '1px solid #E8C89860',
+              fontSize: 11, color: '#B87333', fontWeight: 600,
+            }}>
+              {hiddenGems.length} lesser-known experience{hiddenGems.length > 1 ? 's' : ''} here
+            </div>
+          )}
+        </div>
       </div>
 
-      {/* Activities panel */}
-      {showActivities && hasActivities && (
-        <div style={{ borderTop: '1px solid var(--border)', padding: '12px 16px', background: '#fff' }}>
-          <div style={{ fontSize: 11, fontWeight: 700, color: '#8C8A87', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 10 }}>
-            Things to do
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {activities.map((act) => (
-              <ActivityRow key={act.id} activity={act} />
-            ))}
-          </div>
+      {/* Activities + live POIs section */}
+      {showActivities && (
+        <div style={{ borderTop: '1px solid var(--border)', padding: '14px 18px', background: 'var(--bg-base)' }}>
+          {/* Live data from Overpass + Wikipedia */}
+          {livePOIsLoading ? (
+            <div style={{ fontSize: 12, color: '#8C8A87', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
+              <span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%', background: GREEN, animation: 'pulse 1.2s ease-in-out infinite' }} />
+              Finding real cafes, trails & attractions nearby…
+            </div>
+          ) : livePOIs !== null ? (
+            <div style={{ marginBottom: 14 }}>
+              <LivePOISection pois={livePOIs} wikiSummary={wikiSummary ?? null} />
+            </div>
+          ) : null}
+
+          {/* Curated activities */}
+          {activities.length > 0 && (
+            <>
+              <div style={{ fontSize: 10, fontWeight: 700, color: '#8C8A87', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 8 }}>
+                Curated picks
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 260, overflowY: 'auto' }}>
+                {activities.map((act) => (
+                  <ActivityRow key={act.id} activity={act} />
+                ))}
+              </div>
+            </>
+          )}
         </div>
       )}
+
+      {/* Action row */}
+      <div style={{
+        display: 'flex', gap: 8, padding: '12px 18px',
+        borderTop: '1px solid var(--border)',
+        marginTop: 'auto',
+      }}>
+        <button
+          onClick={() => setShowActivities((v) => !v)}
+          style={{
+            flex: 1,
+            padding: '9px 0', borderRadius: 9,
+            background: showActivities ? 'var(--bg-muted)' : 'var(--bg-base)',
+            border: '1.5px solid var(--border)',
+            color: '#4A4948', fontSize: 13, fontWeight: 600,
+            cursor: 'pointer', transition: 'background 0.15s',
+          }}
+          onMouseEnter={(e) => (e.currentTarget.style.background = '#edecea')}
+          onMouseLeave={(e) => (e.currentTarget.style.background = showActivities ? 'var(--bg-muted)' : 'var(--bg-base)')}
+        >
+          {showActivities ? 'Hide' : "What's here"}
+        </button>
+        <button
+          onClick={handlePlanClick}
+          style={{
+            flex: 2,
+            padding: '10px 0', borderRadius: 9,
+            background: GREEN, border: 'none',
+            color: '#fff', fontSize: 13, fontWeight: 700,
+            cursor: 'pointer', transition: 'background 0.15s',
+            letterSpacing: '-0.01em',
+          }}
+          onMouseEnter={(e) => (e.currentTarget.style.background = '#2d5440')}
+          onMouseLeave={(e) => (e.currentTarget.style.background = GREEN)}
+        >
+          Plan this escape →
+        </button>
+      </div>
     </div>
   )
 }
+
+// ── Activity row ──────────────────────────────────────────────────────
 
 function ActivityRow({ activity: act }: { activity: Activity }) {
   const costColour = act.cost === 'free' ? '#3A6B4F' : act.cost === '$' ? '#8C8A87' : act.cost === '$$' ? '#B87333' : '#C94040'
   return (
     <div style={{
       display: 'flex', gap: 10, alignItems: 'flex-start',
-      padding: '8px 10px', borderRadius: 8,
-      background: act.isHiddenGem ? '#FFF8F0' : 'var(--bg-base)',
+      padding: '9px 11px', borderRadius: 9,
+      background: act.isHiddenGem ? '#FFF8F0' : '#fff',
       border: `1px solid ${act.isHiddenGem ? '#E8C89880' : 'var(--border)'}`,
     }}>
-      <span style={{ fontSize: 18, flexShrink: 0, lineHeight: 1.3 }}>{act.emoji}</span>
+      <span style={{ fontSize: 19, flexShrink: 0, lineHeight: 1.3 }}>{act.emoji}</span>
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
           <span style={{ fontSize: 13, fontWeight: 700, color: '#1C1C1A' }}>{act.name}</span>
@@ -668,8 +959,9 @@ function ActivityRow({ activity: act }: { activity: Activity }) {
             <span style={{
               fontSize: 10, fontWeight: 700, color: '#B87333',
               background: '#FFF0D8', border: '1px solid #E8C89880',
-              padding: '1px 6px', borderRadius: 5,
-            }}>💎 Hidden gem</span>
+              padding: '1px 7px', borderRadius: 5, letterSpacing: '0.03em',
+              textTransform: 'uppercase',
+            }}>Local favourite</span>
           )}
         </div>
         <div style={{ fontSize: 12, color: '#4A4948', lineHeight: 1.5, marginTop: 2 }}>{act.description}</div>
@@ -678,9 +970,7 @@ function ActivityRow({ activity: act }: { activity: Activity }) {
           <span style={{ fontSize: 11, color: costColour, fontWeight: 600 }}>
             {act.cost === 'free' ? 'Free' : act.cost}
           </span>
-          {!act.kidsOk && (
-            <span style={{ fontSize: 11, color: '#8C8A87' }}>🔞 Adults</span>
-          )}
+          {act.kidsOk && <span style={{ fontSize: 11, color: '#8C8A87' }}>👶 Kids ok</span>}
           <a
             href={act.mapsUrl}
             target="_blank"
@@ -691,7 +981,7 @@ function ActivityRow({ activity: act }: { activity: Activity }) {
               display: 'flex', alignItems: 'center', gap: 3,
             }}
           >
-            Google Maps ↗
+            Maps ↗
           </a>
         </div>
       </div>
@@ -699,7 +989,8 @@ function ActivityRow({ activity: act }: { activity: Activity }) {
   )
 }
 
-// Hook to access distanceBetween without circular imports
+// ── Inline haversine hook ────────────────────────────────────────────
+
 function useDriveDist() {
   return {
     distanceBetween: (

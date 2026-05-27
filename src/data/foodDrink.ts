@@ -270,10 +270,11 @@ export function getFoodForCorridor(
   diningPrefs: DiningPref[],
   mealTime: 'breakfast' | 'lunch' | 'dinner' | 'drinks'
 ): FoodDrinkPOI[] {
+  if (diningPrefs.length === 0) return []
   return FOOD_DRINK.filter(
     (f) =>
       f.corridor_id === corridorId &&
       f.meal_times.includes(mealTime) &&
-      (diningPrefs.length === 0 || f.matching_prefs.some((p) => diningPrefs.includes(p)))
+      f.matching_prefs.some((p) => diningPrefs.includes(p))
   )
 }

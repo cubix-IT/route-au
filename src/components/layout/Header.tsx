@@ -1,26 +1,17 @@
 import { useAppStore } from '@/store/useAppStore'
+import logoSrc from '@/assets/logo.png'
 
 const GREEN = '#3A6B4F'
-const WARM = '#B87333'
 
 export function LogoMark({ size = 40 }: { size?: number }) {
   return (
-    <svg width={size} height={size} viewBox="0 0 40 40" fill="none" aria-hidden>
-      {/* Origin dot */}
-      <circle cx="7" cy="32" r="4" fill={GREEN} />
-      {/* Winding road */}
-      <path
-        d="M7 32 Q10 18 20 20 Q30 22 33 8"
-        stroke={GREEN}
-        strokeWidth="2.8"
-        strokeLinecap="round"
-        fill="none"
-      />
-      {/* Destination pin body */}
-      <circle cx="33" cy="8" r="4.5" fill={WARM} />
-      {/* Destination pin inner dot */}
-      <circle cx="33" cy="8" r="1.8" fill="#fff" />
-    </svg>
+    <img
+      src={logoSrc}
+      alt="Unplanned Escapes"
+      width={size}
+      height={size}
+      style={{ objectFit: 'contain', display: 'block' }}
+    />
   )
 }
 

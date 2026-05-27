@@ -1,16 +1,19 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useAppStore } from '@/store/useAppStore'
 import { DayCard } from './DayCard'
 import { GuardrailBanner } from './GuardrailBanner'
 import { DiningExplorer } from './DiningExplorer'
 import { exportGPX } from '@/utils/gpxExport'
 import { useWeather } from '@/hooks/useWeather'
-import type { Itinerary, RouteConstraintViolation, ScoredPOI } from '@/types'
+import type { Activity, ActivityCategory } from '@/data/victorianActivities'
+import { useActivities } from '@/hooks/useActivities'
+import type { Itinerary, RouteConstraintViolation } from '@/types'
 import type { DayForecast } from '@/hooks/useWeather'
+import { fetchLivePOIs, fetchWikipediaSummary, type LivePOI } from '@/lib/overpass'
 
 export function ItineraryPanel() {
   const {
-    activeItinerary, constraintViolations, userProfile, nearbyPOIs,
+    activeItinerary, constraintViolations, userProfile,
     activeTab, setActiveTab, setWizardOpen,
   } = useAppStore()
 
@@ -28,33 +31,28 @@ export function ItineraryPanel() {
         flexShrink: 0,
       }}>
         {([
-          ['itinerary', '📅', 'Itinerary'],
-          ['dining', '🍽️', 'Dining'],
-          ['pois', '📍', 'Nearby'],
-          ['checklist', '✓', 'Checklist'],
-        ] as const).map(([tab, icon, label]) => (
+          ['itinerary', 'Your Plan'],
+          ['dining', 'Food on Route'],
+          ['pois', 'Things to Do'],
+        ] as const).map(([tab, label]) => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
             style={{
               flex: 1,
-              padding: '12px 8px',
+              padding: '14px 8px',
               background: 'none',
               border: 'none',
               cursor: 'pointer',
-              fontSize: 12,
-              fontWeight: activeTab === tab ? 600 : 400,
-              color: activeTab === tab ? 'var(--amber)' : 'var(--text-muted)',
-              borderBottom: activeTab === tab ? '2px solid var(--amber)' : '2px solid transparent',
+              fontSize: 12.5,
+              fontWeight: activeTab === tab ? 700 : 400,
+              color: activeTab === tab ? '#B87333' : 'var(--text-muted)',
+              borderBottom: activeTab === tab ? '2px solid #B87333' : '2px solid transparent',
               marginBottom: -1,
               transition: 'color 0.15s',
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              gap: 2,
+              letterSpacing: '0.01em',
             }}
           >
-            <span style={{ fontSize: 16 }}>{icon}</span>
             {label}
           </button>
         ))}
@@ -70,8 +68,7 @@ export function ItineraryPanel() {
           />
         )}
         {activeTab === 'dining' && <DiningExplorer />}
-        {activeTab === 'pois' && <NearbyTab pois={nearbyPOIs} />}
-        {activeTab === 'checklist' && <ChecklistTab />}
+        {activeTab === 'pois' && <ExploreTab />}
       </div>
     </div>
   )
@@ -255,183 +252,290 @@ function formatDateShort(iso: string) {
   return new Date(iso).toLocaleDateString('en-AU', { day: 'numeric', month: 'short' })
 }
 
-// ── Nearby POIs tab ────────────────────────────────────────────────
+// ── Explore tab — destination activities ──────────────────────────
 
-const CAT_EMOJI: Record<string, string> = {
-  Hiking: '🥾', Chilling: '🏖️', Lookouts: '👁️', Photography: '📷',
-  Wildlife: '🦘', History: '🏛️', Beach: '🌊', FreeCamping: '⛺',
+type FilterKey = 'all' | ActivityCategory
+
+const FILTER_LABELS: { key: FilterKey; label: string }[] = [
+  { key: 'all', label: 'All' },
+  { key: 'food', label: 'Food & Drink' },
+  { key: 'drink', label: 'Drink' },
+  { key: 'nature', label: 'Nature' },
+  { key: 'active', label: 'Active' },
+  { key: 'wildlife', label: 'Wildlife' },
+  { key: 'history', label: 'History' },
+  { key: 'art', label: 'Art & Culture' },
+  { key: 'family', label: 'Family' },
+  { key: 'relaxation', label: 'Relaxation' },
+]
+
+const GREEN_EXPLORE = '#3A6B4F'
+
+const POI_CFG_EXPLORE: Record<LivePOI['type'], { label: string; emoji: string }> = {
+  cafe:       { label: 'Cafes',              emoji: '☕' },
+  restaurant: { label: 'Restaurants',        emoji: '🍽' },
+  pub:        { label: 'Pubs',              emoji: '🍺' },
+  viewpoint:  { label: 'Viewpoints & Peaks', emoji: '👁' },
+  attraction: { label: 'Attractions',        emoji: '🏛' },
+  hiking:     { label: 'Hiking routes',      emoji: '🥾' },
 }
 
-function NearbyTab({ pois }: { pois: ScoredPOI[] }) {
-  if (pois.length === 0) {
-    return (
-      <div style={{ padding: 32, textAlign: 'center' }}>
-        <div style={{ fontSize: 40, marginBottom: 12 }}>📍</div>
-        <p style={{ color: 'var(--text-muted)', fontSize: 14 }}>
-          Plan a trip to discover attractions along your route.
-        </p>
-      </div>
-    )
+function ExploreTab() {
+  const destId = useAppStore((s) => s.destId)
+  const destName = useAppStore((s) => s.destName)
+  const destCoord = useAppStore((s) => s.destCoord)
+  const [filter, setFilter] = useState<FilterKey>('all')
+  const [showLocalOnly, setShowLocalOnly] = useState(false)
+  const [livePOIs, setLivePOIs] = useState<LivePOI[] | null>(null)
+  const [livePOIsLoading, setLivePOIsLoading] = useState(false)
+  const [wikiSummary, setWikiSummary] = useState<string | null>(null)
+
+  const { activities: allActivities } = useActivities(destId)
+
+  // Fetch live POIs from Overpass to supplement (or replace) sparse static data
+  useEffect(() => {
+    if (!destCoord || livePOIs !== null) return
+    setLivePOIsLoading(true)
+    Promise.all([
+      fetchLivePOIs(destId, destCoord.lat, destCoord.lng),
+      fetchWikipediaSummary(destId, destName),
+    ]).then(([pois, wiki]) => {
+      setLivePOIs(pois)
+      setWikiSummary(wiki)
+      setLivePOIsLoading(false)
+    }).catch(() => {
+      setLivePOIs([])
+      setLivePOIsLoading(false)
+    })
+  }, [destId, destCoord?.lat, destCoord?.lng, destName])
+
+  const visible = allActivities.filter((a) => {
+    if (filter !== 'all' && a.category !== filter) return false
+    if (showLocalOnly && !a.isHiddenGem) return false
+    return true
+  })
+
+  const availableCategories = new Set(allActivities.map((a) => a.category))
+  const activeFilters = FILTER_LABELS.filter(
+    (f) => f.key === 'all' || availableCategories.has(f.key as ActivityCategory)
+  )
+
+  // Group live POIs by type, cap at 5 per type, exclude food (food goes in Food tab)
+  const nonFoodLivePOIs = (livePOIs ?? []).filter((p) => p.type !== 'cafe' && p.type !== 'restaurant' && p.type !== 'pub')
+  const byType: Partial<Record<LivePOI['type'], LivePOI[]>> = {}
+  for (const poi of nonFoodLivePOIs) {
+    if (!byType[poi.type]) byType[poi.type] = []
+    if (byType[poi.type]!.length < 5) byType[poi.type]!.push(poi)
   }
 
   return (
-    <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 8 }}>
-      <p style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 4 }}>
-        {pois.length} attractions within 30 km of your route
-      </p>
-      {pois.map((poi) => (
-        <div key={poi.id} style={{
-          display: 'flex', gap: 12, alignItems: 'flex-start',
-          background: 'var(--bg-card)', border: '1px solid var(--border)',
-          borderRadius: 12, padding: '12px 14px',
-        }}>
-          <div style={{
-            width: 40, height: 40, borderRadius: '50%',
-            background: 'var(--amber-glow)', border: '1.5px solid var(--amber-dim)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: 20, flexShrink: 0,
-          }}>
-            {CAT_EMOJI[poi.category] ?? '📍'}
-          </div>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
-              <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>
-                {poi.name}
-              </span>
-              {poi.vibe_score >= 70 && (
-                <span style={{
-                  fontSize: 10, color: 'var(--amber)', fontWeight: 700,
-                  background: 'var(--amber-glow)', padding: '2px 6px', borderRadius: 4,
-                  flexShrink: 0,
-                }}>
-                  ★ TOP
-                </span>
-              )}
-            </div>
-            <p style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 3, lineHeight: 1.4 }}>
-              {poi.description.slice(0, 80)}{poi.description.length > 80 ? '…' : ''}
-            </p>
-            <div style={{ display: 'flex', gap: 8, marginTop: 6 }}>
-              <span style={{
-                fontSize: 11, color: 'var(--text-muted)',
-                background: 'rgba(255,255,255,0.05)',
-                padding: '2px 6px', borderRadius: 4,
-              }}>
-                {poi.category}
-              </span>
-              <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
-                {Math.round(poi.detour_km)} km detour
-              </span>
-            </div>
-          </div>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+      {/* Header */}
+      <div style={{
+        padding: '14px 16px 10px',
+        borderBottom: '1px solid var(--border)',
+        background: 'var(--bg-surface)',
+        flexShrink: 0,
+      }}>
+        <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 2 }}>
+          Things to do in {destName.split('&')[0].trim()}
         </div>
-      ))}
+        <div style={{ fontSize: 11.5, color: 'var(--text-muted)', marginBottom: 10 }}>
+          {allActivities.length > 0 ? `${allActivities.length} curated experience${allActivities.length !== 1 ? 's' : ''}` : 'Live data from OpenStreetMap'} — tap any for directions
+        </div>
+
+        {allActivities.length > 0 && (
+          <div style={{ display: 'flex', gap: 6, overflowX: 'auto', paddingBottom: 2 }}>
+            {activeFilters.map(({ key, label }) => (
+              <button
+                key={key}
+                onClick={() => setFilter(key)}
+                style={{
+                  flexShrink: 0,
+                  padding: '5px 11px', borderRadius: 7,
+                  background: filter === key ? '#1C1C1A' : 'var(--bg-base)',
+                  color: filter === key ? '#fff' : 'var(--text-muted)',
+                  border: `1.5px solid ${filter === key ? '#1C1C1A' : 'var(--border)'}`,
+                  fontSize: 11.5, fontWeight: filter === key ? 700 : 500,
+                  cursor: 'pointer', transition: 'all 0.12s',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                {label}
+              </button>
+            ))}
+            <button
+              onClick={() => setShowLocalOnly((v) => !v)}
+              style={{
+                flexShrink: 0,
+                padding: '5px 11px', borderRadius: 7,
+                background: showLocalOnly ? '#B87333' : 'var(--bg-base)',
+                color: showLocalOnly ? '#fff' : '#B87333',
+                border: `1.5px solid ${showLocalOnly ? '#B87333' : '#E8C898'}`,
+                fontSize: 11.5, fontWeight: 700,
+                cursor: 'pointer', transition: 'all 0.12s',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              Local favourites
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* Content */}
+      <div style={{ flex: 1, overflowY: 'auto', padding: '12px 12px' }}>
+        {/* Wikipedia fact */}
+        {wikiSummary && (
+          <div style={{
+            padding: '10px 13px', borderRadius: 9, marginBottom: 12,
+            background: '#F0F4F1', border: '1px solid rgba(58,107,79,0.15)',
+          }}>
+            <div style={{ fontSize: 10, fontWeight: 700, color: GREEN_EXPLORE, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 4 }}>
+              About {destName.split('&')[0].trim()}
+            </div>
+            <p style={{ fontSize: 12.5, color: '#4A4948', lineHeight: 1.65, margin: 0 }}>{wikiSummary}</p>
+          </div>
+        )}
+
+        {/* Curated static activities */}
+        {visible.length > 0 && (
+          <>
+            <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 8 }}>
+              Curated experiences
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 16 }}>
+              {visible.map((act) => <ActivityCard key={act.id} activity={act} />)}
+            </div>
+          </>
+        )}
+
+        {/* Live Overpass POIs (non-food) */}
+        {livePOIsLoading ? (
+          <div style={{ fontSize: 12, color: 'var(--text-muted)', padding: '8px 0', display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span style={{ display: 'inline-block', width: 7, height: 7, borderRadius: '50%', background: GREEN_EXPLORE, animation: 'pulse 1.2s ease-in-out infinite' }} />
+            Finding trails, viewpoints & attractions nearby…
+          </div>
+        ) : nonFoodLivePOIs.length > 0 ? (
+          <>
+            <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 8 }}>
+              From OpenStreetMap
+            </div>
+            {(['hiking', 'viewpoint', 'attraction'] as LivePOI['type'][]).map((type) => {
+              const items = byType[type]
+              if (!items?.length) return null
+              const cfg = POI_CFG_EXPLORE[type]
+              return (
+                <div key={type} style={{ marginBottom: 12 }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: '#4A4948', marginBottom: 5 }}>
+                    {cfg.emoji} {cfg.label}
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                    {items.map((poi) => (
+                      <div key={poi.id} style={{
+                        display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between',
+                        padding: '8px 11px', borderRadius: 8,
+                        background: 'var(--bg-surface)', border: '1px solid var(--border)',
+                      }}>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <span style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--text-primary)' }}>{poi.name}</span>
+                          {poi.routeLength && (
+                            <span style={{ fontSize: 11, color: 'var(--text-muted)', marginLeft: 7 }}>{poi.routeLength}</span>
+                          )}
+                        </div>
+                        {poi.website && (
+                          <a
+                            href={poi.website.startsWith('http') ? poi.website : `https://${poi.website}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            style={{ fontSize: 11, color: '#4285F4', fontWeight: 600, textDecoration: 'none', marginLeft: 8, flexShrink: 0 }}
+                          >
+                            Website ↗
+                          </a>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )
+            })}
+          </>
+        ) : allActivities.length === 0 && !livePOIsLoading ? (
+          <div style={{ padding: '16px 4px', textAlign: 'center' }}>
+            <div style={{ fontSize: 32, marginBottom: 8 }}>🗺</div>
+            <p style={{ color: 'var(--text-muted)', fontSize: 13, lineHeight: 1.7 }}>
+              Plan a trip to a destination to see what's there.
+            </p>
+          </div>
+        ) : null}
+      </div>
     </div>
   )
 }
 
-// ── Checklist tab ──────────────────────────────────────────────────
-
-const CHECKLIST_ITEMS = [
-  { id: 'tyres', group: 'Vehicle', label: 'Check tyre pressure (incl. spare)' },
-  { id: 'oil', group: 'Vehicle', label: 'Check engine oil & coolant' },
-  { id: 'fuel', group: 'Vehicle', label: 'Fill fuel tank before departure' },
-  { id: 'recovery', group: 'Vehicle', label: 'Recovery gear: tow rope, shovel, max trax' },
-  { id: 'uhf', group: 'Communications', label: 'UHF CB radio (ch 40 for road traffic)' },
-  { id: 'epirb', group: 'Communications', label: 'EPIRB or PLB activated & registered' },
-  { id: 'phone', group: 'Communications', label: 'Downloaded offline maps (OsmAnd/Hema)' },
-  { id: 'water', group: 'Supplies', label: 'Water: 4L per person per day minimum' },
-  { id: 'food', group: 'Supplies', label: 'Food for journey + 2 emergency days' },
-  { id: 'first_aid', group: 'Safety', label: 'First aid kit fully stocked' },
-  { id: 'snakebite', group: 'Safety', label: 'Snakebite bandages × 3' },
-  { id: 'sunscreen', group: 'Safety', label: 'SPF 50+ sunscreen, hat & sunglasses' },
-  { id: 'itinerary', group: 'Admin', label: 'Trip plan lodged with someone at home' },
-  { id: 'park_permit', group: 'Admin', label: 'National park permits purchased online' },
-  { id: 'insurance', group: 'Admin', label: 'Vehicle & travel insurance confirmed' },
-]
-
-function ChecklistTab() {
-  const [checked, setChecked] = useState<Set<string>>(new Set())
-
-  const toggle = (id: string) => setChecked((prev) => {
-    const next = new Set(prev)
-    next.has(id) ? next.delete(id) : next.add(id)
-    return next
-  })
-
-  const groups = [...new Set(CHECKLIST_ITEMS.map((i) => i.group))]
-  const total = CHECKLIST_ITEMS.length
-  const done = checked.size
+function ActivityCard({ activity: act }: { activity: Activity }) {
+  const GREEN = '#3A6B4F'
+  const costMap: Record<string, string> = { free: 'Free', '$': 'Budget', '$$': 'Mid-range', '$$$': 'Premium' }
+  const costColor: Record<string, string> = {
+    free: GREEN, '$': 'var(--text-muted)', '$$': '#B87333', '$$$': '#C94040',
+  }
 
   return (
-    <div style={{ padding: 16 }}>
-      <div style={{
-        background: 'var(--bg-card)', border: '1px solid var(--border)',
-        borderRadius: 12, padding: '12px 14px', marginBottom: 16,
-      }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-          <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>
-            Pre-trip checklist
-          </span>
-          <span style={{ fontSize: 13, color: done === total ? 'var(--green)' : 'var(--amber)' }}>
-            {done}/{total}
-          </span>
+    <div style={{
+      borderRadius: 11,
+      background: act.isHiddenGem ? '#FEFAF5' : 'var(--bg-surface)',
+      border: `1px solid ${act.isHiddenGem ? '#E8C89870' : 'var(--border)'}`,
+      overflow: 'hidden',
+    }}>
+      <div style={{ padding: '12px 14px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10 }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 7, flexWrap: 'wrap', marginBottom: 4 }}>
+              <span style={{ fontSize: 13.5, fontWeight: 700, color: 'var(--text-primary)', lineHeight: 1.3 }}>
+                {act.name}
+              </span>
+              {act.isHiddenGem && (
+                <span style={{
+                  fontSize: 10, fontWeight: 700, color: '#B87333',
+                  background: '#FFF0D8', border: '1px solid #E8C89880',
+                  padding: '1px 7px', borderRadius: 5,
+                  letterSpacing: '0.04em', textTransform: 'uppercase',
+                }}>
+                  Local favourite
+                </span>
+              )}
+            </div>
+            <p style={{ fontSize: 12.5, color: 'var(--text-secondary)', lineHeight: 1.6, margin: 0 }}>
+              {act.description}
+            </p>
+          </div>
         </div>
-        <div style={{ height: 4, background: 'rgba(255,255,255,0.07)', borderRadius: 2 }}>
-          <div style={{
-            height: '100%',
-            width: `${(done / total) * 100}%`,
-            background: done === total ? 'var(--green)' : 'var(--amber)',
-            borderRadius: 2,
-            transition: 'width 0.3s ease',
-          }} />
+
+        <div style={{ display: 'flex', gap: 12, marginTop: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+          <span style={{ fontSize: 11.5, color: 'var(--text-muted)' }}>{act.duration}</span>
+          <span style={{ fontSize: 11.5, color: costColor[act.cost], fontWeight: 600 }}>
+            {costMap[act.cost]}
+          </span>
+          {act.kidsOk && (
+            <span style={{ fontSize: 11.5, color: 'var(--text-muted)' }}>Suitable for children</span>
+          )}
+          <a
+            href={act.mapsUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{
+              marginLeft: 'auto',
+              fontSize: 12, fontWeight: 700, color: '#fff',
+              background: '#1C1C1A',
+              padding: '5px 12px', borderRadius: 7,
+              textDecoration: 'none',
+              flexShrink: 0,
+            }}
+          >
+            Directions ↗
+          </a>
         </div>
       </div>
-
-      {groups.map((group) => (
-        <div key={group} style={{ marginBottom: 16 }}>
-          <div style={{
-            fontSize: 11, fontWeight: 700, color: 'var(--text-muted)',
-            textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8,
-          }}>
-            {group}
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-            {CHECKLIST_ITEMS.filter((i) => i.group === group).map((item) => (
-              <button
-                key={item.id}
-                onClick={() => toggle(item.id)}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: 10,
-                  padding: '10px 12px', borderRadius: 10, width: '100%', textAlign: 'left',
-                  background: checked.has(item.id) ? 'rgba(16,185,129,0.08)' : 'var(--bg-card)',
-                  border: `1px solid ${checked.has(item.id) ? 'rgba(16,185,129,0.3)' : 'var(--border)'}`,
-                  cursor: 'pointer', transition: 'all 0.15s',
-                }}
-              >
-                <div style={{
-                  width: 20, height: 20, borderRadius: 6, flexShrink: 0,
-                  background: checked.has(item.id) ? 'var(--green)' : 'rgba(255,255,255,0.07)',
-                  border: `1.5px solid ${checked.has(item.id) ? 'var(--green)' : 'var(--border)'}`,
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                }}>
-                  {checked.has(item.id) && (
-                    <span style={{ fontSize: 12, color: '#fff', lineHeight: 1 }}>✓</span>
-                  )}
-                </div>
-                <span style={{
-                  fontSize: 13,
-                  color: checked.has(item.id) ? 'var(--text-muted)' : 'var(--text-secondary)',
-                  textDecoration: checked.has(item.id) ? 'line-through' : 'none',
-                  flex: 1,
-                }}>
-                  {item.label}
-                </span>
-              </button>
-            ))}
-          </div>
-        </div>
-      ))}
     </div>
   )
 }
