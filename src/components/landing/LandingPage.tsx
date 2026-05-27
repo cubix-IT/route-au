@@ -3,11 +3,10 @@ import { useAppStore } from '@/store/useAppStore'
 import type { PreselectedDest } from '@/store/useAppStore'
 import { getCurrentSeason, SEASON_META } from '@/utils/season'
 import type { VicCluster, SubDest } from '@/data/victorianClusters'
-import type { Activity } from '@/data/victorianActivities'
 import { useClusters } from '@/hooks/useClusters'
 import { useActivities } from '@/hooks/useActivities'
 import { LogoMark } from '@/components/layout/Header'
-import { fetchLivePOIs, fetchWikipediaSummary, type LivePOI } from '@/lib/overpass'
+import { DestinationModal } from './DestinationModal'
 
 const GREEN = '#3A6B4F'
 
@@ -511,105 +510,6 @@ function FromWhereModal({
 
 // ── Live POI section (Overpass + Wikipedia) ────────────────────────
 
-const POI_CFG: Record<LivePOI['type'], { label: string; emoji: string }> = {
-  cafe: { label: 'Cafes', emoji: '☕' },
-  restaurant: { label: 'Restaurants', emoji: '🍽' },
-  pub: { label: 'Pubs & Bars', emoji: '🍺' },
-  viewpoint: { label: 'Viewpoints & Peaks', emoji: '👁' },
-  attraction: { label: 'Attractions', emoji: '🏛' },
-  hiking: { label: 'Hiking routes', emoji: '🥾' },
-}
-
-function LivePOISection({ pois, wikiSummary }: { pois: LivePOI[]; wikiSummary: string | null }) {
-  const byType: Partial<Record<LivePOI['type'], LivePOI[]>> = {}
-  for (const poi of pois) {
-    if (!byType[poi.type]) byType[poi.type] = []
-    if ((byType[poi.type]!).length < 5) byType[poi.type]!.push(poi)
-  }
-
-  const order: LivePOI['type'][] = ['cafe', 'restaurant', 'pub', 'hiking', 'viewpoint', 'attraction']
-  const hasAny = order.some((t) => (byType[t]?.length ?? 0) > 0)
-
-  return (
-    <div>
-      {wikiSummary && (
-        <div style={{
-          padding: '10px 12px', borderRadius: 8, marginBottom: 10,
-          background: '#F0F4F1', border: '1px solid rgba(58,107,79,0.15)',
-        }}>
-          <div style={{ fontSize: 10, fontWeight: 700, color: GREEN, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 4 }}>
-            About this area
-          </div>
-          <p style={{ fontSize: 12, color: '#4A4948', lineHeight: 1.65, margin: 0 }}>{wikiSummary}</p>
-        </div>
-      )}
-
-      {hasAny ? (
-        <>
-          <div style={{ fontSize: 10, fontWeight: 700, color: '#8C8A87', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 8 }}>
-            Real places nearby · OpenStreetMap
-          </div>
-          {order.map((type) => {
-            const items = byType[type]
-            if (!items?.length) return null
-            const cfg = POI_CFG[type]
-            return (
-              <div key={type} style={{ marginBottom: 10 }}>
-                <div style={{ fontSize: 11, fontWeight: 700, color: '#4A4948', marginBottom: 4 }}>
-                  {cfg.emoji} {cfg.label}
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-                  {items.map((poi) => (
-                    <div key={poi.id} style={{
-                      display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between',
-                      padding: '7px 10px', borderRadius: 7,
-                      background: '#fff', border: '1px solid var(--border)',
-                    }}>
-                      <div style={{ minWidth: 0 }}>
-                        <span style={{ fontSize: 12, fontWeight: 600, color: '#1C1C1A' }}>{poi.name}</span>
-                        {poi.cuisine && (
-                          <span style={{ fontSize: 11, color: '#8C8A87', marginLeft: 6 }}>{poi.cuisine}</span>
-                        )}
-                        {poi.routeLength && (
-                          <span style={{ fontSize: 11, color: '#8C8A87', marginLeft: 6 }}>{poi.routeLength}</span>
-                        )}
-                        {poi.openingHours && (
-                          <div style={{ fontSize: 11, color: '#8C8A87', marginTop: 1 }}>
-                            {poi.openingHours.split(';')[0]}
-                          </div>
-                        )}
-                      </div>
-                      {poi.website && (
-                        <a
-                          href={poi.website.startsWith('http') ? poi.website : `https://${poi.website}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          style={{
-                            fontSize: 11, color: '#4285F4', fontWeight: 600,
-                            textDecoration: 'none', flexShrink: 0, marginLeft: 8, marginTop: 1,
-                          }}
-                        >
-                          Website ↗
-                        </a>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )
-          })}
-        </>
-      ) : (
-        !wikiSummary && (
-          <p style={{ fontSize: 12, color: '#8C8A87', margin: 0, lineHeight: 1.6 }}>
-            No OpenStreetMap listings found nearby — OSM coverage varies in regional areas.
-          </p>
-        )
-      )}
-    </div>
-  )
-}
-
 // ── Big cluster card with backdrop image ────────────────────────────
 
 function ClusterCard({
@@ -755,11 +655,8 @@ function ClusterCard({
 // ── Sub-destination detail panel ─────────────────────────────────────
 
 function SubDestDetail({ sub, onPlan }: { sub: SubDest; onPlan: () => void }) {
-  const [showActivities, setShowActivities] = useState(false)
+  const [showModal, setShowModal] = useState(false)
   const [showFromWhere, setShowFromWhere] = useState(false)
-  const [livePOIs, setLivePOIs] = useState<LivePOI[] | null>(null)
-  const [livePOIsLoading, setLivePOIsLoading] = useState(false)
-  const [wikiSummary, setWikiSummary] = useState<string | null | undefined>(undefined)
 
   const originCoord = useAppStore((s) => s.originCoord)
   const originName = useAppStore((s) => s.originName)
@@ -778,23 +675,6 @@ function SubDestDetail({ sub, onPlan }: { sub: SubDest; onPlan: () => void }) {
 
   const { activities } = useActivities(sub.id)
   const hiddenGems = activities.filter((a) => a.isHiddenGem)
-
-  // Fetch live POIs + Wikipedia when panel opens
-  useEffect(() => {
-    if (!showActivities || livePOIs !== null) return
-    setLivePOIsLoading(true)
-    Promise.all([
-      fetchLivePOIs(sub.id, sub.coord.lat, sub.coord.lng),
-      fetchWikipediaSummary(sub.id, sub.name),
-    ]).then(([pois, wiki]) => {
-      setLivePOIs(pois)
-      setWikiSummary(wiki)
-      setLivePOIsLoading(false)
-    }).catch(() => {
-      setLivePOIs([])
-      setLivePOIsLoading(false)
-    })
-  }, [showActivities, sub.id, sub.coord, sub.name, livePOIs])
 
   const handlePlanClick = () => {
     if (!originSet) {
@@ -817,6 +697,17 @@ function SubDestDetail({ sub, onPlan }: { sub: SubDest; onPlan: () => void }) {
         <FromWhereModal
           onConfirm={handleFromWhereConfirm}
           onClose={() => setShowFromWhere(false)}
+        />
+      )}
+
+      {/* Destination detail modal */}
+      {showModal && (
+        <DestinationModal
+          sub={sub}
+          driveLabel={driveLabel}
+          activities={activities}
+          onPlan={() => { setShowModal(false); handlePlanClick() }}
+          onClose={() => setShowModal(false)}
         />
       )}
 
@@ -855,49 +746,18 @@ function SubDestDetail({ sub, onPlan }: { sub: SubDest; onPlan: () => void }) {
             ))}
           </ul>
 
-          {hiddenGems.length > 0 && !showActivities && (
+          {hiddenGems.length > 0 && (
             <div style={{
               display: 'inline-flex', alignItems: 'center', gap: 5,
               marginTop: 10, padding: '3px 9px', borderRadius: 6,
               background: '#FFF8F0', border: '1px solid #E8C89860',
               fontSize: 11, color: '#B87333', fontWeight: 600,
             }}>
-              {hiddenGems.length} lesser-known experience{hiddenGems.length > 1 ? 's' : ''} here
+              {hiddenGems.length} local gem{hiddenGems.length > 1 ? 's' : ''} here
             </div>
           )}
         </div>
       </div>
-
-      {/* Activities + live POIs section */}
-      {showActivities && (
-        <div style={{ borderTop: '1px solid var(--border)', padding: '14px 18px', background: 'var(--bg-base)' }}>
-          {/* Live data from Overpass + Wikipedia */}
-          {livePOIsLoading ? (
-            <div style={{ fontSize: 12, color: '#8C8A87', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
-              <span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%', background: GREEN, animation: 'pulse 1.2s ease-in-out infinite' }} />
-              Finding real cafes, trails & attractions nearby…
-            </div>
-          ) : livePOIs !== null ? (
-            <div style={{ marginBottom: 14 }}>
-              <LivePOISection pois={livePOIs} wikiSummary={wikiSummary ?? null} />
-            </div>
-          ) : null}
-
-          {/* Curated activities */}
-          {activities.length > 0 && (
-            <>
-              <div style={{ fontSize: 10, fontWeight: 700, color: '#8C8A87', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 8 }}>
-                Curated picks
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 260, overflowY: 'auto' }}>
-                {activities.map((act) => (
-                  <ActivityRow key={act.id} activity={act} />
-                ))}
-              </div>
-            </>
-          )}
-        </div>
-      )}
 
       {/* Action row */}
       <div style={{
@@ -906,19 +766,19 @@ function SubDestDetail({ sub, onPlan }: { sub: SubDest; onPlan: () => void }) {
         marginTop: 'auto',
       }}>
         <button
-          onClick={() => setShowActivities((v) => !v)}
+          onClick={() => setShowModal(true)}
           style={{
             flex: 1,
             padding: '9px 0', borderRadius: 9,
-            background: showActivities ? 'var(--bg-muted)' : 'var(--bg-base)',
+            background: 'var(--bg-base)',
             border: '1.5px solid var(--border)',
             color: '#4A4948', fontSize: 13, fontWeight: 600,
             cursor: 'pointer', transition: 'background 0.15s',
           }}
           onMouseEnter={(e) => (e.currentTarget.style.background = '#edecea')}
-          onMouseLeave={(e) => (e.currentTarget.style.background = showActivities ? 'var(--bg-muted)' : 'var(--bg-base)')}
+          onMouseLeave={(e) => (e.currentTarget.style.background = 'var(--bg-base)')}
         >
-          {showActivities ? 'Hide' : "What's here"}
+          What's here
         </button>
         <button
           onClick={handlePlanClick}
@@ -940,54 +800,7 @@ function SubDestDetail({ sub, onPlan }: { sub: SubDest; onPlan: () => void }) {
   )
 }
 
-// ── Activity row ──────────────────────────────────────────────────────
 
-function ActivityRow({ activity: act }: { activity: Activity }) {
-  const costColour = act.cost === 'free' ? '#3A6B4F' : act.cost === '$' ? '#8C8A87' : act.cost === '$$' ? '#B87333' : '#C94040'
-  return (
-    <div style={{
-      display: 'flex', gap: 10, alignItems: 'flex-start',
-      padding: '9px 11px', borderRadius: 9,
-      background: act.isHiddenGem ? '#FFF8F0' : '#fff',
-      border: `1px solid ${act.isHiddenGem ? '#E8C89880' : 'var(--border)'}`,
-    }}>
-      <span style={{ fontSize: 19, flexShrink: 0, lineHeight: 1.3 }}>{act.emoji}</span>
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-          <span style={{ fontSize: 13, fontWeight: 700, color: '#1C1C1A' }}>{act.name}</span>
-          {act.isHiddenGem && (
-            <span style={{
-              fontSize: 10, fontWeight: 700, color: '#B87333',
-              background: '#FFF0D8', border: '1px solid #E8C89880',
-              padding: '1px 7px', borderRadius: 5, letterSpacing: '0.03em',
-              textTransform: 'uppercase',
-            }}>Local favourite</span>
-          )}
-        </div>
-        <div style={{ fontSize: 12, color: '#4A4948', lineHeight: 1.5, marginTop: 2 }}>{act.description}</div>
-        <div style={{ display: 'flex', gap: 8, marginTop: 5, alignItems: 'center', flexWrap: 'wrap' }}>
-          <span style={{ fontSize: 11, color: '#8C8A87' }}>⏱ {act.duration}</span>
-          <span style={{ fontSize: 11, color: costColour, fontWeight: 600 }}>
-            {act.cost === 'free' ? 'Free' : act.cost}
-          </span>
-          {act.kidsOk && <span style={{ fontSize: 11, color: '#8C8A87' }}>👶 Kids ok</span>}
-          <a
-            href={act.mapsUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            style={{
-              fontSize: 11, color: '#4285F4', fontWeight: 600,
-              textDecoration: 'none', marginLeft: 'auto',
-              display: 'flex', alignItems: 'center', gap: 3,
-            }}
-          >
-            Maps ↗
-          </a>
-        </div>
-      </div>
-    </div>
-  )
-}
 
 // ── Inline haversine hook ────────────────────────────────────────────
 

@@ -42,7 +42,7 @@ function App() {
       {view === 'planner' && (
         <div style={{
           display: 'flex', flexDirection: 'column', height: '100vh',
-          background: 'var(--bg-base)', color: 'var(--text-primary)',
+          background: '#F8F7F4', color: 'var(--text-primary)',
           overflow: 'hidden',
         }}>
           <Header />
@@ -51,19 +51,42 @@ function App() {
           <div style={{ flex: 1, display: 'flex', overflow: 'hidden', minHeight: 0 }}>
 
             {/* Map */}
-            <div style={{ flex: '0 0 60%', position: 'relative', minHeight: 0 }}>
+            <div style={{ flex: '0 0 58%', position: 'relative', minHeight: 0 }}>
               <MapContainer />
             </div>
 
-            {/* Right panel: two stacked tiles */}
+            {/* Right panel: two stacked tiles with premium card styling */}
             <div style={{
               flex: 1, display: 'flex', flexDirection: 'column',
               overflow: 'hidden', minHeight: 0,
               borderLeft: '1px solid var(--border)',
+              background: '#F8F7F4',
             }}>
-              <FoodTile />
-              <div style={{ height: 1, background: 'var(--border)', flexShrink: 0 }} />
-              <ThingsTile />
+              {/* Food tile – upper half */}
+              <div style={{
+                flex: 1, minHeight: 0, overflow: 'hidden',
+                margin: '10px 10px 5px',
+                borderRadius: 14,
+                background: '#fff',
+                border: '1px solid var(--border)',
+                boxShadow: '0 1px 4px rgba(0,0,0,0.05)',
+                display: 'flex', flexDirection: 'column',
+              }}>
+                <FoodTile />
+              </div>
+
+              {/* Things tile – lower half */}
+              <div style={{
+                flex: 1, minHeight: 0, overflow: 'hidden',
+                margin: '5px 10px 10px',
+                borderRadius: 14,
+                background: '#fff',
+                border: '1px solid var(--border)',
+                boxShadow: '0 1px 4px rgba(0,0,0,0.05)',
+                display: 'flex', flexDirection: 'column',
+              }}>
+                <ThingsTile />
+              </div>
             </div>
           </div>
 

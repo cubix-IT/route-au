@@ -1,6 +1,6 @@
 export interface LivePOI {
   id: string
-  type: 'cafe' | 'restaurant' | 'pub' | 'viewpoint' | 'attraction' | 'hiking'
+  type: 'cafe' | 'restaurant' | 'pub' | 'fast_food' | 'bakery' | 'winery' | 'viewpoint' | 'attraction' | 'hiking'
   name: string
   lat?: number
   lng?: number
@@ -20,18 +20,22 @@ const wikiCache = new Map<string, string | null>()
 export async function fetchLivePOIs(cacheKey: string, lat: number, lng: number): Promise<LivePOI[]> {
   if (poiCache.has(cacheKey)) return poiCache.get(cacheKey)!
 
-  const r = 6000   // 6 km for food & drink
-  const rBig = 15000 // 15 km for trails, views, attractions
+  const r = 8000    // 8 km for food & drink (covers most town areas)
+  const rBig = 20000 // 20 km for trails, views, attractions
 
-  const query = `[out:json][timeout:20];
+  const query = `[out:json][timeout:25];
 (
-  node["amenity"~"^(cafe|restaurant|pub|bar)$"]["name"](around:${r},${lat},${lng});
-  node["tourism"~"^(viewpoint|attraction|museum)$"]["name"](around:${rBig},${lat},${lng});
-  node["natural"~"^(peak|beach)$"]["name"](around:${rBig},${lat},${lng});
+  nwr["amenity"~"^(cafe|restaurant|pub|bar|fast_food|food_court|bakery)$"]["name"](around:${r},${lat},${lng});
+  nwr["shop"="bakery"]["name"](around:${r},${lat},${lng});
+  nwr["amenity"~"^(winery)$"]["name"](around:${rBig},${lat},${lng});
+  nwr["tourism"~"^(winery|wine_cellar)$"]["name"](around:${rBig},${lat},${lng});
+  nwr["craft"~"^(winery|wine)$"]["name"](around:${rBig},${lat},${lng});
+  nwr["tourism"~"^(viewpoint|attraction|museum)$"]["name"](around:${rBig},${lat},${lng});
+  nwr["natural"~"^(peak|beach)$"]["name"](around:${rBig},${lat},${lng});
   relation["route"="hiking"]["name"](around:${rBig},${lat},${lng});
   way["route"="hiking"]["name"](around:${rBig},${lat},${lng});
 );
-out center tags 80;`
+out center tags 120;`
 
   try {
     const res = await fetch(OVERPASS, {
@@ -61,6 +65,9 @@ out center tags 80;`
       if (t.amenity === 'cafe') type = 'cafe'
       else if (t.amenity === 'restaurant') type = 'restaurant'
       else if (t.amenity === 'pub' || t.amenity === 'bar') type = 'pub'
+      else if (t.amenity === 'fast_food' || t.amenity === 'food_court') type = 'fast_food'
+      else if (t.shop === 'bakery') type = 'bakery'
+      else if (t.amenity === 'winery' || t.tourism === 'winery' || t.tourism === 'wine_cellar' || t.craft === 'winery' || t.craft === 'wine') type = 'winery'
       else if (t.tourism === 'viewpoint' || t.natural === 'peak') type = 'viewpoint'
       else if (t.tourism === 'attraction' || t.tourism === 'museum' || t.natural === 'beach') type = 'attraction'
       else if (t.route === 'hiking' || t.route === 'foot') type = 'hiking'
@@ -88,6 +95,8 @@ out center tags 80;`
   }
 }
 
+const wikiThumbCache = new Map<string, string | null>()
+
 export async function fetchWikipediaSummary(cacheKey: string, placeName: string): Promise<string | null> {
   if (wikiCache.has(cacheKey)) return wikiCache.get(cacheKey)!
 
@@ -105,11 +114,22 @@ export async function fetchWikipediaSummary(cacheKey: string, placeName: string)
       const match = json.extract.match(/^(.+?[.!?](?:\s.+?[.!?])?)(?:\s|$)/)
       const summary = match ? match[1].trim() : json.extract.slice(0, 220)
       wikiCache.set(cacheKey, summary)
+      // Cache the thumbnail separately
+      const thumbUrl: string | null = json.thumbnail?.source ?? json.originalimage?.source ?? null
+      wikiThumbCache.set(cacheKey, thumbUrl)
       return summary
     } catch { /* */ }
   }
   wikiCache.set(cacheKey, null)
   return null
+}
+
+export async function fetchWikipediaThumb(cacheKey: string, placeName: string): Promise<string | null> {
+  // Thumbnail is populated as a side-effect of fetchWikipediaSummary
+  if (wikiThumbCache.has(cacheKey)) return wikiThumbCache.get(cacheKey)!
+  // If summary hasn't been fetched yet, fetch it now
+  await fetchWikipediaSummary(cacheKey, placeName)
+  return wikiThumbCache.get(cacheKey) ?? null
 }
 
 // ── Route food stops (for the Dining tab) ─────────────────────────
@@ -163,37 +183,52 @@ export async function fetchRouteFoodStops(
   const cacheKey = `${origin.lat.toFixed(2)},${origin.lng.toFixed(2)}-${dest.lat.toFixed(2)},${dest.lng.toFixed(2)}-${relevant.sort().join(',')}`
   if (routeFoodCache.has(cacheKey)) return routeFoodCache.get(cacheKey)!
 
-  const buf = 0.3  // ~30km buffer around bounding box
+  // Generous bbox: 0.6° (~60km) padding so nearby towns aren't clipped
+  const buf = 0.6
   const minLat = Math.min(origin.lat, dest.lat) - buf
   const maxLat = Math.max(origin.lat, dest.lat) + buf
   const minLng = Math.min(origin.lng, dest.lng) - buf
   const maxLng = Math.max(origin.lng, dest.lng) + buf
   const bbox = `${minLat},${minLng},${maxLat},${maxLng}`
 
+  // Use `nwr` (node + way + relation) so polygon-tagged places (wineries, pubs)
+  // are included — many Australian venues are mapped as area features in OSM.
   const parts: string[] = []
-  if (relevant.includes('Cafes')) parts.push(`node["amenity"="cafe"]["name"](${bbox})`)
-  if (relevant.includes('Bakeries')) parts.push(`node["shop"="bakery"]["name"](${bbox})`)
-  if (relevant.includes('CasualDining') || relevant.includes('FineDining')) parts.push(`node["amenity"="restaurant"]["name"](${bbox})`)
+  if (relevant.includes('Cafes')) {
+    parts.push(`nwr["amenity"="cafe"]["name"](${bbox})`)
+  }
+  if (relevant.includes('Bakeries')) {
+    parts.push(`nwr["shop"="bakery"]["name"](${bbox})`)
+  }
+  if (relevant.includes('CasualDining') || relevant.includes('FineDining')) {
+    parts.push(`nwr["amenity"="restaurant"]["name"](${bbox})`)
+  }
   if (relevant.includes('LocalPubs')) {
-    parts.push(`node["amenity"="pub"]["name"](${bbox})`)
-    parts.push(`node["amenity"="bar"]["name"](${bbox})`)
+    parts.push(`nwr["amenity"="pub"]["name"](${bbox})`)
+    parts.push(`nwr["amenity"="bar"]["name"](${bbox})`)
   }
   if (relevant.includes('Wineries')) {
-    parts.push(`node["amenity"="winery"]["name"](${bbox})`)
-    parts.push(`node["tourism"="winery"]["name"](${bbox})`)
-    parts.push(`node["craft"="winery"]["name"](${bbox})`)
+    // All common OSM tagging schemes for wineries
+    parts.push(`nwr["amenity"="winery"]["name"](${bbox})`)
+    parts.push(`nwr["tourism"="winery"]["name"](${bbox})`)
+    parts.push(`nwr["craft"="winery"]["name"](${bbox})`)
+    parts.push(`nwr["craft"="wine"]["name"](${bbox})`)
+    parts.push(`nwr["tourism"="wine_cellar"]["name"](${bbox})`)
   }
-  if (relevant.includes('Roadhouses')) parts.push(`node["amenity"="fuel"]["name"](${bbox})`)
+  if (relevant.includes('Roadhouses')) {
+    parts.push(`nwr["amenity"="fuel"]["name"](${bbox})`)
+  }
 
   if (parts.length === 0) return []
 
-  const query = `[out:json][timeout:20];\n(\n  ${parts.join(';\n  ')};\n);\nout tags 200;`
+  // `out center tags` returns the centroid for ways/relations so we always get coords
+  const query = `[out:json][timeout:25];\n(\n  ${parts.join(';\n  ')};\n);\nout center tags 400;`
 
   try {
     const res = await fetch(OVERPASS, {
       method: 'POST',
       body: query,
-      signal: AbortSignal.timeout(20000),
+      signal: AbortSignal.timeout(25000),
     })
     if (!res.ok) throw new Error(`HTTP ${res.status}`)
     const json = await res.json()
@@ -204,22 +239,28 @@ export async function fetchRouteFoodStops(
     for (const el of (json.elements ?? [])) {
       const t = el.tags ?? {}
       const name = t.name
-      if (!name || el.lat === undefined || el.lon === undefined) continue
+      // Support both point nodes (lat/lon) and polygon centers (center.lat/center.lon)
+      const elLat = el.lat ?? el.center?.lat
+      const elLon = el.lon ?? el.center?.lon
+      if (!name || elLat === undefined || elLon === undefined) continue
 
       const key = `${t.amenity || t.shop || t.tourism || t.craft}:${name.toLowerCase()}`
       if (seen.has(key)) continue
       seen.add(key)
 
-      const p = { lat: el.lat, lng: el.lon }
+      const p = { lat: elLat, lng: elLon }
       const dist = pointToSegmentKm(p, origin, dest)
-      if (dist > 30) continue  // too far off route
+      if (dist > 80) continue  // filter out anything >80km off the direct line
 
       let type: RouteFoodStop['type']
       if (t.amenity === 'cafe') type = 'cafe'
       else if (t.shop === 'bakery') type = 'bakery'
       else if (t.amenity === 'restaurant') type = 'restaurant'
       else if (t.amenity === 'pub' || t.amenity === 'bar') type = 'pub'
-      else if (t.amenity === 'winery' || t.tourism === 'winery' || t.craft === 'winery') type = 'winery'
+      else if (
+        t.amenity === 'winery' || t.tourism === 'winery' || t.tourism === 'wine_cellar' ||
+        t.craft === 'winery' || t.craft === 'wine'
+      ) type = 'winery'
       else if (t.amenity === 'fuel') type = 'roadhouse'
       else continue
 
@@ -228,11 +269,11 @@ export async function fetchRouteFoodStops(
       const extraStopMin = detourDriveMin + stopDuration
 
       stops.push({
-        id: `${el.id}`,
+        id: `${el.type ?? 'n'}-${el.id}`,
         name,
         type,
-        lat: el.lat,
-        lng: el.lon,
+        lat: elLat,
+        lng: elLon,
         openingHours: t.opening_hours,
         website: t.website || t['contact:website'],
         cuisine: t.cuisine?.split(';')[0],

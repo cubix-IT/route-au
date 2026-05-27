@@ -2,12 +2,39 @@ import { useState, useEffect } from 'react'
 import { useAppStore } from '@/store/useAppStore'
 import { useActivities } from '@/hooks/useActivities'
 import { fetchLivePOIs, fetchWikipediaSummary, type LivePOI } from '@/lib/overpass'
+import type { ActivityCategory } from '@/data/victorianActivities'
 
 const GREEN = '#3A6B4F'
 
 const POI_EMOJI: Record<LivePOI['type'], string> = {
-  cafe: '☕', restaurant: '🍽', pub: '🍺',
+  cafe: '☕', restaurant: '🍽', pub: '🍺', fast_food: '🥡', bakery: '🥐', winery: '🍷',
   viewpoint: '👁', attraction: '🏛', hiking: '🥾',
+}
+
+const CAT_TAG: Record<ActivityCategory, { label: string; color: string; bg: string }> = {
+  nature:      { label: 'Nature',       color: '#2D7A4A', bg: '#E8F5EE' },
+  active:      { label: 'Outdoor',      color: '#2563EB', bg: '#EFF6FF' },
+  wildlife:    { label: 'Wildlife',     color: '#047857', bg: '#ECFDF5' },
+  history:     { label: 'History',      color: '#7C3AED', bg: '#F5F3FF' },
+  art:         { label: 'Art & Culture',color: '#DB2777', bg: '#FDF2F8' },
+  family:      { label: 'Family',       color: '#D97706', bg: '#FFFBEB' },
+  relaxation:  { label: 'Leisure',      color: '#0891B2', bg: '#ECFEFF' },
+  food:        { label: 'Food',         color: '#B45309', bg: '#FEF3C7' },
+  drink:       { label: 'Drink',        color: '#B87333', bg: '#FFF5EB' },
+  markets:     { label: 'Markets',      color: '#059669', bg: '#ECFDF5' },
+  viewpoint:   { label: 'Scenic View',  color: '#4338CA', bg: '#EEF2FF' },
+}
+
+const POI_TAG: Record<LivePOI['type'], { label: string; color: string; bg: string }> = {
+  hiking:     { label: 'Hiking Trail',  color: '#2563EB', bg: '#EFF6FF' },
+  viewpoint:  { label: 'Scenic View',   color: '#4338CA', bg: '#EEF2FF' },
+  attraction: { label: 'Attraction',    color: '#7C3AED', bg: '#F5F3FF' },
+  cafe:       { label: 'Cafe',          color: '#B45309', bg: '#FEF3C7' },
+  restaurant: { label: 'Restaurant',    color: '#B45309', bg: '#FEF3C7' },
+  pub:        { label: 'Pub',           color: '#B87333', bg: '#FFF5EB' },
+  fast_food:  { label: 'Takeaway',      color: '#9A3412', bg: '#FFF7ED' },
+  bakery:     { label: 'Bakery',        color: '#92400E', bg: '#FFFBEB' },
+  winery:     { label: 'Winery',        color: '#7E22CE', bg: '#FAF5FF' },
 }
 
 export function ThingsTile() {
@@ -95,38 +122,67 @@ export function ThingsTile() {
             {/* Curated activities */}
             {curatedTop.length > 0 && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 6 }}>
-                {curatedTop.map((act) => (
-                  <div key={act.id} style={{
-                    display: 'flex', alignItems: 'center', gap: 8,
-                    padding: '7px 10px', borderRadius: 8,
-                    background: 'var(--bg-card)',
-                    border: `1px solid ${act.isHiddenGem ? 'rgba(184,115,51,0.2)' : 'var(--border)'}`,
-                  }}>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{
-                        fontSize: 12, fontWeight: 700, color: 'var(--text-primary)',
-                        whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-                      }}>
-                        {act.isHiddenGem && <span style={{ marginRight: 4 }}>✦</span>}{act.name}
+                {curatedTop.map((act) => {
+                  const tag = CAT_TAG[act.category]
+                  return (
+                    <div key={act.id} style={{
+                      display: 'flex', alignItems: 'flex-start', gap: 8,
+                      padding: '8px 10px', borderRadius: 8,
+                      background: 'var(--bg-card)',
+                      border: `1px solid ${act.isHiddenGem ? 'rgba(184,115,51,0.2)' : 'var(--border)'}`,
+                    }}>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3, flexWrap: 'wrap' }}>
+                          <span style={{
+                            fontSize: 9.5, fontWeight: 700,
+                            color: tag.color, background: tag.bg,
+                            padding: '1px 6px', borderRadius: 4,
+                            whiteSpace: 'nowrap',
+                          }}>
+                            {tag.label}
+                          </span>
+                          {act.isHiddenGem && (
+                            <span style={{
+                              fontSize: 9, fontWeight: 700, color: '#B87333',
+                              background: '#FFF5EB', padding: '1px 5px', borderRadius: 4,
+                            }}>
+                              Local gem
+                            </span>
+                          )}
+                          {act.cost === 'free' && (
+                            <span style={{
+                              fontSize: 9, fontWeight: 700, color: GREEN,
+                              background: 'var(--green-light)', padding: '1px 5px', borderRadius: 4,
+                            }}>
+                              Free
+                            </span>
+                          )}
+                        </div>
+                        <div style={{
+                          fontSize: 12, fontWeight: 700, color: 'var(--text-primary)',
+                          whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                        }}>
+                          {act.name}
+                        </div>
+                        <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>
+                          {act.duration}
+                        </div>
                       </div>
-                      <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>
-                        {act.duration} · {act.cost === 'free' ? 'Free' : act.cost}
-                      </div>
+                      <a
+                        href={act.mapsUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        style={{
+                          flexShrink: 0, fontSize: 10, fontWeight: 700, color: '#fff',
+                          background: '#1C1C1A', padding: '3px 8px', borderRadius: 5,
+                          textDecoration: 'none', marginTop: 2,
+                        }}
+                      >
+                        Go ↗
+                      </a>
                     </div>
-                    <a
-                      href={act.mapsUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      style={{
-                        flexShrink: 0, fontSize: 10, fontWeight: 700, color: '#fff',
-                        background: '#1C1C1A', padding: '3px 8px', borderRadius: 5,
-                        textDecoration: 'none',
-                      }}
-                    >
-                      Go ↗
-                    </a>
-                  </div>
-                ))}
+                  )
+                })}
               </div>
             )}
 
@@ -138,39 +194,52 @@ export function ThingsTile() {
                     From OpenStreetMap
                   </div>
                 )}
-                {nonFoodPOIs.map((poi) => (
-                  <div key={poi.id} style={{
-                    display: 'flex', alignItems: 'center', gap: 8,
-                    padding: '7px 10px', borderRadius: 8,
-                    background: 'var(--bg-card)', border: '1px solid var(--border)',
-                  }}>
-                    <div style={{ fontSize: 16, flexShrink: 0 }}>{POI_EMOJI[poi.type]}</div>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{
-                        fontSize: 12, fontWeight: 700, color: 'var(--text-primary)',
-                        whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-                      }}>
-                        {poi.name}
+                {nonFoodPOIs.map((poi) => {
+                  const tag = POI_TAG[poi.type]
+                  return (
+                    <div key={poi.id} style={{
+                      display: 'flex', alignItems: 'flex-start', gap: 8,
+                      padding: '8px 10px', borderRadius: 8,
+                      background: 'var(--bg-card)', border: '1px solid var(--border)',
+                    }}>
+                      <div style={{ fontSize: 16, flexShrink: 0, marginTop: 2 }}>{POI_EMOJI[poi.type]}</div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: 3 }}>
+                          <span style={{
+                            fontSize: 9.5, fontWeight: 700,
+                            color: tag.color, background: tag.bg,
+                            padding: '1px 6px', borderRadius: 4,
+                            whiteSpace: 'nowrap',
+                          }}>
+                            {tag.label}
+                          </span>
+                        </div>
+                        <div style={{
+                          fontSize: 12, fontWeight: 700, color: 'var(--text-primary)',
+                          whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                        }}>
+                          {poi.name}
+                        </div>
+                        {poi.routeLength && (
+                          <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>{poi.routeLength}</div>
+                        )}
                       </div>
-                      {poi.routeLength && (
-                        <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>{poi.routeLength}</div>
+                      {poi.website && (
+                        <a
+                          href={poi.website.startsWith('http') ? poi.website : `https://${poi.website}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          style={{
+                            flexShrink: 0, fontSize: 10, fontWeight: 700, color: '#4285F4',
+                            textDecoration: 'none', marginTop: 2,
+                          }}
+                        >
+                          Site ↗
+                        </a>
                       )}
                     </div>
-                    {poi.website && (
-                      <a
-                        href={poi.website.startsWith('http') ? poi.website : `https://${poi.website}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        style={{
-                          flexShrink: 0, fontSize: 10, fontWeight: 700, color: '#4285F4',
-                          textDecoration: 'none',
-                        }}
-                      >
-                        Site ↗
-                      </a>
-                    )}
-                  </div>
-                ))}
+                  )
+                })}
               </div>
             )}
 
