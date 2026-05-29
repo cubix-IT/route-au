@@ -279,16 +279,36 @@ export function ExperiencePanel({ hideTimeline = false }: { hideTimeline?: boole
                 <FoodCard key={poi.id} poi={poi} destName={d.shortDest} />
               ))}
             </div>
-            {d.curatedDining.length > 0 && (
-              <div style={{ padding: '14px 16px 0' }}>
-                <div style={{ fontSize: 10, fontWeight: 700, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 8 }}>
-                  Editor's Picks
+            {(() => {
+              const activityFood = d.activities.filter((a) => a.category === 'food' || a.category === 'drink')
+              const allCurated = [...d.curatedDining.map(f => ({ type: 'poi' as const, food: f })), ...activityFood.map(a => ({ type: 'act' as const, act: a }))]
+              if (allCurated.length === 0) return null
+              return (
+                <div style={{ padding: '14px 16px 0' }}>
+                  <div style={{ fontSize: 10, fontWeight: 700, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 8 }}>
+                    Local Favourites
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    {d.curatedDining.map((f) => <CuratedDiningCard key={f.id} food={f} />)}
+                    {activityFood.map((act) => (
+                      <div key={act.id} style={{ background: '#FFFBF5', border: '1px solid rgba(184,115,51,0.2)', borderRadius: 12, padding: '12px 14px', display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+                        <div style={{ width: 36, height: 36, borderRadius: 9, background: '#FFF5EB', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, flexShrink: 0 }}>{act.emoji}</div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
+                            <span style={{ fontSize: 13, fontWeight: 700, color: '#1C1B1F' }}>{act.name}</span>
+                            {act.cost !== 'free' && <span style={{ fontSize: 9.5, fontWeight: 700, color: WARM, background: '#FFF5EB', padding: '1px 6px', borderRadius: 4 }}>{act.cost}</span>}
+                            {act.cost === 'free' && <span style={{ fontSize: 9.5, fontWeight: 700, color: '#059669', background: '#ECFDF5', padding: '1px 6px', borderRadius: 4 }}>Free</span>}
+                          </div>
+                          <div style={{ fontSize: 11.5, color: '#6B7280', lineHeight: 1.5 }}>{act.description.slice(0, 100)}{act.description.length > 100 ? '…' : ''}</div>
+                          {act.duration && <div style={{ fontSize: 10.5, color: '#9CA3AF', marginTop: 3 }}>⏱ {act.duration}</div>}
+                        </div>
+                        <a href={act.mapsUrl} target="_blank" rel="noopener noreferrer" style={{ padding: '6px 10px', borderRadius: 7, background: '#1C1B1F', color: '#fff', fontSize: 11, fontWeight: 700, textDecoration: 'none', flexShrink: 0 }}>Maps ↗</a>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                  {d.curatedDining.map((f) => <CuratedDiningCard key={f.id} food={f} />)}
-                </div>
-              </div>
-            )}
+              )
+            })()}
 
             {d.livePOIs !== null && d.foodPOIs.length === 0 && d.curatedDining.length === 0 && (
               <div style={{ margin: '0 16px 12px', padding: '16px', background: '#F8F7F4', borderRadius: 12, border: '1px solid var(--border)', textAlign: 'center' }}>
@@ -356,18 +376,23 @@ export function ExperiencePanel({ hideTimeline = false }: { hideTimeline?: boole
           </SectionBlock>
         )}
 
-        {/* ── Things to Do (human-made attractions) ── */}
-        {(filter === 'all' || filter === 'activities') && (
+        {/* ── Things to Do (non-food activities only) ── */}
+        {(filter === 'all' || filter === 'activities') && (() => {
+          const thingsToDo = d.activities.filter((a) => a.category !== 'food' && a.category !== 'drink')
+          const curatedFood = d.activities.filter((a) => a.category === 'food' || a.category === 'drink')
+          // Bubble curated food into the Eat & Drink section via a ref we can use below
+          void curatedFood // shown in Eat & Drink section
+          return (
           <SectionBlock
             id="section-activities"
             title="Things to Do"
             icon="🗺"
-            count={d.activities.length + d.activityPOIs.length}
-            loading={d.livePOIs === null && d.activities.length === 0}
-            empty={d.activities.length === 0 && d.activityPOIs.length === 0}
+            count={thingsToDo.length + d.activityPOIs.length}
+            loading={d.livePOIs === null && thingsToDo.length === 0}
+            empty={thingsToDo.length === 0 && d.activityPOIs.length === 0}
           >
             <div className="activity-grid" style={{ padding: '0 16px' }}>
-              {d.activities.map((act) => (
+              {thingsToDo.map((act) => (
                 <ActivityCard
                   key={act.id} act={act}
                   expanded={expandedActId === act.id}
@@ -397,7 +422,8 @@ export function ExperiencePanel({ hideTimeline = false }: { hideTimeline?: boole
               </>
             )}
           </SectionBlock>
-        )}
+          )
+        })()}
 
         {/* ── Nature & Outdoors (hikes, viewpoints, beaches) ── */}
         {(filter === 'all' || filter === 'nature') && (

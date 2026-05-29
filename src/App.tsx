@@ -58,7 +58,7 @@ function App() {
         <LoadingScreen onDone={() => setView(activeItinerary ? 'planner' : 'landing')} />
       )}
 
-      {view === 'landing' && !isWizardOpen && <LandingPage />}
+      {view === 'landing' && <LandingPage />}
 
       {view === 'planner' && (
         isMobile ? (
