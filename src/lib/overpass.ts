@@ -23,6 +23,38 @@ const OVERPASS = 'https://overpass-api.de/api/interpreter'
 const poiCache = new Map<string, LivePOI[]>()
 const wikiCache = new Map<string, string | null>()
 
+const WIKI_LS_KEY = 'ue-wiki-cache-v1'
+const WIKI_TTL_MS = 24 * 60 * 60 * 1000
+
+function loadWikiLS(): void {
+  try {
+    const raw = localStorage.getItem(WIKI_LS_KEY)
+    if (!raw) return
+    const store: Record<string, { v: string | null; t: number }> = JSON.parse(raw)
+    const now = Date.now()
+    for (const [k, entry] of Object.entries(store)) {
+      if (now - entry.t < WIKI_TTL_MS) wikiCache.set(k, entry.v)
+    }
+  } catch { /* */ }
+}
+
+function saveWikiLS(key: string, value: string | null): void {
+  try {
+    const raw = localStorage.getItem(WIKI_LS_KEY)
+    const store: Record<string, { v: string | null; t: number }> = raw ? JSON.parse(raw) : {}
+    store[key] = { v: value, t: Date.now() }
+    // Keep store lean — drop entries older than TTL
+    const now = Date.now()
+    for (const k of Object.keys(store)) {
+      if (now - store[k].t >= WIKI_TTL_MS) delete store[k]
+    }
+    localStorage.setItem(WIKI_LS_KEY, JSON.stringify(store))
+  } catch { /* */ }
+}
+
+// Load persisted cache on module init
+try { loadWikiLS() } catch { /* */ }
+
 // ── Google Places fallback (supplements sparse Overpass results) ───
 
 const GP_LIVE_TYPE: Record<string, LivePOI['type']> = {
@@ -356,6 +388,7 @@ export async function fetchWikipediaSummary(cacheKey: string, placeName: string)
       const match = json.extract.match(/^(.+?[.!?](?:\s.+?[.!?])?)(?:\s|$)/)
       const summary = match ? match[1].trim() : json.extract.slice(0, 220)
       wikiCache.set(cacheKey, summary)
+      saveWikiLS(cacheKey, summary)
       // Cache the thumbnail separately
       const thumbUrl: string | null = json.thumbnail?.source ?? json.originalimage?.source ?? null
       wikiThumbCache.set(cacheKey, thumbUrl)
@@ -363,6 +396,7 @@ export async function fetchWikipediaSummary(cacheKey: string, placeName: string)
     } catch { /* */ }
   }
   wikiCache.set(cacheKey, null)
+  saveWikiLS(cacheKey, null)
   return null
 }
 

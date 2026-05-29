@@ -270,9 +270,9 @@ export function ExperiencePanel({ hideTimeline = false }: { hideTimeline?: boole
             id="section-food"
             title="Eat & Drink"
             icon="🍽"
-            count={d.foodPOIs.length}
-            loading={d.livePOIs === null}
-            empty={d.livePOIs !== null && d.foodPOIs.length === 0}
+            count={d.foodPOIs.length + d.curatedDining.length}
+            loading={d.livePOIs === null && d.curatedDining.length === 0}
+            empty={false}
           >
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, padding: '0 16px' }}>
               {d.foodPOIs.map((poi) => (
@@ -290,6 +290,20 @@ export function ExperiencePanel({ hideTimeline = false }: { hideTimeline?: boole
               </div>
             )}
 
+            {d.livePOIs !== null && d.foodPOIs.length === 0 && d.curatedDining.length === 0 && (
+              <div style={{ margin: '0 16px 12px', padding: '16px', background: '#F8F7F4', borderRadius: 12, border: '1px solid var(--border)', textAlign: 'center' }}>
+                <div style={{ fontSize: 13, color: '#6B7280', marginBottom: 10 }}>
+                  No venue data in our directory for {d.shortDest} yet.
+                </div>
+                <a
+                  href={`https://www.google.com/maps/search/?api=1&query=cafes+restaurants+near+${encodeURIComponent(d.shortDest + ' Victoria')}`}
+                  target="_blank" rel="noopener noreferrer"
+                  style={{ display: 'inline-block', padding: '9px 18px', borderRadius: 9, background: '#1C1B1F', color: '#fff', fontSize: 12, fontWeight: 700, textDecoration: 'none' }}
+                >
+                  Find food near {d.shortDest} on Google Maps ↗
+                </a>
+              </div>
+            )}
             {d.foodPOIs.length > 0 && (
               <a
                 href={`https://www.google.com/maps/search/?api=1&query=restaurants+near+${encodeURIComponent(d.shortDest + ' Victoria')}`}

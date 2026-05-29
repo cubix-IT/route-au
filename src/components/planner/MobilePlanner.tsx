@@ -135,7 +135,14 @@ export function MobilePlanner() {
       {/* ── Things to Do ── */}
       <MSection title="Things to Do" emoji="🗺" loading={d.livePOIs === null && d.activities.length === 0} empty={d.activities.length === 0 && d.activityPOIs.length === 0} emptyMsg={`No activities listed for ${d.shortDest} yet.`}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: '0 14px' }}>
-          {d.activities.map((act) => <MActivityCard key={act.id} act={act} />)}
+          {d.activities.map((act) => (
+          <MActivityCard
+            key={act.id} act={act}
+            isAdded={d.addedActivities.some((a) => a.actId === act.id)}
+            onAdd={() => d.addActivity({ actId: act.id, actName: act.name, emoji: act.emoji, dayNumber: 1 })}
+            onRemove={() => d.removeActivity(act.id)}
+          />
+        ))}
           {d.activityPOIs.length > 0 && d.activities.length > 0 && (
             <div style={{ fontSize: 10, fontWeight: 700, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.08em', padding: '6px 0 2px' }}>Nearby on OpenStreetMap</div>
           )}
@@ -282,20 +289,31 @@ function MFoodCallout({ count, pois, loading, destName }: { count: number; pois:
   )
 }
 
-function MActivityCard({ act }: { act: Activity }) {
+function MActivityCard({ act, isAdded, onAdd, onRemove }: {
+  act: Activity; isAdded?: boolean; onAdd?: () => void; onRemove?: () => void
+}) {
   const tag = CAT_TAG[act.category] ?? { label: act.category, color: '#374151', bg: '#F3F4F6' }
   return (
-    <div style={{ background: '#fff', borderRadius: 18, border: act.isHiddenGem ? '1.5px solid rgba(184,115,51,0.3)' : '1px solid rgba(0,0,0,0.07)', padding: '16px', boxShadow: '0 1px 4px rgba(0,0,0,0.05)' }}>
+    <div style={{ background: isAdded ? '#F0FDF4' : '#fff', borderRadius: 18, border: isAdded ? `1.5px solid rgba(58,107,79,0.4)` : act.isHiddenGem ? '1.5px solid rgba(184,115,51,0.3)' : '1px solid rgba(0,0,0,0.07)', padding: '16px', boxShadow: '0 1px 4px rgba(0,0,0,0.05)' }}>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginBottom: 10 }}>
         <MPillChip label={tag.label} color={tag.color} bg={tag.bg} />
         {act.isHiddenGem && <MPillChip label="Local gem" color={WARM} bg="#FFF5EB" />}
         {act.cost === 'free' && <MPillChip label="Free" color={GREEN} bg="#E8F5EE" />}
+        {isAdded && <MPillChip label="In your plan" color={GREEN} bg="#E8F5EE" />}
       </div>
       <div style={{ fontSize: 17, fontWeight: 800, color: '#1C1B1F', lineHeight: 1.25, marginBottom: 6 }}>{act.name}</div>
       {act.description && <div style={{ fontSize: 13, color: '#49454F', lineHeight: 1.65, marginBottom: 10 }}>{act.description.length > 140 ? act.description.slice(0, 140) + '…' : act.description}</div>}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
         <span style={{ fontSize: 12, color: '#6B7280' }}>⏱ {act.duration}</span>
-        <a href={act.mapsUrl} target="_blank" rel="noopener noreferrer" style={{ fontSize: 13, fontWeight: 700, color: '#fff', background: '#1C1B1F', padding: '8px 16px', borderRadius: 100, textDecoration: 'none' }}>View ↗</a>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <a href={act.mapsUrl} target="_blank" rel="noopener noreferrer" style={{ fontSize: 13, fontWeight: 700, color: '#fff', background: '#1C1B1F', padding: '8px 16px', borderRadius: 100, textDecoration: 'none' }}>Maps ↗</a>
+          {onAdd && !isAdded && (
+            <button onClick={onAdd} style={{ fontSize: 13, fontWeight: 700, color: GREEN, background: '#E8F5EE', border: `1.5px solid ${GREEN}`, padding: '8px 16px', borderRadius: 100, cursor: 'pointer' }}>+ Plan it</button>
+          )}
+          {onRemove && isAdded && (
+            <button onClick={onRemove} style={{ fontSize: 13, fontWeight: 700, color: '#B91C1C', background: '#FEF2F2', border: '1.5px solid rgba(220,38,38,0.3)', padding: '8px 14px', borderRadius: 100, cursor: 'pointer' }}>Remove</button>
+          )}
+        </div>
       </div>
     </div>
   )
