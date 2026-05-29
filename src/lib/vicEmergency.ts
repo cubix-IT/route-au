@@ -10,9 +10,10 @@ export interface HazardAlert {
 
 // Categories worth surfacing to travellers
 const ALERT_CATEGORIES = new Set(['Fire', 'Flooding', 'Met'])
-// Statuses that indicate an active/dangerous situation
+// Only statuses that indicate an ACTIVE danger to travellers
+// "Under Control" excluded — fire is contained, not a travel risk
 const ALERT_STATUSES = new Set([
-  'Under Control', 'Responding', 'On Scene',
+  'Responding', 'On Scene',
   'Request For Assistance', 'Warning',
 ])
 
@@ -59,7 +60,7 @@ const cache = new Map<string, { alerts: HazardAlert[]; ts: number }>()
 export async function fetchHazardsNear(
   destLat: number,
   destLng: number,
-  radiusKm = 150,
+  radiusKm = 40,
 ): Promise<HazardAlert[]> {
   const key = `${destLat.toFixed(1)},${destLng.toFixed(1)}`
   const hit = cache.get(key)

@@ -264,6 +264,45 @@ export const FOOD_DRINK: FoodDrinkPOI[] = [
     signature_dish: 'Aged Cabernet Sauvignon flight',
   },
 
+  // --- Bellarine Peninsula ---
+  {
+    id: 'portarlington-mussel-bar',
+    name: 'Portarlington Mussel Bar',
+    category: 'Seafood',
+    coord: { lng: 144.652, lat: -38.118 },
+    description: 'Fresh Portarlington mussels steamed or in a pot with crusty bread — straight from the bay. Best seafood meal on the Bellarine and criminally cheap.',
+    corridor_id: 'bellarine',
+    meal_times: ['lunch'],
+    price_range: '$',
+    matching_prefs: ['CasualDining'],
+    signature_dish: 'Steamed mussels + bread',
+  },
+  {
+    id: 'jack-rabbit-vineyard',
+    name: 'Jack Rabbit Vineyard',
+    category: 'Winery',
+    coord: { lng: 144.507, lat: -38.224 },
+    description: 'Bellarine\'s most celebrated restaurant — glass-walled dining room with sweeping views over the vines and bay. Long lunches with estate Pinot Gris and Shiraz.',
+    corridor_id: 'bellarine',
+    meal_times: ['lunch'],
+    price_range: '$$$',
+    matching_prefs: ['FineDining', 'Wineries'],
+    must_book: true,
+    signature_dish: 'Bay snapper + Pinot Gris',
+  },
+  {
+    id: 'empire-retreat-portarlington',
+    name: 'Empire Retreat Cafe',
+    category: 'Cafe',
+    coord: { lng: 144.650, lat: -38.116 },
+    description: 'Locals\' breakfast spot right in Portarlington village. Excellent coffee, house-made pastries, shaded courtyard garden.',
+    corridor_id: 'bellarine',
+    meal_times: ['breakfast'],
+    price_range: '$',
+    matching_prefs: ['Cafes'],
+    signature_dish: 'Sourdough eggs + cold brew',
+  },
+
   // --- Mornington Peninsula ---
   {
     id: 'peninsula-hot-springs-cafe',
