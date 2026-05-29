@@ -1,8 +1,9 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useAppStore } from '@/store/useAppStore'
 import { useItineraryBuilder } from '@/hooks/useItineraryBuilder'
 import { matchDestinations, VICTORIAN_CLUSTERS } from '@/data/victorianClusters'
 import { getCurrentSeason } from '@/utils/season'
+import { fetchWeatherForCoord } from '@/api/weather'
 import type { MatchedDest, TripInterest } from '@/data/victorianClusters'
 import type {
   TripType, CrewType, VehicleType, FuelType,
@@ -13,16 +14,6 @@ import type {
 const GREEN = '#3A6B4F'
 const season = getCurrentSeason()
 
-function getMinDate(tripType: TripType): string {
-  const now = new Date()
-  if (tripType === 'day' && now.getHours() >= 18) {
-    const d = new Date(now)
-    d.setDate(d.getDate() + 1)
-    return d.toISOString().split('T')[0]
-  }
-  return now.toISOString().split('T')[0]
-}
-
 function haversinKm(a: Coordinate, b: Coordinate): number {
   const R = 6371
   const dLat = ((b.lat - a.lat) * Math.PI) / 180
@@ -32,6 +23,20 @@ function haversinKm(a: Coordinate, b: Coordinate): number {
 }
 
 // ── Interest definitions ──────────────────────────────────────────
+
+const INTEREST_GRAD: Record<string, string> = {
+  Wildlife:   'linear-gradient(145deg, #1a472a 0%, #2d6a4f 100%)',
+  Beach:      'linear-gradient(145deg, #0c4a6e 0%, #0284c7 100%)',
+  Wine:       'linear-gradient(145deg, #581c87 0%, #9333ea 100%)',
+  Hiking:     'linear-gradient(145deg, #1e3a5f 0%, #3b82f6 100%)',
+  HotSprings: 'linear-gradient(145deg, #9f1239 0%, #f97316 100%)',
+  History:    'linear-gradient(145deg, #78350f 0%, #c97c2f 100%)',
+  Food:       'linear-gradient(145deg, #92400e 0%, #f59e0b 100%)',
+  Relaxation: 'linear-gradient(145deg, #164e63 0%, #06b6d4 100%)',
+  FamilyFun:  'linear-gradient(145deg, #92400e 0%, #fbbf24 100%)',
+  Adventure:  'linear-gradient(145deg, #14532d 0%, #22c55e 100%)',
+  Scenic:     'linear-gradient(145deg, #1e3a8a 0%, #60a5fa 100%)',
+}
 
 const INTERESTS: { id: TripInterest; emoji: string; label: string }[] = [
   { id: 'Wildlife',   emoji: '🦘', label: 'Wildlife' },
@@ -102,9 +107,6 @@ export function ProfileWizard() {
 
   const toggleInterest = (id: TripInterest) =>
     setInterests((p) => p.includes(id) ? p.filter((i) => i !== id) : [...p, id])
-
-  const toggleDining = (p: DiningPref) =>
-    setDiningPrefs((prev) => prev.includes(p) ? prev.filter((d) => d !== p) : [...prev, p])
 
   const toggleDietary = (r: DietaryReq) =>
     setDietary((prev) => prev.includes(r) ? prev.filter((d) => d !== r) : [...prev, r])
@@ -288,12 +290,13 @@ export function ProfileWizard() {
                 <StepPreferences
                   hasKids={hasKids} kidsAge={kidsAge}
                   tripType={tripType}
-                  diningPrefs={diningPrefs} toggleDining={toggleDining}
                   dietary={dietary} toggleDietary={toggleDietary}
                   vehicleType={vehicleType} setVehicleType={setVehicleType}
                   accommodation={accommodation} setAccommodation={setAccommodation}
                   dailyDriveHours={dailyDriveHours} setDailyDriveHours={setDailyDriveHours}
                   departureHour={departureHour} setDepartureHour={setDepartureHour}
+                  destCoord={preselectedDest?.destCoord ?? undefined}
+                  hideDepartureTime={true}
                 />
               )}
             </>
@@ -325,7 +328,6 @@ export function ProfileWizard() {
                 <StepPreferences
                   hasKids={hasKids} kidsAge={kidsAge}
                   tripType={tripType}
-                  diningPrefs={diningPrefs} toggleDining={toggleDining}
                   dietary={dietary} toggleDietary={toggleDietary}
                   vehicleType={vehicleType} setVehicleType={setVehicleType}
                   accommodation={accommodation} setAccommodation={setAccommodation}
@@ -333,6 +335,7 @@ export function ProfileWizard() {
                   departureHour={departureHour} setDepartureHour={setDepartureHour}
                   startDate={startDate} setStartDate={setStartDate}
                   endDate={endDate} setEndDate={setEndDate}
+                  destCoord={pickedDest?.sub.coord ?? undefined}
                 />
               )}
             </>
@@ -385,9 +388,11 @@ function StepHowFarAndWho({
   const matching = VICTORIAN_CLUSTERS.flatMap((c) => c.subDests)
     .filter((s) => s.driveTimeHours <= maxDriveHours).length
 
-  const driveLabel = maxDriveHours <= 1
+  const driveLabel = maxDriveHours < 1
     ? `${Math.round(maxDriveHours * 60)} min`
-    : `${maxDriveHours} hrs`
+    : maxDriveHours % 1 === 0
+      ? `${maxDriveHours}h`
+      : `${Math.floor(maxDriveHours)}h ${Math.round((maxDriveHours % 1) * 60)}m`
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
@@ -409,13 +414,13 @@ function StepHowFarAndWho({
       }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 14 }}>
           <Label>How far from Melbourne are you happy to drive?</Label>
-          <span style={{ fontSize: 22, fontWeight: 800, color: GREEN, letterSpacing: '-0.04em', fontFamily: "'Fraunces', Georgia, serif" }}>
+          <span style={{ fontSize: 22, fontWeight: 800, color: GREEN, letterSpacing: '-0.04em', fontFamily: "'Fraunces', Georgia, serif", minWidth: 80, textAlign: 'right' }}>
             {driveLabel}
           </span>
         </div>
         <input
           type="range" min={0.75} max={4} step={0.25} value={maxDriveHours}
-          onChange={(e) => setMaxDriveHours(Number(e.target.value))}
+          onChange={(e) => setMaxDriveHours(Math.round(Number(e.target.value) * 4) / 4)}
           style={{ width: '100%', accentColor: GREEN }}
         />
         <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'var(--text-muted)', marginTop: 6 }}>
@@ -537,17 +542,36 @@ function StepInterests({ interests, toggleInterest, hasKids, kidsAge }: {
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
-        {visible.map((i) => (
-          <div
-            key={i.id}
-            className={`option-card ${interests.includes(i.id) ? 'selected' : ''}`}
-            onClick={() => toggleInterest(i.id)}
-            style={{ padding: '14px 8px', gap: 6 }}
-          >
-            <span style={{ fontSize: 24 }}>{i.emoji}</span>
-            <span style={{ fontSize: 11, fontWeight: 600, textAlign: 'center', lineHeight: 1.3 }}>{i.label}</span>
-          </div>
-        ))}
+        {visible.map((i) => {
+          const selected = interests.includes(i.id)
+          return (
+            <div
+              key={i.id}
+              onClick={() => toggleInterest(i.id)}
+              style={{
+                position: 'relative',
+                borderRadius: 14,
+                background: INTEREST_GRAD[i.id] ?? '#2d5440',
+                padding: '18px 8px 14px',
+                display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6,
+                cursor: 'pointer',
+                outline: selected ? '3px solid #fff' : 'none',
+                boxShadow: selected
+                  ? `0 0 0 4px ${GREEN}, 0 4px 14px rgba(0,0,0,0.25)`
+                  : '0 2px 8px rgba(0,0,0,0.14)',
+                transform: selected ? 'scale(1.06)' : 'scale(1)',
+                transition: 'all 0.18s',
+                opacity: selected ? 1 : 0.8,
+              }}
+            >
+              <span style={{ fontSize: 26 }}>{i.emoji}</span>
+              <span style={{ fontSize: 10, fontWeight: 700, textAlign: 'center', lineHeight: 1.3, color: '#fff', textShadow: '0 1px 3px rgba(0,0,0,0.5)' }}>{i.label}</span>
+              {selected && (
+                <div style={{ position: 'absolute', top: 6, right: 6, width: 18, height: 18, borderRadius: '50%', background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, color: GREEN, fontWeight: 900 }}>✓</div>
+              )}
+            </div>
+          )
+        })}
       </div>
 
       {interests.length > 0 && (
@@ -697,18 +721,118 @@ function StepPickDest({ suggestions, picked, onPick }: {
   )
 }
 
-// ── Step 3 (Discovery) / Step 1 (Preselect): Preferences ─────────
+// ── Date day-strip with weather ───────────────────────────────────
 
-const ALL_DINING: { pref: DiningPref; emoji: string; label: string; kidsOk: boolean }[] = [
-  { pref: 'Cafes',        emoji: '☕', label: 'Cafes',          kidsOk: true },
-  { pref: 'Bakeries',     emoji: '🥐', label: 'Bakeries',       kidsOk: true },
-  { pref: 'CasualDining', emoji: '🍔', label: 'Casual dining',  kidsOk: true },
-  { pref: 'LocalPubs',    emoji: '🍺', label: 'Local pubs',     kidsOk: false },
-  { pref: 'Wineries',     emoji: '🍷', label: 'Winery lunch',   kidsOk: false },
-  { pref: 'FineDining',   emoji: '🍽️', label: 'Fine dining',    kidsOk: false },
-  { pref: 'Roadhouses',   emoji: '🛣️', label: 'Roadhouses',     kidsOk: true },
-  { pref: 'SelfCatering', emoji: '🔥', label: 'Self-catering',  kidsOk: true },
-]
+function weatherEmoji(description: string): string {
+  if (description === 'Clear sky') return '☀️'
+  if (description === 'Partly cloudy') return '⛅'
+  if (description === 'Foggy') return '🌫️'
+  if (description === 'Rainy' || description === 'Showers') return '🌧️'
+  if (description === 'Snowfall') return '❄️'
+  if (description === 'Thunderstorm') return '⛈️'
+  return '🌤️'
+}
+
+function DateDayStrip({
+  value, onChange, tripType, endDate, onEndDateChange, destCoord,
+}: {
+  value: string
+  onChange: (d: string) => void
+  tripType: TripType
+  endDate?: string
+  onEndDateChange?: (d: string) => void
+  destCoord?: Coordinate
+}) {
+  const [page, setPage] = useState(0)
+  const [wx, setWx] = useState<{ emoji: string; max: number }[] | null>(null)
+
+  useEffect(() => {
+    if (!destCoord) return
+    fetchWeatherForCoord(destCoord, 14)
+      .then((days) => setWx(days.map((d) => ({ emoji: weatherEmoji(d.description), max: Math.round(d.temp_max_c) }))))
+      .catch(() => {})
+  }, [destCoord?.lat, destCoord?.lng])
+
+  const today = new Date()
+  const allDays = Array.from({ length: 14 }, (_, i) => {
+    const d = new Date(today)
+    d.setDate(d.getDate() + i)
+    return {
+      iso: d.toISOString().split('T')[0],
+      day: d.toLocaleDateString('en-AU', { weekday: 'short' }),
+      num: d.getDate(),
+      mon: d.toLocaleDateString('en-AU', { month: 'short' }),
+    }
+  })
+
+  const visible = allDays.slice(page * 7, page * 7 + 7)
+
+  return (
+    <div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+        <button
+          onClick={() => setPage(0)} disabled={page === 0}
+          style={{ width: 28, height: 28, borderRadius: 14, border: '1px solid var(--border)', background: '#fff', cursor: page === 0 ? 'default' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: page === 0 ? 'var(--border)' : GREEN, fontSize: 15, fontWeight: 700, flexShrink: 0 }}
+        >‹</button>
+        <div style={{ flex: 1, display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 3 }}>
+          {visible.map((d, idx) => {
+            const wIdx = page * 7 + idx
+            const selected = d.iso === value
+            return (
+              <button key={d.iso} onClick={() => onChange(d.iso)} style={{
+                display: 'flex', flexDirection: 'column', alignItems: 'center',
+                padding: '7px 2px', borderRadius: 10, cursor: 'pointer', gap: 1,
+                background: selected ? 'var(--green-light)' : 'var(--bg-muted)',
+                border: `1.5px solid ${selected ? GREEN : 'transparent'}`,
+              }}>
+                <span style={{ fontSize: 8.5, fontWeight: 700, color: selected ? GREEN : '#9CA3AF', textTransform: 'uppercase' }}>{d.day}</span>
+                <span style={{ fontSize: 14, fontWeight: 800, color: selected ? GREEN : '#1C1B1F' }}>{d.num}</span>
+                <span style={{ fontSize: 8, color: '#9CA3AF' }}>{d.mon}</span>
+                {wx?.[wIdx] && <span style={{ fontSize: 11, lineHeight: 1.2 }}>{wx[wIdx].emoji}</span>}
+                {wx?.[wIdx] && <span style={{ fontSize: 8, color: selected ? GREEN : '#6B7280' }}>{wx[wIdx].max}°</span>}
+              </button>
+            )
+          })}
+        </div>
+        <button
+          onClick={() => setPage(1)} disabled={page === 1}
+          style={{ width: 28, height: 28, borderRadius: 14, border: '1px solid var(--border)', background: '#fff', cursor: page === 1 ? 'default' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: page === 1 ? 'var(--border)' : GREEN, fontSize: 15, fontWeight: 700, flexShrink: 0 }}
+        >›</button>
+      </div>
+
+      {tripType === 'multiday' && value && onEndDateChange && (
+        <div style={{ marginTop: 12 }}>
+          <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 8 }}>How many nights?</div>
+          <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
+            {[1, 2, 3, 4, 5, 6].map((n) => {
+              const ret = new Date(value + 'T00:00:00')
+              ret.setDate(ret.getDate() + n)
+              const retIso = ret.toISOString().split('T')[0]
+              const sel = endDate === retIso
+              return (
+                <button key={n} onClick={() => onEndDateChange(retIso)} style={{
+                  padding: '7px 12px', borderRadius: 8, cursor: 'pointer',
+                  background: sel ? 'var(--green-light)' : 'var(--bg-muted)',
+                  border: `1.5px solid ${sel ? GREEN : 'var(--border)'}`,
+                  color: sel ? GREEN : 'var(--text-muted)', fontSize: 12, fontWeight: 700,
+                }}>
+                  {n}{n === 1 ? ' night' : ' nights'}
+                </button>
+              )
+            })}
+          </div>
+          {endDate && (
+            <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 5 }}>
+              Returning {new Date(endDate + 'T00:00:00').toLocaleDateString('en-AU', { weekday: 'short', day: 'numeric', month: 'short' })}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── Step 3 (Discovery) / Step 1 (Preselect): Preferences ─────────
 
 const DIETARY: { req: DietaryReq; emoji: string; label: string }[] = [
   { req: 'Vegetarian', emoji: '🥦', label: 'Vegetarian' },
@@ -720,7 +844,6 @@ const DIETARY: { req: DietaryReq; emoji: string; label: string }[] = [
 
 function StepPreferences({
   hasKids, kidsAge, tripType,
-  diningPrefs, toggleDining,
   dietary, toggleDietary,
   vehicleType, setVehicleType,
   accommodation, setAccommodation,
@@ -728,9 +851,10 @@ function StepPreferences({
   departureHour, setDepartureHour,
   startDate, setStartDate,
   endDate, setEndDate,
+  destCoord,
+  hideDepartureTime,
 }: {
   hasKids: boolean; kidsAge: KidsAge | null; tripType: TripType
-  diningPrefs: DiningPref[]; toggleDining: (p: DiningPref) => void
   dietary: DietaryReq[]; toggleDietary: (r: DietaryReq) => void
   vehicleType: VehicleType; setVehicleType: (v: VehicleType) => void
   accommodation: AccommodationPreference; setAccommodation: (a: AccommodationPreference) => void
@@ -738,13 +862,10 @@ function StepPreferences({
   departureHour: number; setDepartureHour: (h: number) => void
   startDate?: string; setStartDate?: (d: string) => void
   endDate?: string; setEndDate?: (d: string) => void
+  destCoord?: Coordinate
+  hideDepartureTime?: boolean
 }) {
-  const minDate = getMinDate(tripType)
-  const visibleDining = ALL_DINING.filter((d) => {
-    if (!hasKids) return true
-    if (!d.kidsOk && kidsAge !== 'teen') return false
-    return true
-  })
+  void hasKids; void kidsAge
 
   const vehicles = [
     { type: 'Sedan' as VehicleType,            emoji: '🚗', label: 'Sedan / Hatch' },
@@ -775,19 +896,15 @@ function StepPreferences({
       {setStartDate && (
         <div>
           <Label>When are you going?</Label>
-          <div style={{ display: 'grid', gridTemplateColumns: tripType === 'multiday' ? '1fr 1fr' : '1fr', gap: 10, marginTop: 10 }}>
-            <div>
-              <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 4 }}>{tripType === 'multiday' ? 'Departing' : 'Date'}</div>
-              <input type="date" value={startDate} min={minDate} onChange={(e) => setStartDate!(e.target.value)}
-                className="input-field" />
-            </div>
-            {tripType === 'multiday' && (
-              <div>
-                <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 4 }}>Returning</div>
-                <input type="date" value={endDate} min={startDate} onChange={(e) => setEndDate!(e.target.value)}
-                  className="input-field" />
-              </div>
-            )}
+          <div style={{ marginTop: 10 }}>
+            <DateDayStrip
+              value={startDate ?? ''}
+              onChange={setStartDate}
+              tripType={tripType}
+              endDate={endDate}
+              onEndDateChange={setEndDate}
+              destCoord={destCoord}
+            />
           </div>
         </div>
       )}
@@ -800,7 +917,7 @@ function StepPreferences({
             <span style={{ fontSize: 13, fontWeight: 700, color: GREEN }}>{dailyDriveHours} hrs</span>
           </div>
           <input type="range" min={1} max={8} step={0.5} value={dailyDriveHours}
-            onChange={(e) => setDailyDriveHours(Number(e.target.value))}
+            onChange={(e) => setDailyDriveHours(Math.round(Number(e.target.value) * 2) / 2)}
             style={{ width: '100%', accentColor: GREEN }} />
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'var(--text-muted)', marginTop: 3 }}>
             <span>1 hr relaxed</span><span>4–5 hrs standard</span><span>8 hrs push</span>
@@ -808,44 +925,32 @@ function StepPreferences({
         </div>
       )}
 
-      {/* Departure time */}
-      <div>
-        <Label>What time do you want to leave?</Label>
-        <div style={{ display: 'flex', gap: 6, marginTop: 10, flexWrap: 'wrap' }}>
-          {[
-            [6, '6:00 AM'], [7, '7:00 AM'], [8, '8:00 AM'], [9, '9:00 AM'], [10, '10:00 AM'],
-          ].map(([h, label]) => (
-            <button
-              key={h}
-              onClick={() => setDepartureHour(h as number)}
-              style={{
-                padding: '9px 13px', borderRadius: 9, cursor: 'pointer',
-                background: departureHour === h ? 'var(--green-light)' : 'var(--bg-muted)',
-                border: `1.5px solid ${departureHour === h ? 'var(--border-active)' : 'var(--border)'}`,
-                color: departureHour === h ? GREEN : 'var(--text-muted)',
-                fontSize: 12, fontWeight: departureHour === h ? 700 : 500,
-                transition: 'all 0.15s',
-              }}
-            >
-              {label}
-            </button>
-          ))}
+      {/* Departure time — hidden in preselected flow (already set in step 0) */}
+      {!hideDepartureTime && (
+        <div>
+          <Label>What time do you want to leave?</Label>
+          <div style={{ display: 'flex', gap: 6, marginTop: 10, flexWrap: 'wrap' }}>
+            {[
+              [6, '6:00 AM'], [7, '7:00 AM'], [8, '8:00 AM'], [9, '9:00 AM'], [10, '10:00 AM'],
+            ].map(([h, label]) => (
+              <button
+                key={h}
+                onClick={() => setDepartureHour(h as number)}
+                style={{
+                  padding: '9px 13px', borderRadius: 9, cursor: 'pointer',
+                  background: departureHour === h ? 'var(--green-light)' : 'var(--bg-muted)',
+                  border: `1.5px solid ${departureHour === h ? 'var(--border-active)' : 'var(--border)'}`,
+                  color: departureHour === h ? GREEN : 'var(--text-muted)',
+                  fontSize: 12, fontWeight: departureHour === h ? 700 : 500,
+                  transition: 'all 0.15s',
+                }}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
         </div>
-      </div>
-
-      {/* Food */}
-      <div>
-        <Label>Food stops <span style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 400 }}>leave blank for no stops</span></Label>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginTop: 10 }}>
-          {visibleDining.map((d) => (
-            <div key={d.pref} className={`option-card ${diningPrefs.includes(d.pref) ? 'selected' : ''}`}
-              onClick={() => toggleDining(d.pref)} style={{ padding: '11px 6px', gap: 5 }}>
-              <span style={{ fontSize: 18 }}>{d.emoji}</span>
-              <span style={{ fontSize: 10, fontWeight: 600, textAlign: 'center', lineHeight: 1.3 }}>{d.label}</span>
-            </div>
-          ))}
-        </div>
-      </div>
+      )}
 
       {/* Dietary */}
       <div>
@@ -920,7 +1025,6 @@ function StepPlanningDetails({
   departureHour: number; setDepartureHour: (h: number) => void
 }) {
   const showKids = crewType === 'family' || crewType === 'group'
-  const minDate = getMinDate(tripType)
   const originCoord = useAppStore((s) => s.originCoord)
   const originName = useAppStore((s) => s.originName)
 
@@ -973,19 +1077,18 @@ function StepPlanningDetails({
       </div>
 
       {/* Dates */}
-      <div style={{ display: 'grid', gridTemplateColumns: tripType === 'multiday' ? '1fr 1fr' : '1fr', gap: 10 }}>
-        <div>
-          <Label>{tripType === 'multiday' ? 'Departing' : 'Date'}</Label>
-          <input type="date" value={startDate} min={minDate} onChange={(e) => setStartDate(e.target.value)}
-            className="input-field" style={{ marginTop: 6 }} />
+      <div>
+        <Label>When are you going?</Label>
+        <div style={{ marginTop: 10 }}>
+          <DateDayStrip
+            value={startDate}
+            onChange={setStartDate}
+            tripType={tripType}
+            endDate={endDate}
+            onEndDateChange={setEndDate}
+            destCoord={preselectedDest.destCoord}
+          />
         </div>
-        {tripType === 'multiday' && (
-          <div>
-            <Label>Returning</Label>
-            <input type="date" value={endDate} min={startDate} onChange={(e) => setEndDate(e.target.value)}
-              className="input-field" style={{ marginTop: 6 }} />
-          </div>
-        )}
       </div>
 
       {/* Departure time */}

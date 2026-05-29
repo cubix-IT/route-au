@@ -1,21 +1,43 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 
+// Static system instructions — marked ephemeral so Anthropic caches them
+// across repeated calls, cutting token spend on the fixed portion.
+const SYSTEM_PROMPT =
+  'You are an elite, vibe-driven travel copywriter for Victoria, Australia. ' +
+  'Using the provided text solely for geographic context, write an evocative, ' +
+  'sensory-rich 2-sentence description of the destination. ' +
+  'CRITICAL RULES: You are strictly forbidden from mentioning census data, ' +
+  'population statistics, square kilometers, elevation metrics, or historical ' +
+  'establishment dates. Focus entirely on the atmospheric charm, landscape ' +
+  'features, local culinary notes, and the emotional feeling of escaping to ' +
+  'this specific town. ' +
+  'Respond exclusively in valid JSON format: ' +
+  '{"summary":"2-sentence sensory description here","bestFor":["pick 3-4 from: ' +
+  'Couples, Families, Solo travellers, Nature lovers, Foodies, Wine lovers, ' +
+  'Hikers, History buffs, Beach lovers, Adventure seekers"]}'
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  const { dest, wiki } = req.query as { dest?: string; wiki?: string }
+  const { dest, wiki, hasKids, interests } = req.query as {
+    dest?: string; wiki?: string; hasKids?: string; interests?: string
+  }
   if (!dest) return res.status(400).json({ error: 'dest required' })
 
   const apiKey = process.env.ANTHROPIC_API_KEY
   if (!apiKey) {
-    // Graceful fallback — return wiki summary if no AI key configured
     return res.status(200).json({ summary: wiki ?? null, bestFor: ['Couples', 'Nature lovers'] })
   }
 
-  const prompt = `You are a concise travel writer for Victoria, Australia.${wiki ? `\nBackground: ${wiki}` : ''}
+  // Build the variable user message — includes geo context + traveller preferences
+  const interestList = interests ? interests.split(',').map((s) => s.trim()).filter(Boolean) : []
+  const prefLines: string[] = []
+  if (hasKids === 'true') prefLines.push('The group includes children — weave in family-friendly aspects where naturally relevant.')
+  if (interestList.length > 0) prefLines.push(`Highlight aspects relevant to these traveller interests: ${interestList.join(', ')}.`)
 
-Write a 2-sentence engaging travel description of ${dest}. Then list who this destination suits best.
-
-Respond with valid JSON only, no markdown:
-{"summary":"2-sentence description here","bestFor":["pick 3-4 from: Couples, Families, Solo travellers, Nature lovers, Foodies, Wine lovers, Hikers, History buffs, Beach lovers, Adventure seekers"]}`
+  const userContent = [
+    `Destination: ${dest}`,
+    wiki ? `Geographic context: ${wiki.slice(0, 400)}` : null,
+    prefLines.length > 0 ? prefLines.join(' ') : null,
+  ].filter(Boolean).join('\n\n')
 
   try {
     const r = await fetch('https://api.anthropic.com/v1/messages', {
@@ -23,13 +45,22 @@ Respond with valid JSON only, no markdown:
       headers: {
         'x-api-key': apiKey,
         'anthropic-version': '2023-06-01',
+        // Enables prompt caching — static system block is cached after first call
+        'anthropic-beta': 'prompt-caching-2024-07-31',
         'content-type': 'application/json',
       },
       body: JSON.stringify({
         model: 'claude-haiku-4-5-20251001',
-        max_tokens: 250,
+        max_tokens: 200,
         temperature: 0.4,
-        messages: [{ role: 'user', content: prompt }],
+        system: [
+          {
+            type: 'text',
+            text: SYSTEM_PROMPT,
+            cache_control: { type: 'ephemeral' },
+          },
+        ],
+        messages: [{ role: 'user', content: userContent }],
       }),
       signal: AbortSignal.timeout(10000),
     })
@@ -41,7 +72,6 @@ Respond with valid JSON only, no markdown:
     const match = text.match(/\{[\s\S]*\}/)
     if (match) {
       const data = JSON.parse(match[0]) as { summary: string; bestFor: string[] }
-      // Cache for 24 hours — destination descriptions don't change
       res.setHeader('Cache-Control', 's-maxage=86400, stale-while-revalidate')
       return res.status(200).json(data)
     }

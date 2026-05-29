@@ -51,7 +51,7 @@ export function TripTimeline() {
   const safePos = ((safeHour - departureHour) / totalDriveHours) * 100
 
   const pos = (h: number) =>
-    Math.max(0, Math.min(100, ((h - departureHour) / totalDriveHours) * 100))
+    Math.max(2, Math.min(98, ((h - departureHour) / totalDriveHours) * 100))
 
   const scheduleMarkers = day1.schedule.filter(
     (item) => item.type !== 'depart' && item.type !== 'drive' && item.type !== 'arrive',
@@ -61,8 +61,8 @@ export function TripTimeline() {
   const addedMarkers = addedDiningStops.map((stop) => {
     const stopCoord = { lat: stop.stopLat, lng: stop.stopLng }
     const ratio = originDist > 0
-      ? Math.min(haversinKm(originCoord, stopCoord) / originDist, 0.9)
-      : (stop.timeOfDay === 'morning' ? 0.25 : 0.60)
+      ? Math.min(haversinKm(originCoord, stopCoord) / originDist, 0.92)
+      : (stop.timeOfDay === 'morning' ? 0.28 : 0.62)
     return { ...stop, timeHour: departureHour + ratio * totalDriveHours, timePos: ratio * 100 }
   })
 
@@ -75,54 +75,50 @@ export function TripTimeline() {
       flexShrink: 0,
       background: '#fff',
       borderTop: '1.5px solid var(--border)',
-      padding: '10px 24px 14px',
+      padding: '10px 20px 12px',
     }}>
+
       {/* Label row */}
       <div style={{
-        display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8,
+        display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10,
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.07em' }}>
-            Day {day1.day_number} route
-            {activeItinerary.total_days > 1 && ` · ${activeItinerary.total_days}-day trip`}
-          </div>
+          <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.07em' }}>
+            Route timeline
+            {activeItinerary.total_days > 1 && ` · ${activeItinerary.total_days} days`}
+          </span>
           {addedDiningStops.length > 0 && (
-            <div style={{
+            <span style={{
               fontSize: 9.5, fontWeight: 700, color: GREEN,
               background: 'var(--green-light)', padding: '2px 7px', borderRadius: 5,
             }}>
               {addedDiningStops.length} stop{addedDiningStops.length > 1 ? 's' : ''} added
-            </div>
+            </span>
           )}
         </div>
-        <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>
-          {totalKm}km · ~{Math.round(totalDriveHours * 10) / 10}h drive
-        </div>
+        <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>
+          {totalKm} km · ~{Math.round(totalDriveHours * 10) / 10}h
+        </span>
       </div>
 
-      {/* Timeline bar container */}
-      <div style={{ position: 'relative', height: 64, userSelect: 'none' }}>
+      {/* Timeline container */}
+      <div style={{ position: 'relative', height: 68, userSelect: 'none' }}>
 
-        {/* Coloured track */}
+        {/* Track — two-colour gradient */}
         <div style={{
-          position: 'absolute',
-          top: 30, left: 12, right: 12,
-          height: 6, borderRadius: 3,
+          position: 'absolute', top: 32, left: 14, right: 14,
+          height: 5, borderRadius: 3,
           display: 'flex', overflow: 'hidden',
+          boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
         }}>
-          <div style={{ width: `${safePos}%`, background: GREEN, opacity: 0.8 }} />
-          <div style={{ flex: 1, background: WARM, opacity: 0.7 }} />
+          <div style={{ width: `${safePos}%`, background: `linear-gradient(90deg, ${GREEN}CC, ${GREEN}99)` }} />
+          <div style={{ flex: 1, background: `linear-gradient(90deg, ${WARM}99, ${WARM}CC)` }} />
         </div>
 
-        {/* Origin */}
-        <EndpointMarker
-          label={shortOrigin}
-          time={fmtHour(departureHour)}
-          color={GREEN}
-          align="left"
-        />
+        {/* Origin endpoint */}
+        <Endpoint label={shortOrigin} time={fmtHour(departureHour)} color={GREEN} align="left" />
 
-        {/* Schedule markers */}
+        {/* Schedule markers (from itinerary) */}
         {scheduleMarkers.map((item) => {
           const h = parseTimeToHours(item.time)
           if (h < 0) return null
@@ -133,11 +129,10 @@ export function TripTimeline() {
               title={`${item.title} · ${item.time}`}
               style={{
                 position: 'absolute',
-                left: `calc(${p}% + 12px - (${p}% / 100) * 24px)`,
-                top: 20,
-                fontSize: 15, lineHeight: 1, zIndex: 2,
+                left: `calc(${p}% + 14px - (${p / 100}) * 28px)`,
+                top: 20, fontSize: 14, lineHeight: 1,
                 transform: 'translateX(-50%)',
-                cursor: 'default',
+                zIndex: 2, cursor: 'default',
               }}
             >
               {item.emoji}
@@ -145,96 +140,82 @@ export function TripTimeline() {
           )
         })}
 
-        {/* Added dining stop markers */}
+        {/* Added stop markers */}
         {addedMarkers.map((stop) => (
           <div
             key={stop.foodId}
             style={{
               position: 'absolute',
-              left: `calc(${stop.timePos}% + 12px - (${stop.timePos}% / 100) * 24px)`,
-              top: 8,
-              transform: 'translateX(-50%)',
-              zIndex: 3,
-              display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2,
+              left: `calc(${stop.timePos}% + 14px - (${stop.timePos / 100}) * 28px)`,
+              top: 6, transform: 'translateX(-50%)',
+              zIndex: 3, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2,
             }}
           >
-            {/* Removable label */}
-            <div
+            <button
               onClick={() => removeDiningStop(stop.foodId)}
               title={`Remove ${stop.stopName}`}
               style={{
                 fontSize: 9, fontWeight: 700, color: '#fff',
-                background: GREEN,
-                padding: '2px 5px', borderRadius: 4,
-                whiteSpace: 'nowrap', maxWidth: 64,
+                background: GREEN, padding: '2px 5px', borderRadius: 4,
+                whiteSpace: 'nowrap', maxWidth: 68,
                 overflow: 'hidden', textOverflow: 'ellipsis',
-                cursor: 'pointer',
+                cursor: 'pointer', border: 'none',
               }}
             >
               ✕ {stop.stopName.split(' ')[0]}
-            </div>
+            </button>
             <div style={{
-              width: 9, height: 9, borderRadius: '50%',
+              width: 8, height: 8, borderRadius: '50%',
               background: GREEN, border: '2px solid #fff',
-              boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
+              boxShadow: `0 1px 4px ${GREEN}66`,
             }} />
           </div>
         ))}
 
-        {/* Safe zone divider */}
+        {/* Safe-zone divider */}
         {showSafe && (
           <div style={{
             position: 'absolute',
-            left: `calc(${safePos}% + 12px - (${safePos}% / 100) * 24px)`,
-            top: 20,
-            transform: 'translateX(-50%)',
+            left: `calc(${safePos}% + 14px - (${safePos / 100}) * 28px)`,
+            top: 22, transform: 'translateX(-50%)',
             display: 'flex', flexDirection: 'column', alignItems: 'center',
           }}>
-            <div style={{ fontSize: 8, color: 'var(--text-muted)', whiteSpace: 'nowrap', marginBottom: 1 }}>rest</div>
-            <div style={{ width: 1.5, height: 14, background: 'var(--border-strong)', borderRadius: 1 }} />
+            <div style={{ fontSize: 7.5, color: 'var(--text-muted)', whiteSpace: 'nowrap', marginBottom: 1, letterSpacing: '-0.01em' }}>rest</div>
+            <div style={{ width: 1, height: 12, background: 'rgba(0,0,0,0.2)', borderRadius: 1 }} />
           </div>
         )}
 
-        {/* Destination */}
-        <EndpointMarker
-          label={shortDest}
-          time={fmtHour(arrivalHour)}
-          color={WARM}
-          align="right"
-        />
+        {/* Destination endpoint */}
+        <Endpoint label={shortDest} time={fmtHour(arrivalHour)} color={WARM} align="right" />
       </div>
     </div>
   )
 }
 
-function EndpointMarker({
+function Endpoint({
   label, time, color, align,
 }: {
-  label: string
-  time: string
-  color: string
-  align: 'left' | 'right'
+  label: string; time: string; color: string; align: 'left' | 'right'
 }) {
-  const left = align === 'left' ? 12 : undefined
-  const right = align === 'right' ? 12 : undefined
-
   return (
     <div style={{
       position: 'absolute',
-      left, right, top: 0,
+      left: align === 'left' ? 14 : undefined,
+      right: align === 'right' ? 14 : undefined,
+      top: 0,
       display: 'flex', flexDirection: 'column',
       alignItems: align === 'left' ? 'flex-start' : 'flex-end',
       gap: 2, zIndex: 4,
     }}>
-      <div style={{ fontSize: 9.5, color: 'var(--text-muted)', fontWeight: 500 }}>{time}</div>
+      <div style={{ fontSize: 9.5, color: 'var(--text-muted)', fontWeight: 600 }}>{time}</div>
       <div style={{
-        width: 12, height: 12, borderRadius: '50%',
+        width: 11, height: 11, borderRadius: '50%',
         background: color, border: '2.5px solid #fff',
-        boxShadow: `0 1px 5px ${color}55`,
+        boxShadow: `0 1px 6px ${color}66`,
       }} />
       <div style={{
         fontSize: 10, fontWeight: 700, color: 'var(--text-secondary)',
-        whiteSpace: 'nowrap', maxWidth: 80,
+        whiteSpace: 'nowrap', maxWidth: 84,
         overflow: 'hidden', textOverflow: 'ellipsis',
       }}>
         {label}

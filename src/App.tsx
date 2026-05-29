@@ -1,32 +1,53 @@
 import { useState, useEffect } from 'react'
 import { Toaster } from 'react-hot-toast'
 import { Header } from '@/components/layout/Header'
+import { ItineraryTimelinePanel } from '@/components/layout/ItineraryTimelinePanel'
 import { MapContainer } from '@/components/map/MapContainer'
 import { ProfileWizard } from '@/components/wizard/ProfileWizard'
 import { LandingPage } from '@/components/landing/LandingPage'
 import { LoadingScreen } from '@/components/LoadingScreen'
-import { FoodTile } from '@/components/planner/FoodTile'
-import { ThingsTile } from '@/components/planner/ThingsTile'
-import { TripTimeline } from '@/components/planner/TripTimeline'
+import { ExperiencePanel } from '@/components/planner/ExperiencePanel'
+import { MobilePlanner } from '@/components/planner/MobilePlanner'
+import { PlannerMetrics } from '@/components/planner/PlannerMetrics'
 import { useOfflineSync } from '@/hooks/useOfflineSync'
 import { useAppStore } from '@/store/useAppStore'
 
 type View = 'loading' | 'landing' | 'planner'
+
+function useIsMobile() {
+  const [mobile, setMobile] = useState(() => window.innerWidth < 768)
+  useEffect(() => {
+    const fn = () => setMobile(window.innerWidth < 768)
+    window.addEventListener('resize', fn)
+    return () => window.removeEventListener('resize', fn)
+  }, [])
+  return mobile
+}
+
+function useIsWide() {
+  const [wide, setWide] = useState(() => window.innerWidth >= 1280)
+  useEffect(() => {
+    const fn = () => setWide(window.innerWidth >= 1280)
+    window.addEventListener('resize', fn)
+    return () => window.removeEventListener('resize', fn)
+  }, [])
+  return wide
+}
 
 function App() {
   useOfflineSync()
 
   const isWizardOpen = useAppStore((s) => s.isWizardOpen)
   const activeItinerary = useAppStore((s) => s.activeItinerary)
+  const isMobile = useIsMobile()
+  const isWide   = useIsWide()
 
   const [view, setView] = useState<View>('loading')
 
-  // Forward: itinerary built → show planner
   useEffect(() => {
     if (activeItinerary) setView('planner')
   }, [activeItinerary])
 
-  // Reverse: itinerary cleared → return to landing
   useEffect(() => {
     if (!activeItinerary && view !== 'loading') setView('landing')
   }, [activeItinerary]) // eslint-disable-line react-hooks/exhaustive-deps
@@ -40,62 +61,82 @@ function App() {
       {view === 'landing' && !isWizardOpen && <LandingPage />}
 
       {view === 'planner' && (
-        <div style={{
-          display: 'flex', flexDirection: 'column', height: '100vh',
-          background: '#F8F7F4', color: 'var(--text-primary)',
-          overflow: 'hidden',
-        }}>
-          <Header />
+        isMobile ? (
+          /* ── Mobile: full-page scrollable layout ── */
+          <div style={{ display: 'flex', flexDirection: 'column', height: '100dvh', background: '#FAFAF8', overflow: 'hidden' }}>
+            <Header />
+            <MobilePlanner />
+          </div>
+        ) : isWide ? (
+          /* ── 3-Column Command Center (≥1280px) ── */
+          <div style={{
+            display: 'flex', flexDirection: 'column', height: '100vh',
+            background: '#F8F7F4', color: 'var(--text-primary)', overflow: 'hidden',
+          }}>
+            <Header />
+            <div style={{ flex: 1, display: 'flex', overflow: 'hidden', minHeight: 0 }}>
 
-          {/* Main content: map (left 60%) + right panel (40%) */}
-          <div style={{ flex: 1, display: 'flex', overflow: 'hidden', minHeight: 0 }}>
-
-            {/* Map */}
-            <div style={{ flex: '0 0 58%', position: 'relative', minHeight: 0 }}>
-              <MapContainer />
-            </div>
-
-            {/* Right panel: two stacked tiles with premium card styling */}
-            <div style={{
-              flex: 1, display: 'flex', flexDirection: 'column',
-              overflow: 'hidden', minHeight: 0,
-              borderLeft: '1px solid var(--border)',
-              background: '#F8F7F4',
-            }}>
-              {/* Food tile – upper half */}
-              <div style={{
-                flex: 1, minHeight: 0, overflow: 'hidden',
-                margin: '10px 10px 5px',
-                borderRadius: 14,
-                background: '#fff',
-                border: '1px solid var(--border)',
-                boxShadow: '0 1px 4px rgba(0,0,0,0.05)',
-                display: 'flex', flexDirection: 'column',
-              }}>
-                <FoodTile />
+              {/* Col 1 — Itinerary Timeline (20%) */}
+              <div style={{ flex: '0 0 20%', minHeight: 0, overflow: 'hidden' }}>
+                <ItineraryTimelinePanel />
               </div>
 
-              {/* Things tile – lower half */}
+              {/* Col 2 — Experience Discovery (50%) */}
               <div style={{
-                flex: 1, minHeight: 0, overflow: 'hidden',
-                margin: '5px 10px 10px',
-                borderRadius: 14,
-                background: '#fff',
-                border: '1px solid var(--border)',
-                boxShadow: '0 1px 4px rgba(0,0,0,0.05)',
-                display: 'flex', flexDirection: 'column',
+                flex: '0 0 50%', display: 'flex', flexDirection: 'column',
+                overflow: 'hidden', minHeight: 0, borderRight: '1px solid var(--border)',
               }}>
-                <ThingsTile />
+                <ExperiencePanel hideTimeline />
               </div>
+
+              {/* Col 3 — Map + Metrics (30%) */}
+              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+                <div style={{ flex: '0 0 65%', position: 'relative', minHeight: 0 }}>
+                  <MapContainer />
+                </div>
+                <div style={{ flex: '0 0 35%', overflow: 'hidden' }}>
+                  <PlannerMetrics />
+                </div>
+              </div>
+
             </div>
           </div>
 
-          {/* Timeline: full width at bottom */}
-          <TripTimeline />
-        </div>
+        ) : (
+          /* ── 2-Column Desktop (768–1279px) ── */
+          <div style={{
+            display: 'flex', flexDirection: 'column', height: '100vh',
+            background: '#F8F7F4', color: 'var(--text-primary)', overflow: 'hidden',
+          }}>
+            <Header />
+
+            <div style={{ flex: 1, display: 'flex', overflow: 'hidden', minHeight: 0 }}>
+              {/* Content panel — 62% */}
+              <div style={{
+                flex: '0 0 62%', display: 'flex', flexDirection: 'column',
+                overflow: 'hidden', minHeight: 0, borderRight: '1px solid var(--border)',
+              }}>
+                <ExperiencePanel />
+              </div>
+
+              {/* Map panel — 38% */}
+              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+                <div style={{ flex: 1, position: 'relative', minHeight: 0 }}>
+                  <MapContainer />
+                </div>
+                <PlannerMetrics />
+              </div>
+            </div>
+          </div>
+        )
       )}
 
       {isWizardOpen && <ProfileWizard />}
+
+      {/* SYS-01: version badge */}
+      <div style={{ position: 'fixed', bottom: 6, right: 10, fontSize: 10, color: 'rgba(0,0,0,0.22)', fontWeight: 500, letterSpacing: '0.02em', pointerEvents: 'none', zIndex: 500 }}>
+        v1.0.2-beta
+      </div>
 
       <Toaster
         position="bottom-right"

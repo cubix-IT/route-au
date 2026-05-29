@@ -212,25 +212,51 @@ export function DayCard({ day }: Props) {
   )
 }
 
+const STEP_TYPE_LABEL: Record<string, { icon: string; label: string; color: string }> = {
+  depart:     { icon: '🚗', label: 'Depart',      color: '#3A6B4F' },
+  drive:      { icon: '🛣',  label: 'Drive',       color: '#6B7280' },
+  breakfast:  { icon: '☕', label: 'Breakfast',   color: '#92400E' },
+  lunch:      { icon: '🥗', label: 'Lunch',       color: '#B45309' },
+  dinner:     { icon: '🍽',  label: 'Dinner',      color: '#7C3AED' },
+  drinks:     { icon: '🍷', label: 'Drinks',      color: '#B87333' },
+  poi:        { icon: '📍', label: 'Activity',    color: '#2563EB' },
+  fuel:       { icon: '⛽', label: 'Fuel Up',     color: '#DC2626' },
+  camp:       { icon: '⛺', label: 'Camp',        color: '#3A6B4F' },
+  arrive:     { icon: '🏁', label: 'Arrive',      color: '#3A6B4F' },
+  sunset:     { icon: '🌅', label: 'Sunset',      color: '#F97316' },
+  stargazing: { icon: '🌟', label: 'Stargazing',  color: '#4338CA' },
+}
+
 function ScheduleRow({ item }: { item: ScheduleItem }) {
   const isHighlight = item.is_highlight
+  const typeMeta = STEP_TYPE_LABEL[item.type]
 
   return (
     <div className="schedule-item">
       <div className={`schedule-dot${isHighlight ? ' highlight' : ''}`} style={{ flexShrink: 0 }}>
         {item.emoji}
       </div>
-      <div style={{ flex: 1, minWidth: 0, paddingTop: 4 }}>
+      <div style={{ flex: 1, minWidth: 0, paddingTop: 3 }}>
         <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
-          <span style={{
-            flex: 1,
-            fontSize: 14,
-            fontWeight: isHighlight ? 600 : 400,
-            color: isHighlight ? 'var(--text-primary)' : 'var(--text-secondary)',
-            lineHeight: 1.3,
-          }}>
-            {item.title}
-          </span>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            {typeMeta && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 2 }}>
+                <span style={{ fontSize: 11 }}>{typeMeta.icon}</span>
+                <span style={{ fontSize: 10, fontWeight: 700, color: typeMeta.color, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                  {typeMeta.label}
+                </span>
+              </div>
+            )}
+            <span style={{
+              fontSize: 14,
+              fontWeight: isHighlight ? 700 : 500,
+              color: isHighlight ? 'var(--text-primary)' : 'var(--text-secondary)',
+              lineHeight: 1.3,
+              display: 'block',
+            }}>
+              {item.title}
+            </span>
+          </div>
           <span className="schedule-time" style={{ flexShrink: 0 }}>{item.time}</span>
         </div>
         {item.subtitle && (
@@ -243,11 +269,11 @@ function ScheduleRow({ item }: { item: ScheduleItem }) {
             {item.subtitle}
           </p>
         )}
-        {item.duration_min > 0 && item.type !== 'depart' && item.type !== 'arrive' && (
+        {item.duration_min > 0 && item.type !== 'depart' && item.type !== 'arrive' && item.type !== 'camp' && (
           <span style={{
             display: 'inline-block',
-            fontSize: 11,
-            color: 'rgba(255,255,255,0.2)',
+            fontSize: 10,
+            color: 'var(--text-muted)',
             marginTop: 3,
           }}>
             ~{item.duration_min} min

@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useMemo } from 'react'
 import { useAppStore } from '@/store/useAppStore'
 import type { PreselectedDest } from '@/store/useAppStore'
 import { getCurrentSeason, SEASON_META } from '@/utils/season'
@@ -16,16 +16,26 @@ const seasonMeta = SEASON_META[season]
 // ── Photon autocomplete ───────────────────────────────────────────────
 
 interface PhotonFeature {
-  properties: { name: string; city?: string; state?: string; country?: string }
+  properties: { name: string; city?: string; state?: string; country?: string; osm_value?: string }
   geometry: { coordinates: [number, number] }
 }
 
+const SETTLEMENT_TYPES = new Set([
+  'city', 'town', 'village', 'suburb', 'locality', 'hamlet',
+  'municipality', 'neighbourhood', 'quarter',
+])
+
 async function searchOrigin(q: string): Promise<PhotonFeature[]> {
   if (q.length < 2) return []
-  const url = `https://photon.komoot.io/api/?q=${encodeURIComponent(q)}&lang=en&limit=6&bbox=140,-39,150,-34`
+  // layer=city covers cities/towns/villages/suburbs in Photon taxonomy
+  const url = `https://photon.komoot.io/api/?q=${encodeURIComponent(q)}&lang=en&limit=10&bbox=140,-39,150,-34&layer=city&layer=district&layer=locality`
   const res = await fetch(url)
   const json = await res.json()
-  return json.features ?? []
+  const features: PhotonFeature[] = json.features ?? []
+  // Secondary filter: keep only settlement-type OSM values
+  return features
+    .filter((f) => SETTLEMENT_TYPES.has(f.properties.osm_value ?? ''))
+    .slice(0, 6)
 }
 
 function featureLabel(f: PhotonFeature): string {
@@ -164,6 +174,26 @@ function OriginSearchBox({
   )
 }
 
+// ── Rotating Victoria highlights ─────────────────────────────────────
+
+const VICTORIA_HIGHLIGHTS = [
+  'hundreds of little penguins waddling ashore at Phillip Island at dusk?',
+  'wildflowers blanketing the Grampians from every ridge and gully in spring?',
+  'dozens of wild koalas in the roadside gums at Kennett River on the Great Ocean Road?',
+  'wombats grazing fearlessly around your tent at Wilson\'s Promontory at dusk?',
+  'southern right whales nursing their calves from the clifftop at Logans Beach?',
+  'the Ovens River in Bright in May — Japanese maples and elms turning red and gold?',
+  'misty vineyard rows in the Yarra Valley just after an autumn rain?',
+  'steam rising from open-air mineral pools at Peninsula Hot Springs under a winter sky?',
+  'a genuine 1860s paddle steamer churning up the Murray at Echuca?',
+  'the sunrise from Boroka Lookout — the entire Grampians spread below you?',
+  'Australia\'s largest fur seal colony just a short walk from Cape Bridgewater?',
+  'king parrots eating from your hand at Grants Picnic Ground in the Dandenongs?',
+  'Beechworth\'s intact gold-rush granite streetscape — unchanged since the 1860s?',
+  'wild dolphins leaping through the waves off Sorrento on a summer morning?',
+  'the Twelve Apostles at golden hour, limestone stacks rising from the Southern Ocean?',
+]
+
 // ── Main landing page ─────────────────────────────────────────────────
 
 export function LandingPage() {
@@ -172,6 +202,10 @@ export function LandingPage() {
     (a, b) => (b.seasonalScores[season] ?? 0) - (a.seasonalScores[season] ?? 0)
   )
   const { setWizardOpen, setPreselectedDest, setTripPlanState, setOriginSet } = useAppStore()
+  const highlight = useMemo(
+    () => VICTORIA_HIGHLIGHTS[Math.floor(Math.random() * VICTORIA_HIGHLIGHTS.length)],
+    [],
+  )
 
   const handleOriginSelect = (name: string, coord: { lng: number; lat: number }) => {
     setTripPlanState({ originName: name, originCoord: coord })
@@ -217,20 +251,13 @@ export function LandingPage() {
         backdropFilter: 'blur(12px)',
         borderBottom: '1px solid var(--border)',
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <LogoMark size={34} />
-          <div>
-            <div style={{
-              fontFamily: "'Fraunces', Georgia, serif",
-              fontSize: 15, fontWeight: 700,
-              color: '#1C1C1A', lineHeight: 1.15, letterSpacing: '-0.02em',
-            }}>
-              Unplanned<span style={{ color: GREEN }}> Escapes</span>
-            </div>
-            <div style={{ fontSize: 9, color: '#8C8A87', letterSpacing: '0.08em', textTransform: 'uppercase', fontWeight: 500 }}>
-              Victoria
-            </div>
-          </div>
+        <div style={{
+          fontFamily: "'Fraunces', Georgia, serif",
+          fontSize: 16, fontWeight: 700,
+          color: '#1C1C1A', lineHeight: 1.2, letterSpacing: '-0.02em',
+        }}>
+          Unplanned<span style={{ color: GREEN }}> Escapes</span>
+          <span style={{ color: '#8C8A87', fontWeight: 400, fontSize: 13 }}> Victoria</span>
         </div>
         <button onClick={openWizard} style={{
           padding: '7px 16px', borderRadius: 9,
@@ -249,48 +276,21 @@ export function LandingPage() {
         background: `linear-gradient(170deg, ${seasonMeta.palette.from}14 0%, transparent 60%)`,
         borderBottom: '1px solid var(--border)',
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 14, marginBottom: 32 }}>
-          <LogoMark size={56} />
-          <div style={{ textAlign: 'left' }}>
-            <div style={{
-              fontFamily: "'Fraunces', Georgia, serif",
-              fontSize: 'clamp(26px, 4vw, 40px)', fontWeight: 700,
-              color: '#1C1C1A', lineHeight: 1.1, letterSpacing: '-0.03em',
-            }}>
-              Unplanned<span style={{ color: GREEN }}> Escapes</span>
-            </div>
-            <div style={{ fontSize: 11, color: '#8C8A87', letterSpacing: '0.1em', textTransform: 'uppercase', fontWeight: 600, marginTop: 3 }}>
-              Victorian weekend getaways
-            </div>
-          </div>
-        </div>
-
-        <div style={{
-          display: 'inline-flex', alignItems: 'center', gap: 6,
-          padding: '5px 14px', borderRadius: 20,
-          background: `${seasonMeta.palette.from}12`,
-          border: `1px solid ${seasonMeta.palette.from}30`,
-          fontSize: 11, fontWeight: 700, color: seasonMeta.palette.from,
-          letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 20,
-        }}>
-          {seasonMeta.label} in Victoria
-        </div>
-
         <h1 style={{
           fontFamily: "'Fraunces', Georgia, serif",
-          fontSize: 'clamp(28px, 5vw, 56px)',
-          fontWeight: 700, letterSpacing: '-0.03em', lineHeight: 1.1,
-          color: '#1C1C1A', maxWidth: 640, margin: '0 auto 16px',
+          fontSize: 'clamp(24px, 4vw, 46px)',
+          fontWeight: 700, letterSpacing: '-0.03em', lineHeight: 1.3,
+          color: '#1C1C1A', maxWidth: 800, margin: '0 auto 28px',
         }}>
-          {seasonMeta.headline}
+          <span style={{ color: GREEN }}>Have you seen...</span>{' '}{highlight}
         </h1>
 
         <p style={{
-          fontSize: 'clamp(14px, 1.8vw, 17px)',
-          color: '#4A4948', lineHeight: 1.7,
-          maxWidth: 500, margin: '0 auto 36px',
+          fontSize: 'clamp(16px, 1.8vw, 19px)',
+          color: '#4A4A4A', lineHeight: 1.6,
+          maxWidth: 480, margin: '0 auto 32px',
         }}>
-          {seasonMeta.sub}
+          Explore what Victoria has to offer.
         </p>
 
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
@@ -307,15 +307,23 @@ export function LandingPage() {
           </button>
         </div>
 
-        <div style={{ display: 'flex', gap: 32, justifyContent: 'center', marginTop: 48, flexWrap: 'wrap' }}>
+        {/* Value prop chips */}
+        <div style={{ display: 'flex', gap: 10, justifyContent: 'center', marginTop: 40, flexWrap: 'wrap' }}>
           {[
-            { val: '12', label: 'regions' },
-            { val: '35+', label: 'specific spots' },
-            { val: '60+', label: 'local experiences' },
-          ].map(({ val, label }) => (
-            <div key={label} style={{ textAlign: 'center' }}>
-              <div style={{ fontFamily: "'Fraunces', Georgia, serif", fontSize: 24, fontWeight: 700, color: GREEN }}>{val}</div>
-              <div style={{ fontSize: 11, color: '#8C8A87', marginTop: 2, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{label}</div>
+            { icon: '⚡', text: 'Plan in 30 seconds' },
+            { icon: '🗺', text: 'Real road routes' },
+            { icon: '☕', text: 'Local food & stays' },
+            { icon: '🇦🇺', text: 'Victoria only' },
+          ].map(({ icon, text }) => (
+            <div key={text} style={{
+              display: 'inline-flex', alignItems: 'center', gap: 6,
+              padding: '6px 14px', borderRadius: 20,
+              background: 'rgba(255,255,255,0.7)', backdropFilter: 'blur(6px)',
+              border: '1px solid rgba(0,0,0,0.08)',
+              fontSize: 12, fontWeight: 600, color: '#4A4948',
+            }}>
+              <span>{icon}</span>
+              <span>{text}</span>
             </div>
           ))}
         </div>
@@ -325,17 +333,17 @@ export function LandingPage() {
       <section id="clusters" style={{ padding: '56px 24px 100px', maxWidth: 1440, margin: '0 auto' }}>
         <div style={{ marginBottom: 40 }}>
           <div style={{ fontSize: 10, fontWeight: 700, color: GREEN, letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 8 }}>
-            {seasonMeta.label} recommendations
+            Victoria's best weekend escapes
           </div>
           <h2 style={{
             fontFamily: "'Fraunces', Georgia, serif",
             fontSize: 'clamp(22px, 3vw, 30px)',
             fontWeight: 700, letterSpacing: '-0.02em', color: '#1C1C1A', marginBottom: 8,
           }}>
-            Choose a region, then select your destination
+            Pick a destination, we'll handle the planning
           </h2>
           <p style={{ fontSize: 13, color: '#8C8A87', lineHeight: 1.6 }}>
-            Drive times are calculated from your location. Select any destination to view what's there and start planning.
+            Drive times calculated from your suburb. Click any destination to preview food, activities and accommodation before committing.
           </p>
         </div>
 
@@ -770,13 +778,13 @@ function SubDestDetail({ sub, onPlan }: { sub: SubDest; onPlan: () => void }) {
           style={{
             flex: 1,
             padding: '9px 0', borderRadius: 9,
-            background: 'var(--bg-base)',
+            background: 'transparent',
             border: '1.5px solid var(--border)',
             color: '#4A4948', fontSize: 13, fontWeight: 600,
             cursor: 'pointer', transition: 'background 0.15s',
           }}
-          onMouseEnter={(e) => (e.currentTarget.style.background = '#edecea')}
-          onMouseLeave={(e) => (e.currentTarget.style.background = 'var(--bg-base)')}
+          onMouseEnter={(e) => (e.currentTarget.style.background = 'rgba(0,0,0,0.04)')}
+          onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
         >
           What's here
         </button>

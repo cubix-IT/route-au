@@ -3,6 +3,7 @@ import { adminSupabase } from './_lib/supabase.js'
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' })
+  if (!adminSupabase) return res.status(200).json([])
 
   const { data: clusters, error: cErr } = await adminSupabase
     .from('clusters')

@@ -520,7 +520,7 @@ function ActivityCard({ activity: act }: { activity: Activity }) {
             {costMap[act.cost]}
           </span>
           {act.kidsOk && (
-            <span style={{ fontSize: 11.5, color: 'var(--text-muted)' }}>Suitable for children</span>
+            <span style={{ fontSize: 11.5, color: '#D97706', fontWeight: 600 }}>Kid Friendly</span>
           )}
           <a
             href={act.mapsUrl}

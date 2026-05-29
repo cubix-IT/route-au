@@ -98,6 +98,16 @@ interface AppState {
 
   activeTab: 'itinerary' | 'dining' | 'pois'
   setActiveTab: (tab: AppState['activeTab']) => void
+
+  // Map pin reactivity — updated when the ExperiencePanel filter changes
+  activePOIFilter: string
+  displayedMapPins: Array<{ id: string; lat: number; lng: number; type: string; name: string }>
+  setActivePOIFilter: (filter: string) => void
+  setDisplayedMapPins: (pins: Array<{ id: string; lat: number; lng: number; type: string; name: string }>) => void
+
+  // Google Places budget failover
+  placesLimitedMode: boolean
+  setPlacesLimitedMode: (v: boolean) => void
 }
 
 export const useAppStore = create<AppState>()(
@@ -185,6 +195,14 @@ export const useAppStore = create<AppState>()(
 
       activeTab: 'itinerary' as const,
       setActiveTab: (tab) => set({ activeTab: tab }),
+
+      activePOIFilter: 'all',
+      displayedMapPins: [],
+      setActivePOIFilter: (filter) => set({ activePOIFilter: filter }),
+      setDisplayedMapPins: (pins) => set({ displayedMapPins: pins }),
+
+      placesLimitedMode: false,
+      setPlacesLimitedMode: (v) => set({ placesLimitedMode: v }),
     }),
     {
       name: 'route-au-v4',

@@ -48,7 +48,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       status: 'error',
       message: msg,
       records_added: 0,
-    }).catch(() => {})
+    }).then(() => {}, () => {})
 
     return res.status(500).json({ error: msg })
   }
