@@ -20,7 +20,7 @@ export function MapContainer() {
   const markersRef = useRef<maplibregl.Marker[]>([])
   const pinMarkersRef = useRef<maplibregl.Marker[]>([])
   const poiMarkersRef = useRef<maplibregl.Marker[]>([])
-  const { activeItinerary, nearbyPOIs, displayedMapPins, setSelectedPOI } = useAppStore()
+  const { activeItinerary, nearbyPOIs, displayedMapPins, setSelectedPOI, setSelectedPinId } = useAppStore()
 
   const handleMapReady = useCallback((m: maplibregl.Map) => {
     setMap(m)
@@ -106,24 +106,43 @@ export function MapContainer() {
 
       const el = document.createElement('div')
       el.style.cssText = `
-        width: 28px; height: 28px; border-radius: 50%;
-        background: white; border: 2px solid ${color};
+        width: 30px; height: 30px; border-radius: 50%;
+        background: white; border: 2.5px solid ${color};
         display: flex; align-items: center; justify-content: center;
-        font-size: 13px; cursor: pointer;
+        font-size: 14px; cursor: pointer;
         box-shadow: 0 2px 8px rgba(0,0,0,0.18);
-        transition: transform 0.12s;
+        transition: transform 0.12s, box-shadow 0.12s;
       `
       el.textContent = emoji
-      el.addEventListener('mouseenter', () => { el.style.transform = 'scale(1.25)' })
-      el.addEventListener('mouseleave', () => { el.style.transform = 'scale(1)' })
+
+      const typeLabel = pin.type.replace(/_/g, ' ')
+      const popup = new maplibregl.Popup({ offset: 18, closeButton: false, maxWidth: '200px' })
+        .setHTML(`
+          <div style="padding:2px 0">
+            <div style="font-size:12px;font-weight:700;color:#1C1C1A;line-height:1.3">${pin.name}</div>
+            <div style="font-size:11px;color:#8C8A87;margin-top:3px">${emoji} ${typeLabel}</div>
+          </div>
+        `)
 
       const marker = new maplibregl.Marker({ element: el })
         .setLngLat([pin.lng, pin.lat])
-        .setPopup(
-          new maplibregl.Popup({ offset: 16, closeButton: false })
-            .setHTML(`<strong style="font-size:12px">${pin.name}</strong>`)
-        )
+        .setPopup(popup)
         .addTo(map)
+
+      el.addEventListener('mouseenter', () => {
+        el.style.transform = 'scale(1.3)'
+        el.style.boxShadow = `0 4px 14px rgba(0,0,0,0.25), 0 0 0 3px ${color}33`
+        popup.addTo(map)
+      })
+      el.addEventListener('mouseleave', () => {
+        el.style.transform = 'scale(1)'
+        el.style.boxShadow = '0 2px 8px rgba(0,0,0,0.18)'
+        popup.remove()
+      })
+      el.addEventListener('click', (e) => {
+        e.stopPropagation()
+        setSelectedPinId(pin.id)
+      })
 
       poiMarkersRef.current.push(marker)
     }

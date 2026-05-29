@@ -105,6 +105,10 @@ interface AppState {
   setActivePOIFilter: (filter: string) => void
   setDisplayedMapPins: (pins: Array<{ id: string; lat: number; lng: number; type: string; name: string }>) => void
 
+  // Selected pin — set by map click, consumed by ExperiencePanel to scroll/highlight
+  selectedPinId: string | null
+  setSelectedPinId: (id: string | null) => void
+
   // Google Places budget failover
   placesLimitedMode: boolean
   setPlacesLimitedMode: (v: boolean) => void
@@ -200,6 +204,9 @@ export const useAppStore = create<AppState>()(
       displayedMapPins: [],
       setActivePOIFilter: (filter) => set({ activePOIFilter: filter }),
       setDisplayedMapPins: (pins) => set({ displayedMapPins: pins }),
+
+      selectedPinId: null,
+      setSelectedPinId: (id) => set({ selectedPinId: id }),
 
       placesLimitedMode: false,
       setPlacesLimitedMode: (v) => set({ placesLimitedMode: v }),

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { usePlannerData } from '@/hooks/usePlannerData'
 import { useAppStore } from '@/store/useAppStore'
 import type { LivePOI, RouteFoodStop, AccommodationPOI } from '@/lib/overpass'
@@ -105,6 +105,9 @@ export function ExperiencePanel({ hideTimeline = false }: { hideTimeline?: boole
   const setDisplayedMapPins = useAppStore((s) => s.setDisplayedMapPins)
   const setActivePOIFilter = useAppStore((s) => s.setActivePOIFilter)
   const placesLimitedMode = useAppStore((s) => s.placesLimitedMode)
+  const selectedPinId = useAppStore((s) => s.selectedPinId)
+  const setSelectedPinId = useAppStore((s) => s.setSelectedPinId)
+  const panelRef = useRef<HTMLDivElement>(null)
 
   const [addModal, setAddModal] = useState<RouteFoodStop | null>(null)
   const [filter, setFilter] = useState<FilterMode>('all')
@@ -138,6 +141,17 @@ export function ExperiencePanel({ hideTimeline = false }: { hideTimeline?: boole
     if (d.livePOIs) syncMapPins(filter, d.livePOIs)
   }, [d.livePOIs]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Scroll to and highlight a POI card when selected via map pin click
+  useEffect(() => {
+    if (!selectedPinId || !panelRef.current) return
+    const el = panelRef.current.querySelector(`[data-poi-id="${selectedPinId}"]`)
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      setExpandedPoiId(selectedPinId)
+    }
+    setSelectedPinId(null)
+  }, [selectedPinId]) // eslint-disable-line react-hooks/exhaustive-deps
+
   if (!d.activeItinerary) return null
 
   const addedIds = new Set(d.addedDiningStops.map((s) => s.foodId))
@@ -148,7 +162,7 @@ export function ExperiencePanel({ hideTimeline = false }: { hideTimeline?: boole
   const showStay  = !isOneDayTrip && (filter === 'all' || filter === 'stay')
 
   return (
-    <div style={{ flex: 1, overflowY: 'auto', background: '#F5F4F1', display: 'flex', flexDirection: 'column' }}>
+    <div ref={panelRef} style={{ flex: 1, overflowY: 'auto', background: '#F5F4F1', display: 'flex', flexDirection: 'column' }}>
 
       {/* ── Destination header ── */}
       <div style={{
@@ -598,7 +612,7 @@ function ActivityPoiCard({ poi, expanded, onToggle }: { poi: LivePOI; expanded: 
     : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(poi.name)}`
 
   return (
-    <div onClick={onToggle} style={{
+    <div data-poi-id={poi.id} onClick={onToggle} style={{
       background: '#fff', borderRadius: 14,
       border: `1.5px solid ${expanded ? `${tag.color}55` : 'var(--border)'}`,
       padding: '13px 14px', cursor: 'pointer', transition: 'all 0.15s',

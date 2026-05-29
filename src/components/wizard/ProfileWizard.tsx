@@ -311,6 +311,8 @@ export function ProfileWizard() {
                   crewType={crewType} setCrewType={setCrewType}
                   hasKids={hasKids} setHasKids={(v) => { setHasKids(v); if (!v) setKidsAge(null) }}
                   kidsAge={kidsAge} setKidsAge={setKidsAge}
+                  startDate={startDate} setStartDate={setStartDate}
+                  endDate={endDate} setEndDate={setEndDate}
                 />
               )}
               {step === 1 && (
@@ -336,8 +338,6 @@ export function ProfileWizard() {
                   accommodation={accommodation} setAccommodation={setAccommodation}
                   dailyDriveHours={dailyDriveHours} setDailyDriveHours={setDailyDriveHours}
                   departureHour={departureHour} setDepartureHour={setDepartureHour}
-                  startDate={startDate} setStartDate={setStartDate}
-                  endDate={endDate} setEndDate={setEndDate}
                   destCoord={pickedDest?.sub.coord ?? undefined}
                 />
               )}
@@ -378,12 +378,15 @@ export function ProfileWizard() {
 function StepHowFarAndWho({
   maxDriveHours, setMaxDriveHours, tripType, setTripType,
   crewType, setCrewType, hasKids, setHasKids, kidsAge, setKidsAge,
+  startDate, setStartDate, endDate, setEndDate,
 }: {
   maxDriveHours: number; setMaxDriveHours: (n: number) => void
   tripType: TripType; setTripType: (t: TripType) => void
   crewType: CrewType; setCrewType: (c: CrewType) => void
   hasKids: boolean; setHasKids: (b: boolean) => void
   kidsAge: KidsAge | null; setKidsAge: (a: KidsAge) => void
+  startDate: string; setStartDate: (d: string) => void
+  endDate: string; setEndDate: (d: string) => void
 }) {
   const showKids = crewType === 'family' || crewType === 'group'
 
@@ -515,6 +518,20 @@ function StepHowFarAndWho({
           )}
         </div>
       )}
+
+      {/* When are you going? */}
+      <div>
+        <Label>When are you going?</Label>
+        <div style={{ marginTop: 10 }}>
+          <DateDayStrip
+            value={startDate}
+            onChange={setStartDate}
+            tripType={tripType}
+            endDate={endDate}
+            onEndDateChange={setEndDate}
+          />
+        </div>
+      </div>
     </div>
   )
 }
@@ -560,15 +577,15 @@ function StepInterests({ interests, toggleInterest, hasKids, kidsAge }: {
                 cursor: 'pointer',
                 outline: selected ? '3px solid #fff' : 'none',
                 boxShadow: selected
-                  ? `0 0 0 4px ${GREEN}, 0 4px 14px rgba(0,0,0,0.25)`
+                  ? `0 0 0 4px ${GREEN}, 0 4px 14px rgba(0,0,0,0.3)`
                   : '0 2px 8px rgba(0,0,0,0.14)',
                 transform: selected ? 'scale(1.06)' : 'scale(1)',
                 transition: 'all 0.18s',
-                opacity: selected ? 1 : 0.8,
+                filter: selected ? 'none' : 'brightness(0.82) saturate(0.85)',
               }}
             >
               <span style={{ fontSize: 26 }}>{i.emoji}</span>
-              <span style={{ fontSize: 10, fontWeight: 700, textAlign: 'center', lineHeight: 1.3, color: '#fff', textShadow: '0 1px 3px rgba(0,0,0,0.5)' }}>{i.label}</span>
+              <span style={{ fontSize: 11, fontWeight: 700, textAlign: 'center', lineHeight: 1.3, color: '#fff', textShadow: '0 1px 4px rgba(0,0,0,0.7)' }}>{i.label}</span>
               {selected && (
                 <div style={{ position: 'absolute', top: 6, right: 6, width: 18, height: 18, borderRadius: '50%', background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, color: GREEN, fontWeight: 900 }}>✓</div>
               )}
