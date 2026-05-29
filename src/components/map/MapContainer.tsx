@@ -15,12 +15,25 @@ const PIN_COLOR: Record<string, string> = {
   viewpoint: '#4338CA', attraction: '#7C3AED', campsite: '#047857', hotel: '#1D4ED8',
 }
 
+interface FuelStation {
+  id: string
+  name: string
+  brand: string
+  address: string
+  lat: number
+  lng: number
+  priceCents: number
+  pricePerLitre: number
+  distanceKm: number
+}
+
 export function MapContainer() {
   const [map, setMap] = useState<maplibregl.Map | null>(null)
   const markersRef = useRef<maplibregl.Marker[]>([])
   const pinMarkersRef = useRef<maplibregl.Marker[]>([])
   const poiMarkersRef = useRef<maplibregl.Marker[]>([])
-  const { activeItinerary, nearbyPOIs, displayedMapPins, setSelectedPOI, setSelectedPinId } = useAppStore()
+  const fuelMarkersRef = useRef<maplibregl.Marker[]>([])
+  const { activeItinerary, nearbyPOIs, displayedMapPins, vehicleProfile, setSelectedPOI, setSelectedPinId } = useAppStore()
 
   const handleMapReady = useCallback((m: maplibregl.Map) => {
     setMap(m)
@@ -147,6 +160,83 @@ export function MapContainer() {
       poiMarkersRef.current.push(marker)
     }
   }, [map, displayedMapPins])
+
+  // Fuel station markers — cheapest 1st/2nd/3rd near route midpoint
+  useEffect(() => {
+    if (!map || !activeItinerary || !vehicleProfile) return
+
+    fuelMarkersRef.current.forEach((m) => m.remove())
+    fuelMarkersRef.current = []
+
+    if (vehicleProfile.fuel_type === 'Electric') return
+
+    const waypoints = activeItinerary.route.waypoints
+    if (waypoints.length < 2) return
+
+    const origin = waypoints[0].coord
+    const dest = waypoints[waypoints.length - 1].coord
+    const midLat = (origin.lat + dest.lat) / 2
+    const midLng = (origin.lng + dest.lng) / 2
+
+    const RANK_COLORS = ['#16A34A', '#D97706', '#6B7280']
+    const RANK_LABELS = ['1st', '2nd', '3rd']
+
+    fetch(`/api/fuel?lat=${midLat}&lng=${midLng}&fuelType=${vehicleProfile.fuel_type}&limit=3&radius=40`)
+      .then((r) => r.json())
+      .then((data) => {
+        const stations: FuelStation[] = (data as { stations: FuelStation[] }).stations ?? []
+        for (let i = 0; i < stations.length; i++) {
+          const st = stations[i]
+          const color = RANK_COLORS[i]
+          const rank = RANK_LABELS[i]
+
+          const el = document.createElement('div')
+          el.style.cssText = `
+            width: 38px; height: 38px; border-radius: 50%;
+            background: white; border: 2.5px solid ${color};
+            display: flex; align-items: center; justify-content: center;
+            font-size: 16px; cursor: pointer;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.20);
+            position: relative; transition: transform 0.12s;
+          `
+          el.innerHTML = `⛽<div style="
+            position:absolute;top:-4px;right:-4px;
+            width:16px;height:16px;border-radius:50%;
+            background:${color};color:#fff;
+            font-size:8px;font-weight:800;
+            display:flex;align-items:center;justify-content:center;
+            border:1.5px solid #fff;
+          ">${i + 1}</div>`
+
+          const popup = new maplibregl.Popup({ offset: 22, closeButton: false, maxWidth: '210px' })
+            .setHTML(`
+              <div style="padding:4px 0">
+                <div style="font-size:12px;font-weight:700;color:#1C1C1A">${st.brand}</div>
+                <div style="font-size:11px;color:#8C8A87;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:190px">${st.address}</div>
+                <div style="font-size:16px;font-weight:800;color:${color};margin-top:5px">$${st.pricePerLitre.toFixed(3)}<span style="font-size:10px;font-weight:500;color:#8C8A87">/L</span></div>
+                <div style="font-size:10px;color:#8C8A87">${rank} cheapest · ${st.distanceKm} km from midpoint</div>
+              </div>
+            `)
+
+          const marker = new maplibregl.Marker({ element: el })
+            .setLngLat([st.lng, st.lat])
+            .setPopup(popup)
+            .addTo(map)
+
+          el.addEventListener('mouseenter', () => {
+            el.style.transform = 'scale(1.2)'
+            popup.addTo(map)
+          })
+          el.addEventListener('mouseleave', () => {
+            el.style.transform = 'scale(1)'
+            popup.remove()
+          })
+
+          fuelMarkersRef.current.push(marker)
+        }
+      })
+      .catch(() => {})
+  }, [map, activeItinerary, vehicleProfile])
 
   // Legacy scored POI markers (from POI scoring system)
   useEffect(() => {

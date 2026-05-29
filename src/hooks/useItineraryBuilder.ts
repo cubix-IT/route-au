@@ -66,11 +66,15 @@ export function useItineraryBuilder() {
         const date = new Date(startDate)
         date.setDate(date.getDate() + i)
 
-        const dayWaypoints = route.waypoints.filter((_, wi) =>
-          wi >= i * waypointsPerDay && wi < (i + 1) * waypointsPerDay
-        )
+        // Last day of a multi-day trip = return day: reverse waypoints so "arrive" = home
+        const isReturnDay = i > 0 && i === daysCount - 1
+        const dayWaypoints = isReturnDay
+          ? [...route.waypoints].reverse()
+          : route.waypoints.filter((_, wi) =>
+              wi >= i * waypointsPerDay && wi < (i + 1) * waypointsPerDay
+            )
         const dayPOIs = allPOIs.slice(i * poisPerDay, (i + 1) * poisPerDay)
-        const dayOriginLabel = i === 0 ? originLabel : dayWaypoints[0]?.label ?? originLabel
+        const dayOriginLabel = i === 0 ? originLabel : dayWaypoints[0]?.label ?? destLabel
 
         const partialDay = {
           day_number: i + 1,

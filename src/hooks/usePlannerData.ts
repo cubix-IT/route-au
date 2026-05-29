@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useAppStore } from '@/store/useAppStore'
 import { useActivities } from '@/hooks/useActivities'
 import {
@@ -9,6 +9,8 @@ import { fetchHazardsNear, type HazardAlert } from '@/lib/vicEmergency'
 import { captureError } from '@/lib/bugLogger'
 import type { DiningPref, FuelType } from '@/types'
 import { getCurrentSeason, SEASON_META } from '@/utils/season'
+import { FOOD_DRINK, type FoodDrinkPOI } from '@/data/foodDrink'
+import { distanceBetween } from '@/utils/geo'
 
 const FUEL_PRICE_PER_L: Record<FuelType, number> = {
   Unleaded95: 1.98,
@@ -49,6 +51,9 @@ export function usePlannerData() {
   const addedDiningStops = useAppStore((s) => s.addedDiningStops)
   const removeDiningStop = useAppStore((s) => s.removeDiningStop)
   const addDiningStop = useAppStore((s) => s.addDiningStop)
+  const addedActivities = useAppStore((s) => s.addedActivities)
+  const addActivity = useAppStore((s) => s.addActivity)
+  const removeActivity = useAppStore((s) => s.removeActivity)
 
   const { activities } = useActivities(destId)
   const [livePOIs, setLivePOIs] = useState<LivePOI[] | null>(null)
@@ -135,6 +140,16 @@ export function usePlannerData() {
     p.type === 'hiking' || p.type === 'viewpoint'
   ).slice(0, 12)
 
+  const curatedDining = useMemo((): FoodDrinkPOI[] => {
+    if (!destCoord) return []
+    return FOOD_DRINK
+      .map((f) => ({ f, km: distanceBetween(destCoord, f.coord) }))
+      .filter(({ km }) => km <= 25)
+      .sort((a, b) => a.km - b.km)
+      .slice(0, 5)
+      .map(({ f }) => f)
+  }, [destCoord?.lat, destCoord?.lng]) // eslint-disable-line react-hooks/exhaustive-deps
+
   const dayLabel = (activeItinerary?.total_days ?? 1) > 1
     ? `${activeItinerary!.total_days}-Day Escape`
     : 'Day Escape'
@@ -144,6 +159,8 @@ export function usePlannerData() {
     destId, destName, shortDest, shortOrigin,
     activeItinerary, vehicleProfile, userProfile, departureHour,
     addedDiningStops, removeDiningStop, addDiningStop,
+    addedActivities, addActivity, removeActivity,
+    curatedDining,
     // computed
     totalKm, driveHours, fuelCost, dayLabel,
     season, seasonMeta,

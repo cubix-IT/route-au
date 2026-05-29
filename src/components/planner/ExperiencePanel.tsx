@@ -4,7 +4,8 @@ import { useAppStore } from '@/store/useAppStore'
 import type { LivePOI, RouteFoodStop, AccommodationPOI } from '@/lib/overpass'
 import type { HazardAlert } from '@/lib/vicEmergency'
 import type { Activity } from '@/data/victorianActivities'
-import type { AddedDiningStop } from '@/store/useAppStore'
+import type { AddedDiningStop, AddedActivity } from '@/store/useAppStore'
+import type { FoodDrinkPOI } from '@/data/foodDrink'
 import type { GuardrailWarning } from '@/types'
 
 const GREEN = '#3A6B4F'
@@ -155,6 +156,7 @@ export function ExperiencePanel({ hideTimeline = false }: { hideTimeline?: boole
   if (!d.activeItinerary) return null
 
   const addedIds = new Set(d.addedDiningStops.map((s) => s.foodId))
+  const addedActIds = new Set(d.addedActivities.map((a) => a.actId))
   const availableRouteStops = (d.routeFood ?? []).filter((s) => !addedIds.has(s.id))
   const accom = d.userProfile?.accommodation_preference
   const showFood  = filter === 'all' || filter === 'food'
@@ -277,6 +279,17 @@ export function ExperiencePanel({ hideTimeline = false }: { hideTimeline?: boole
                 <FoodCard key={poi.id} poi={poi} destName={d.shortDest} />
               ))}
             </div>
+            {d.curatedDining.length > 0 && (
+              <div style={{ padding: '14px 16px 0' }}>
+                <div style={{ fontSize: 10, fontWeight: 700, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 8 }}>
+                  Editor's Picks
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {d.curatedDining.map((f) => <CuratedDiningCard key={f.id} food={f} />)}
+                </div>
+              </div>
+            )}
+
             {d.foodPOIs.length > 0 && (
               <a
                 href={`https://www.google.com/maps/search/?api=1&query=restaurants+near+${encodeURIComponent(d.shortDest + ' Victoria')}`}
@@ -345,6 +358,9 @@ export function ExperiencePanel({ hideTimeline = false }: { hideTimeline?: boole
                   key={act.id} act={act}
                   expanded={expandedActId === act.id}
                   onToggle={() => setExpandedActId(expandedActId === act.id ? null : act.id)}
+                  isAdded={addedActIds.has(act.id)}
+                  onAdd={() => d.addActivity({ actId: act.id, actName: act.name, emoji: act.emoji, dayNumber: 1 })}
+                  onRemove={() => d.removeActivity(act.id)}
                 />
               ))}
             </div>
@@ -559,14 +575,17 @@ function FoodCard({ poi, destName }: { poi: LivePOI; destName: string }) {
 
 // ── Activity card ─────────────────────────────────────────────────────────────
 
-function ActivityCard({ act, expanded, onToggle }: { act: Activity; expanded: boolean; onToggle: () => void }) {
+function ActivityCard({ act, expanded, onToggle, isAdded, onAdd, onRemove }: {
+  act: Activity; expanded: boolean; onToggle: () => void
+  isAdded?: boolean; onAdd?: () => void; onRemove?: () => void
+}) {
   const tag = CAT_TAG[act.category] ?? { label: act.category, color: '#374151', bg: '#F3F4F6' }
   const mapsUrl = act.mapsUrl || `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(act.name + ' Victoria AU')}`
 
   return (
     <div onClick={onToggle} style={{
-      background: '#fff', borderRadius: 14,
-      border: `1.5px solid ${expanded ? (act.isHiddenGem ? 'rgba(184,115,51,0.45)' : `${GREEN}45`) : (act.isHiddenGem ? 'rgba(184,115,51,0.25)' : 'var(--border)')}`,
+      background: isAdded ? '#F0FDF4' : '#fff', borderRadius: 14,
+      border: `1.5px solid ${isAdded ? 'rgba(58,107,79,0.4)' : expanded ? (act.isHiddenGem ? 'rgba(184,115,51,0.45)' : `${GREEN}45`) : (act.isHiddenGem ? 'rgba(184,115,51,0.25)' : 'var(--border)')}`,
       padding: '13px 15px', cursor: 'pointer',
       transition: 'all 0.15s',
       boxShadow: expanded ? '0 4px 20px rgba(0,0,0,0.09)' : '0 1px 3px rgba(0,0,0,0.04)',
@@ -579,6 +598,7 @@ function ActivityCard({ act, expanded, onToggle }: { act: Activity; expanded: bo
             {act.isHiddenGem && <Chip label="Local gem" color={WARM} bg="#FFF5EB" />}
             {act.cost === 'free' && <Chip label="Free" color={GREEN} bg="#E8F5EE" />}
             {act.kidsOk && <Chip label="Kid Friendly" color="#D97706" bg="#FFFBEB" />}
+            {isAdded && <Chip label="In your plan" color={GREEN} bg="#E8F5EE" />}
           </div>
           <div style={{ fontSize: 13.5, fontWeight: 700, color: '#1C1B1F', marginBottom: 3, lineHeight: 1.3 }}>{act.name}</div>
           {!expanded && act.description && (
@@ -595,10 +615,24 @@ function ActivityCard({ act, expanded, onToggle }: { act: Activity; expanded: bo
           {act.description && (
             <p style={{ fontSize: 12, color: '#374151', lineHeight: 1.65, margin: 0 }}>{act.description}</p>
           )}
-          <a href={mapsUrl} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()}
-            style={{ display: 'block', textAlign: 'center', padding: '9px', borderRadius: 9, background: '#1C1B1F', color: '#fff', fontSize: 12, fontWeight: 700, textDecoration: 'none' }}>
-            📍 Open in Google Maps ↗
-          </a>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <a href={mapsUrl} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()}
+              style={{ flex: 1, display: 'block', textAlign: 'center', padding: '9px', borderRadius: 9, background: '#1C1B1F', color: '#fff', fontSize: 12, fontWeight: 700, textDecoration: 'none' }}>
+              📍 Google Maps ↗
+            </a>
+            {onAdd && !isAdded && (
+              <button onClick={(e) => { e.stopPropagation(); onAdd() }}
+                style={{ padding: '9px 14px', borderRadius: 9, border: `1.5px solid ${GREEN}`, background: '#E8F5EE', color: GREEN, fontSize: 12, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                + Plan it
+              </button>
+            )}
+            {onRemove && isAdded && (
+              <button onClick={(e) => { e.stopPropagation(); onRemove() }}
+                style={{ padding: '9px 14px', borderRadius: 9, border: '1.5px solid rgba(220,38,38,0.3)', background: '#FEF2F2', color: '#B91C1C', fontSize: 12, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                Remove
+              </button>
+            )}
+          </div>
         </div>
       )}
     </div>
@@ -793,6 +827,7 @@ function VerticalStepper({ d }: { d: ReturnType<typeof usePlannerData> }) {
     { label: originName.split(',')[0], time: fmtHour(departureHour), emoji: '●', endpoint: true, color: GREEN },
     ...midpoints.map((item) => ({ label: item.title, time: item.time, emoji: item.emoji ?? '📌' })),
     ...d.addedDiningStops.map((stop) => ({ label: stop.stopName, time: stop.timeOfDay === 'morning' ? 'Morning' : 'Afternoon', emoji: '🍽', color: WARM })),
+    ...d.addedActivities.map((act) => ({ label: act.actName, time: 'At destination', emoji: act.emoji, color: GREEN })),
     { label: destName.split(',')[0].split('&')[0].trim(), time: arrivalDisplay, emoji: '★', endpoint: true, color: WARM },
   ]
 
@@ -832,5 +867,45 @@ function VerticalStepper({ d }: { d: ReturnType<typeof usePlannerData> }) {
   )
 }
 
+// ── Curated dining card ───────────────────────────────────────────────────────
+
+const FOOD_CAT_EMOJI: Record<string, string> = {
+  Cafe: '☕', Pub: '🍺', Restaurant: '🍽', Winery: '🍷',
+  Roadhouse: '⛽', Bakery: '🥐', Brewery: '🍻', Seafood: '🦞',
+}
+
+function CuratedDiningCard({ food }: { food: FoodDrinkPOI }) {
+  const emoji = FOOD_CAT_EMOJI[food.category] ?? '🍽'
+  const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(food.name + ' Victoria')}`
+  return (
+    <div style={{
+      background: '#FFFBF5', border: '1px solid rgba(184,115,51,0.2)', borderRadius: 12,
+      padding: '12px 14px', display: 'flex', gap: 12, alignItems: 'flex-start',
+    }}>
+      <div style={{ width: 36, height: 36, borderRadius: 9, background: '#FFF5EB', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, flexShrink: 0 }}>{emoji}</div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', marginBottom: 2 }}>
+          <span style={{ fontSize: 13, fontWeight: 700, color: '#1C1B1F' }}>{food.name}</span>
+          <span style={{ fontSize: 9.5, fontWeight: 700, color: WARM, background: '#FFF5EB', padding: '1px 6px', borderRadius: 4 }}>{food.price_range}</span>
+          {food.must_book && <span style={{ fontSize: 9.5, fontWeight: 700, color: '#B91C1C', background: '#FEF2F2', padding: '1px 6px', borderRadius: 4 }}>Book ahead</span>}
+        </div>
+        {food.description && (
+          <div style={{ fontSize: 11.5, color: '#6B7280', lineHeight: 1.5, marginBottom: 4 }}>
+            {food.description.slice(0, 100)}{food.description.length > 100 ? '…' : ''}
+          </div>
+        )}
+        {food.signature_dish && (
+          <div style={{ fontSize: 11, color: WARM, fontWeight: 600 }}>Try: {food.signature_dish}</div>
+        )}
+      </div>
+      <a href={mapsUrl} target="_blank" rel="noopener noreferrer"
+        style={{ padding: '6px 10px', borderRadius: 7, background: '#1C1B1F', color: '#fff', fontSize: 11, fontWeight: 700, textDecoration: 'none', flexShrink: 0 }}>
+        Maps ↗
+      </a>
+    </div>
+  )
+}
+
 // suppress unused import warning
 void (null as unknown as AddedDiningStop)
+void (null as unknown as AddedActivity)

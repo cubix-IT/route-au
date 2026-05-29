@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useAppStore } from '@/store/useAppStore'
 import { useItineraryBuilder } from '@/hooks/useItineraryBuilder'
-import { matchDestinations, VICTORIAN_CLUSTERS } from '@/data/victorianClusters'
+import { matchDestinations, getNearbySubDests, VICTORIAN_CLUSTERS } from '@/data/victorianClusters'
 import { getCurrentSeason } from '@/utils/season'
 import { fetchWeatherForCoord } from '@/api/weather'
 import type { MatchedDest, TripInterest } from '@/data/victorianClusters'
@@ -95,7 +95,7 @@ export function ProfileWizard() {
   const [fuelType, setFuelType] = useState<FuelType>('Unleaded95')
   const [accommodation, setAccommodation] = useState<AccommodationPreference>('Any')
 
-  const totalSteps = isPreselected ? 2 : 4 // 0..1 for preselect, 0..3 for discovery
+  const totalSteps = isPreselected ? 3 : 5 // 0..2 for preselect, 0..4 for discovery
 
   if (!isWizardOpen) return null
 
@@ -118,7 +118,7 @@ export function ProfileWizard() {
   }
 
   const handleNext = async () => {
-    const lastStep = isPreselected ? 1 : 3
+    const lastStep = isPreselected ? 2 : 4
 
     // Step 1 in discovery mode → compute suggestions, derive dining prefs, advance
     if (!isPreselected && step === 1) {
@@ -225,23 +225,27 @@ export function ProfileWizard() {
       if (step === 0) return !!startDate && (tripType === 'day' || !!endDate)
       return true
     }
-    if (step === 0) return crewType !== null && (!hasKids || !!kidsAge)
+    if (step === 0) return !!startDate && (tripType === 'day' || !!endDate) && (!hasKids || !!kidsAge)
     if (step === 1) return interests.length > 0
     if (step === 2) return !!pickedDest
-    // Final step: date required
-    return !!startDate && (tripType === 'day' || !!endDate)
+    return true
   })()
 
   const msgs = ['Finding your route…', 'Matching experiences…', 'Building your day…', 'Almost ready…']
 
   // ── Step labels ──
-  const discoveryStepLabels = ['How far & who', 'What you love', 'Pick a spot', 'Finishing touches']
-  const preselectedStepLabels = ['Your trip details', 'Preferences']
+  const discoveryStepLabels = ['How far & who', 'What you love', 'Pick a spot', 'Finishing touches', 'Trip summary']
+  const preselectedStepLabels = ['Your trip details', 'Preferences', 'Trip summary']
   const stepLabels = isPreselected ? preselectedStepLabels : discoveryStepLabels
+
+  const isPickStep = !isPreselected && step === 2
 
   return (
     <div className="wizard-overlay">
-      <div className="wizard-card animate-fade-up">
+      <div
+        className="wizard-card animate-fade-up"
+        style={isPickStep ? { maxWidth: 640 } : undefined}
+      >
 
         {/* Header */}
         <div style={{ padding: '20px 24px 0', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
@@ -269,7 +273,11 @@ export function ProfileWizard() {
         </div>
 
         {/* Body */}
-        <div style={{ flex: 1, overflowY: 'auto', padding: '16px 24px' }}>
+        <div style={{
+          flex: 1,
+          overflowY: isPickStep ? 'hidden' : 'auto',
+          padding: isPickStep ? '12px 0 0' : '16px 24px',
+        }}>
           {generating ? (
             <GeneratingScreen step={genStep} messages={msgs} />
           ) : isPreselected ? (
@@ -299,6 +307,17 @@ export function ProfileWizard() {
                   departureHour={departureHour} setDepartureHour={setDepartureHour}
                   destCoord={preselectedDest?.destCoord ?? undefined}
                   hideDepartureTime={true}
+                />
+              )}
+              {step === 2 && (
+                <StepSummary
+                  effectiveDest={effectiveDest}
+                  startDate={startDate}
+                  endDate={endDate}
+                  tripType={tripType}
+                  crewType={crewType}
+                  vehicleType={vehicleType}
+                  fuelType={fuelType}
                 />
               )}
             </>
@@ -341,6 +360,17 @@ export function ProfileWizard() {
                   destCoord={pickedDest?.sub.coord ?? undefined}
                 />
               )}
+              {step === 4 && (
+                <StepSummary
+                  effectiveDest={effectiveDest}
+                  startDate={startDate}
+                  endDate={endDate}
+                  tripType={tripType}
+                  crewType={crewType}
+                  vehicleType={vehicleType}
+                  fuelType={fuelType}
+                />
+              )}
             </>
           )}
         </div>
@@ -364,7 +394,7 @@ export function ProfileWizard() {
               cursor: canContinue ? 'pointer' : 'not-allowed',
               transition: 'all 0.15s',
             }}>
-              {step === (isPreselected ? 1 : 3) ? 'Build my trip →' : step === 1 && !isPreselected ? 'Show me options →' : 'Continue →'}
+              {step === (isPreselected ? 2 : 4) ? 'Build my trip →' : step === 1 && !isPreselected ? 'Show me options →' : 'Continue →'}
             </button>
           </div>
         )}
@@ -605,138 +635,240 @@ function StepInterests({ interests, toggleInterest, hasKids, kidsAge }: {
 
 // ── Step 2 (Discovery): Pick a destination ───────────────────────
 
+function DestCard({ match, idx, isPicked, onPick, isHovered, onHover }: {
+  match: MatchedDest
+  idx: number
+  isPicked: boolean
+  onPick: () => void
+  isHovered: boolean
+  onHover: (hov: boolean) => void
+}) {
+  const hrs = match.sub.driveTimeHours
+  const driveLabel = hrs < 1 ? `${Math.round(hrs * 60)} min` : `${hrs.toFixed(hrs === Math.floor(hrs) ? 0 : 1)} hrs`
+
+  return (
+    <div
+      onClick={onPick}
+      onMouseEnter={() => onHover(true)}
+      onMouseLeave={() => onHover(false)}
+      style={{
+        borderRadius: 10,
+        cursor: 'pointer',
+        flexShrink: 0,
+        border: `1.5px solid ${isPicked ? GREEN : isHovered ? 'rgba(58,107,79,0.35)' : 'var(--border)'}`,
+        background: isPicked ? '#F0FDF4' : isHovered ? '#F8F7F4' : '#fff',
+        boxShadow: isPicked ? `0 0 0 2px ${GREEN}30` : isHovered ? '0 2px 8px rgba(0,0,0,0.08)' : 'none',
+        transition: 'all 0.15s ease',
+        padding: '10px 12px',
+        display: 'flex', alignItems: 'center', gap: 10,
+      }}
+    >
+      {/* Drive badge */}
+      <div style={{
+        flexShrink: 0, textAlign: 'center', width: 40,
+        padding: '3px 0', borderRadius: 8,
+        background: isPicked ? GREEN : '#F3F4F6',
+      }}>
+        <div style={{ fontSize: 13, fontWeight: 800, color: isPicked ? '#fff' : '#374151', letterSpacing: '-0.03em', lineHeight: 1.1 }}>
+          {hrs < 1 ? Math.round(hrs * 60) : hrs.toFixed(hrs === Math.floor(hrs) ? 0 : 1)}
+        </div>
+        <div style={{ fontSize: 7.5, color: isPicked ? 'rgba(255,255,255,0.8)' : '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 700 }}>
+          {hrs < 1 ? 'min' : 'hrs'}
+        </div>
+      </div>
+
+      {/* Name + region */}
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: 1 }}>
+          {idx === 0 && (
+            <span style={{
+              fontSize: 7.5, fontWeight: 800, color: '#B87333',
+              background: '#FFF5EB', padding: '1px 5px', borderRadius: 3,
+              letterSpacing: '0.06em', flexShrink: 0, border: '1px solid rgba(184,115,51,0.25)',
+            }}>TOP PICK</span>
+          )}
+        </div>
+        <div style={{ fontSize: 12.5, fontWeight: 700, color: '#1C1B1F', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {match.sub.name}
+        </div>
+        <div style={{ fontSize: 10.5, color: '#6B7280', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: 1 }}>
+          {match.cluster.name} · {driveLabel}
+        </div>
+      </div>
+
+      {/* Check */}
+      <div style={{
+        width: 18, height: 18, borderRadius: '50%', flexShrink: 0,
+        background: isPicked ? GREEN : 'transparent',
+        border: `1.5px solid ${isPicked ? GREEN : 'var(--border)'}`,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        fontSize: 9, color: '#fff', transition: 'all 0.15s',
+      }}>
+        {isPicked ? '✓' : ''}
+      </div>
+    </div>
+  )
+}
+
 function StepPickDest({ suggestions, picked, onPick }: {
   suggestions: MatchedDest[]
   picked: MatchedDest | null
   onPick: (d: MatchedDest) => void
 }) {
+  const [hoveredId, setHoveredId] = useState<string | null>(null)
+  const preview = picked ?? (hoveredId ? suggestions.find((s) => s.sub.id === hoveredId) ?? null : suggestions[0] ?? null)
+
   if (suggestions.length === 0) {
     return (
       <div style={{ padding: '40px 0', textAlign: 'center' }}>
         <div style={{ fontSize: 40, marginBottom: 12 }}>🤔</div>
-        <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 8 }}>
-          Nothing matched exactly
-        </div>
-        <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>
-          Try increasing your drive time or picking fewer interests.
-        </div>
+        <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 8 }}>Nothing matched exactly</div>
+        <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>Try increasing your drive time or picking fewer interests.</div>
       </div>
     )
   }
 
+  const nearbyStops = preview && picked && picked.sub.id === preview.sub.id
+    ? getNearbySubDests(picked.sub)
+    : []
+
+  const previewImgUrl = preview ? (preview.sub.imageUrl ?? preview.cluster.imageUrl) : null
+  const previewHrs = preview ? preview.sub.driveTimeHours : 0
+  const previewDriveLabel = previewHrs < 1
+    ? `${Math.round(previewHrs * 60)} min drive`
+    : `${previewHrs.toFixed(previewHrs === Math.floor(previewHrs) ? 0 : 1)} hrs drive`
+
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-      <div>
-        <h2 style={{ fontSize: 20, fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-0.5px', marginBottom: 4 }}>
-          Here's where you should go
-        </h2>
-        <p style={{ fontSize: 13, color: 'var(--text-muted)' }}>
-          Ranked for {season === 'autumn' ? 'autumn' : season === 'winter' ? 'winter' : season === 'spring' ? 'spring' : 'summer'} and your interests. Pick one.
-        </p>
+    <div style={{ display: 'flex', gap: 0, height: '100%', minHeight: 480 }}>
+
+      {/* LEFT: Scrollable list */}
+      <div style={{
+        width: 240,
+        flexShrink: 0,
+        display: 'flex',
+        flexDirection: 'column',
+        borderRight: '1px solid var(--border)',
+        overflow: 'hidden',
+        background: '#FAFAF9',
+      }}>
+        <div style={{ padding: '16px 14px 10px' }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-0.2px' }}>
+            Here's where you should go
+          </div>
+          <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
+            {season.charAt(0).toUpperCase() + season.slice(1)} picks · hover to preview
+          </div>
+        </div>
+
+        <div style={{ flex: 1, overflowY: 'auto', padding: '0 10px 14px', display: 'flex', flexDirection: 'column', gap: 7 }}>
+          {suggestions.map((match, idx) => (
+            <DestCard
+              key={match.sub.id}
+              match={match}
+              idx={idx}
+              isPicked={picked?.sub.id === match.sub.id}
+              onPick={() => onPick(match)}
+              isHovered={hoveredId === match.sub.id}
+              onHover={(hov) => setHoveredId(hov ? match.sub.id : null)}
+            />
+          ))}
+        </div>
       </div>
 
-      {suggestions.map((match, idx) => {
-        const isPicked = picked?.sub.id === match.sub.id
-        const hrs = match.sub.driveTimeHours
-        const driveLabel = hrs < 1 ? `${Math.round(hrs * 60)} min` : `${hrs.toFixed(hrs === Math.floor(hrs) ? 0 : 1)} hrs`
-
-        return (
-          <div
-            key={match.sub.id}
-            onClick={() => onPick(match)}
-            style={{
-              borderRadius: 14,
-              border: `2px solid ${isPicked ? GREEN : 'var(--border)'}`,
-              background: isPicked ? 'var(--green-light)' : '#fff',
-              overflow: 'hidden',
-              cursor: 'pointer',
-              transition: 'all 0.18s',
-              boxShadow: isPicked ? `0 0 0 3px ${GREEN}20` : 'var(--shadow-sm)',
-            }}
-          >
-            {/* Gradient header strip */}
-            <div style={{
-              height: 6,
-              background: `linear-gradient(90deg, ${match.cluster.gradientFrom}, ${match.cluster.gradientTo})`,
-            }} />
-
-            <div style={{ padding: '14px 16px', display: 'flex', gap: 14, alignItems: 'flex-start' }}>
-              {/* Drive time badge */}
-              <div style={{
-                flexShrink: 0, width: 58, textAlign: 'center',
-                padding: '8px 4px', borderRadius: 8,
-                background: isPicked ? 'rgba(58,107,79,0.12)' : 'var(--bg-muted)',
-                border: `1px solid ${isPicked ? 'var(--border-active)' : 'var(--border)'}`,
-              }}>
-                <div style={{ fontSize: 16, fontWeight: 800, color: isPicked ? GREEN : 'var(--text-primary)', letterSpacing: '-0.04em', lineHeight: 1 }}>
-                  {hrs < 1 ? Math.round(hrs * 60) : hrs.toFixed(hrs === Math.floor(hrs) ? 0 : 1)}
-                </div>
-                <div style={{ fontSize: 9, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 600 }}>
-                  {hrs < 1 ? 'min' : 'hrs'}
-                </div>
-                <div style={{ fontSize: 9, color: 'var(--text-muted)', marginTop: 1 }}>drive</div>
-              </div>
-
-              {/* Content */}
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, marginBottom: 2, flexWrap: 'wrap' }}>
-                  {idx === 0 && (
-                    <span style={{
-                      fontSize: 9, fontWeight: 700, color: GREEN,
-                      background: `${GREEN}15`, border: `1px solid ${GREEN}30`,
-                      padding: '1px 6px', borderRadius: 5, letterSpacing: '0.04em',
-                      flexShrink: 0,
-                    }}>
-                      TOP PICK
-                    </span>
-                  )}
-                  <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-0.02em' }}>
-                    {match.sub.name}
-                  </span>
-                </div>
-                <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 10 }}>
-                  {match.cluster.name} · {driveLabel} from Melbourne
-                </div>
-
-                {/* Highlights */}
-                <ul style={{ margin: 0, padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 3 }}>
-                  {match.sub.highlights.slice(0, 3).map((h) => (
-                    <li key={h} style={{ display: 'flex', gap: 6, fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.5 }}>
-                      <span style={{ color: GREEN, flexShrink: 0 }}>·</span>{h}
-                    </li>
-                  ))}
-                </ul>
-
-                {/* Match reasons */}
-                {match.matchReasons.length > 0 && (
-                  <div style={{ display: 'flex', gap: 5, marginTop: 10, flexWrap: 'wrap' }}>
-                    {match.matchReasons.map((r) => (
-                      <span key={r} style={{
-                        fontSize: 10, fontWeight: 600,
-                        color: GREEN,
-                        background: `${GREEN}12`,
-                        padding: '2px 7px', borderRadius: 5,
-                      }}>{r}</span>
-                    ))}
-                  </div>
+      {/* RIGHT: Preview panel — image top, info bottom */}
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, overflow: 'hidden' }}>
+        {preview ? (
+          <>
+            {/* Top: hero image */}
+            <div
+              key={preview.sub.id}
+              style={{
+                height: 190, flexShrink: 0, position: 'relative', overflow: 'hidden',
+                backgroundImage: previewImgUrl ? `url(${previewImgUrl})` : undefined,
+                backgroundSize: 'cover', backgroundPosition: 'center',
+                background: previewImgUrl ? undefined : `linear-gradient(145deg, ${preview.cluster.gradientFrom}, ${preview.cluster.gradientTo})`,
+                transition: 'background-image 0.25s',
+              }}
+            >
+              {/* Drive + match badges */}
+              <div style={{ position: 'absolute', top: 10, left: 12, display: 'flex', gap: 5 }}>
+                <span style={{
+                  fontSize: 10, fontWeight: 700, color: '#fff',
+                  background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(6px)',
+                  padding: '3px 9px', borderRadius: 20,
+                }}>🚗 {previewDriveLabel}</span>
+                {preview.matchReasons.length > 0 && (
+                  <span style={{
+                    fontSize: 10, fontWeight: 700, color: '#fff',
+                    background: `${GREEN}cc`, backdropFilter: 'blur(6px)',
+                    padding: '3px 9px', borderRadius: 20,
+                  }}>✦ {preview.matchReasons[0]}</span>
                 )}
               </div>
-
-              {/* Selected indicator */}
-              <div style={{
-                width: 22, height: 22, borderRadius: '50%', flexShrink: 0,
-                background: isPicked ? GREEN : 'var(--bg-muted)',
-                border: `2px solid ${isPicked ? GREEN : 'var(--border)'}`,
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                transition: 'all 0.15s',
-                fontSize: 11, color: '#fff',
-              }}>
-                {isPicked ? '✓' : ''}
-              </div>
+              {/* Bottom fade into info section */}
+              <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 48, background: 'linear-gradient(to top, #fff 0%, transparent 100%)' }} />
             </div>
+
+            {/* Bottom: destination info */}
+            <div style={{ flex: 1, overflowY: 'auto', padding: '10px 16px 16px', background: '#fff' }}>
+              <div style={{ fontSize: 10, fontWeight: 700, color: '#9CA3AF', letterSpacing: '0.07em', textTransform: 'uppercase', marginBottom: 4 }}>
+                {preview.cluster.name}
+              </div>
+              <div style={{ fontSize: 20, fontWeight: 900, color: '#1C1B1F', letterSpacing: '-0.03em', lineHeight: 1.15, marginBottom: 10, fontFamily: "'Fraunces', Georgia, serif" }}>
+                {preview.sub.name}
+              </div>
+
+              {/* Highlights */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {preview.sub.highlights.slice(0, 4).map((h) => (
+                  <div key={h} style={{ display: 'flex', gap: 8, alignItems: 'flex-start', fontSize: 11.5, color: '#374151', lineHeight: 1.45 }}>
+                    <span style={{ color: '#B87333', flexShrink: 0, marginTop: 1, fontSize: 10 }}>▸</span>{h}
+                  </div>
+                ))}
+              </div>
+
+              {/* Nearby stops — only after picking */}
+              {nearbyStops.length > 0 && (
+                <div style={{ marginTop: 12, padding: '10px 12px', background: '#F8F7F4', borderRadius: 10, border: '1px solid var(--border)' }}>
+                  <div style={{ fontSize: 9.5, fontWeight: 700, color: '#9CA3AF', letterSpacing: '0.07em', textTransform: 'uppercase', marginBottom: 7 }}>
+                    Nearby stops worth adding
+                  </div>
+                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                    {nearbyStops.map(({ sub, cluster }) => {
+                      const nHrs = sub.driveTimeHours
+                      const nLabel = nHrs < 1 ? `${Math.round(nHrs * 60)} min` : `${nHrs.toFixed(nHrs === Math.floor(nHrs) ? 0 : 1)} hrs`
+                      return (
+                        <div key={sub.id} style={{ padding: '5px 9px', borderRadius: 8, background: '#fff', border: '1px solid var(--border)' }}>
+                          <div style={{ fontSize: 11, fontWeight: 700, color: '#1C1B1F' }}>{sub.name}</div>
+                          <div style={{ fontSize: 9, color: '#9CA3AF', marginTop: 1 }}>{cluster.name} · {nLabel}</div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Status hint */}
+              {!picked && (
+                <div style={{ marginTop: 12, fontSize: 10.5, color: '#9CA3AF', fontStyle: 'italic' }}>
+                  Click a destination in the list to select it
+                </div>
+              )}
+              {picked && picked.sub.id === preview.sub.id && (
+                <div style={{ marginTop: 12, fontSize: 11, color: GREEN, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 5 }}>
+                  <span style={{ width: 16, height: 16, borderRadius: '50%', background: GREEN, color: '#fff', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 8 }}>✓</span>
+                  Selected — hit Continue to proceed
+                </div>
+              )}
+            </div>
+          </>
+        ) : (
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--text-muted)', fontSize: 13, flexDirection: 'column', gap: 8 }}>
+            <span style={{ fontSize: 28 }}>🗺</span>
+            Hover a destination to preview
           </div>
-        )
-      })}
+        )}
+      </div>
     </div>
   )
 }
@@ -1044,6 +1176,164 @@ function StepPreferences({
           </div>
         </div>
       )}
+    </div>
+  )
+}
+
+// ── Trip summary step ─────────────────────────────────────────────
+
+interface SummaryFuelStation {
+  id: string
+  name: string
+  brand: string
+  address: string
+  lat: number
+  lng: number
+  priceCents: number
+  pricePerLitre: number
+  distanceKm: number
+}
+
+function StepSummary({ effectiveDest, startDate, endDate, tripType, crewType, vehicleType, fuelType }: {
+  effectiveDest: { name: string; coord: Coordinate } | null
+  startDate: string
+  endDate: string
+  tripType: TripType
+  crewType: CrewType
+  vehicleType: VehicleType
+  fuelType: FuelType
+}) {
+  const originCoord = useAppStore((s) => s.originCoord)
+  const originName = useAppStore((s) => s.originName)
+  const [fuelStations, setFuelStations] = useState<SummaryFuelStation[]>([])
+  const [loadingFuel, setLoadingFuel] = useState(false)
+
+  const destCoord = effectiveDest?.coord
+  const straightKm = destCoord ? haversinKm(originCoord, destCoord) : 0
+  const estKm = Math.round(straightKm * 1.3)
+  const estKmRound = estKm * 2
+  const fuelUsedL = vehicleType === 'Electric' ? 0 : (estKmRound * 10) / 100
+
+  useEffect(() => {
+    if (vehicleType === 'Electric' || !destCoord) return
+    const lat = (originCoord.lat + destCoord.lat) / 2
+    const lng = (originCoord.lng + destCoord.lng) / 2
+    setLoadingFuel(true)
+    // Try midpoint first with 40km radius; fallback to near origin if empty
+    fetch(`/api/fuel?lat=${lat}&lng=${lng}&fuelType=${fuelType}&limit=3&radius=40`)
+      .then((r) => r.json())
+      .then(async (data) => {
+        const stations = (data as { stations: SummaryFuelStation[] }).stations ?? []
+        if (stations.length > 0) return setFuelStations(stations)
+        // Midpoint (possibly over water) found nothing — try near origin
+        const fallback = await fetch(`/api/fuel?lat=${originCoord.lat}&lng=${originCoord.lng}&fuelType=${fuelType}&limit=3&radius=25`).then((r) => r.json())
+        setFuelStations((fallback as { stations: SummaryFuelStation[] }).stations ?? [])
+      })
+      .catch(() => {})
+      .finally(() => setLoadingFuel(false))
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [destCoord?.lat, destCoord?.lng, originCoord.lat, originCoord.lng, fuelType, vehicleType])
+
+  const cheapestPrice = fuelStations[0]?.pricePerLitre
+  const estCost = cheapestPrice ? Math.round(fuelUsedL * cheapestPrice) : null
+
+  const RANK_COLORS = ['#16A34A', '#D97706', '#6B7280']
+  const RANK_LABELS = ['1st', '2nd', '3rd']
+
+  const fmtDate = (iso: string) =>
+    new Date(iso + 'T00:00:00').toLocaleDateString('en-AU', { weekday: 'short', day: 'numeric', month: 'short' })
+
+  const crewEmoji = ({ solo: '🧍', couple: '👫', family: '👨‍👩‍👧', group: '🎉' } as Record<string, string>)[crewType] ?? '👥'
+  const vehicleLabel = ({ Sedan: 'Sedan', AWD: 'SUV / AWD', HighClearance4WD: '4WD', '4WD_WithCaravan': 'Van / Caravan', Electric: 'Electric' } as Record<string, string>)[vehicleType] ?? vehicleType
+  const vehicleEmoji = ({ Sedan: '🚗', AWD: '🚙', HighClearance4WD: '🛻', '4WD_WithCaravan': '🚐', Electric: '⚡' } as Record<string, string>)[vehicleType] ?? '🚗'
+  const fuelLabel = ({ Unleaded95: 'Unleaded 95', Unleaded98: 'Unleaded 98', Diesel: 'Diesel', Electric: 'Electric' } as Record<string, string>)[fuelType] ?? fuelType
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+      <div>
+        <h2 style={{ fontSize: 20, fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-0.5px', marginBottom: 4 }}>
+          Your trip at a glance
+        </h2>
+        <p style={{ fontSize: 13, color: 'var(--text-muted)' }}>Everything looks great — ready to build your itinerary?</p>
+      </div>
+
+      {/* Trip summary card */}
+      <div style={{ borderRadius: 14, border: '1px solid var(--border-active)', background: 'var(--green-light)', padding: '16px 18px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+        <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+          <span style={{ fontSize: 28 }}>📍</span>
+          <div>
+            <div style={{ fontSize: 17, fontWeight: 700, color: GREEN }}>{effectiveDest?.name ?? '—'}</div>
+            <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>{originName} → {effectiveDest?.name} · ~{estKm} km one way</div>
+          </div>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+          <SummaryRow icon="📅" label="Date" value={startDate ? fmtDate(startDate) : 'Not set'} />
+          {tripType === 'multiday' && endDate && <SummaryRow icon="🔚" label="Return" value={fmtDate(endDate)} />}
+          <SummaryRow icon={crewEmoji} label="Crew" value={{ solo: 'Just you', couple: 'Two of you', family: 'Family', group: 'Group' }[crewType] ?? crewType} />
+          <SummaryRow icon={vehicleEmoji} label="Vehicle" value={vehicleLabel} />
+          {vehicleType !== 'Electric' && <SummaryRow icon="⛽" label="Fuel" value={fuelLabel} />}
+          <SummaryRow icon="🛣️" label="Est. round trip" value={`~${estKmRound} km`} />
+        </div>
+      </div>
+
+      {/* Fuel stops */}
+      {vehicleType === 'Electric' ? (
+        <div style={{ textAlign: 'center', padding: '16px', background: 'var(--bg-muted)', borderRadius: 12, color: 'var(--text-muted)', fontSize: 13 }}>
+          ⚡ No fuel stops needed for your electric vehicle
+        </div>
+      ) : (
+        <div>
+          <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+            ⛽ Cheapest fuel near your route
+            {estCost !== null && <span style={{ color: GREEN, fontWeight: 700 }}>· Est. cost ~${estCost}</span>}
+          </div>
+          {loadingFuel ? (
+            <div style={{ textAlign: 'center', padding: 14, color: 'var(--text-muted)', fontSize: 12 }}>Finding stations near your route…</div>
+          ) : fuelStations.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: 14, color: 'var(--text-muted)', fontSize: 12 }}>No station data available for this route</div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {fuelStations.map((st, i) => (
+                <div key={st.id} style={{
+                  display: 'flex', alignItems: 'center', gap: 10,
+                  padding: '10px 12px', borderRadius: 10,
+                  background: '#fff', border: '1px solid var(--border)',
+                }}>
+                  <div style={{
+                    width: 30, height: 30, borderRadius: '50%',
+                    background: RANK_COLORS[i], color: '#fff',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    fontSize: 10, fontWeight: 800, flexShrink: 0,
+                  }}>{RANK_LABELS[i]}</div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {st.brand} · {st.name}
+                    </div>
+                    <div style={{ fontSize: 10, color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{st.address}</div>
+                  </div>
+                  <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                    <div style={{ fontSize: 15, fontWeight: 800, color: RANK_COLORS[i] }}>${st.pricePerLitre.toFixed(3)}</div>
+                    <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>{st.distanceKm} km away</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function SummaryRow({ icon, label, value }: { icon: string; label: string; value: string }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+      <span style={{ fontSize: 14, flexShrink: 0, lineHeight: 1 }}>{icon}</span>
+      <div>
+        <div style={{ fontSize: 10, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em', fontWeight: 600 }}>{label}</div>
+        <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-primary)' }}>{value}</div>
+      </div>
     </div>
   )
 }

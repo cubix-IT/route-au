@@ -28,6 +28,13 @@ export interface AddedDiningStop {
   dayNumber: number
 }
 
+export interface AddedActivity {
+  actId: string
+  actName: string
+  emoji: string
+  dayNumber: number
+}
+
 interface AppState {
   // Profiles
   userProfile: UserProfile | null
@@ -86,6 +93,11 @@ interface AppState {
   addedDiningStops: AddedDiningStop[]
   addDiningStop: (stop: AddedDiningStop) => void
   removeDiningStop: (foodId: string) => void
+
+  // User-chosen activities to include in plan
+  addedActivities: AddedActivity[]
+  addActivity: (act: AddedActivity) => void
+  removeActivity: (actId: string) => void
 
   // UI state
   isWizardOpen: boolean
@@ -154,7 +166,7 @@ export const useAppStore = create<AppState>()(
       setSelectedPOI: (poi) => set({ selectedPOI: poi }),
 
       activeItinerary: null,
-      setActiveItinerary: (i) => set({ activeItinerary: i, addedDiningStops: [] }),
+      setActiveItinerary: (i) => set({ activeItinerary: i, addedDiningStops: [], addedActivities: [] }),
       patchRouteDistances: (distKm, durHours) => set((s) => {
         const itin = s.activeItinerary
         if (!itin) return {}
@@ -172,7 +184,7 @@ export const useAppStore = create<AppState>()(
           },
         }
       }),
-      clearItinerary: () => set({ activeItinerary: null, addedDiningStops: [] }),
+      clearItinerary: () => set({ activeItinerary: null, addedDiningStops: [], addedActivities: [] }),
 
       addedDiningStops: [],
       addDiningStop: (stop) =>
@@ -185,6 +197,18 @@ export const useAppStore = create<AppState>()(
       removeDiningStop: (foodId) =>
         set((s) => ({
           addedDiningStops: s.addedDiningStops.filter((x) => x.foodId !== foodId),
+        })),
+
+      addedActivities: [],
+      addActivity: (act) =>
+        set((s) => ({
+          addedActivities: s.addedActivities.some((x) => x.actId === act.actId)
+            ? s.addedActivities
+            : [...s.addedActivities, act],
+        })),
+      removeActivity: (actId) =>
+        set((s) => ({
+          addedActivities: s.addedActivities.filter((x) => x.actId !== actId),
         })),
 
       isWizardOpen: false,
@@ -229,6 +253,7 @@ export const useAppStore = create<AppState>()(
         diningPrefs: state.diningPrefs,
         activeItinerary: state.activeItinerary,
         addedDiningStops: state.addedDiningStops,
+        addedActivities: state.addedActivities,
       }),
     }
   )
