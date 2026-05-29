@@ -92,6 +92,7 @@ export function ProfileWizard() {
   const [diningPrefs, setDiningPrefs] = useState<DiningPref[]>([])
   const [dietary, setDietary] = useState<DietaryReq[]>([])
   const [vehicleType, setVehicleType] = useState<VehicleType>('AWD')
+  const [fuelType, setFuelType] = useState<FuelType>('Unleaded95')
   const [accommodation, setAccommodation] = useState<AccommodationPreference>('Any')
 
   const totalSteps = isPreselected ? 2 : 4 // 0..1 for preselect, 0..3 for discovery
@@ -183,7 +184,7 @@ export function ProfileWizard() {
       id: 'vehicle-1',
       type: vehicleType,
       clearance_height_meters: vehicleType === 'HighClearance4WD' || vehicleType === '4WD_WithCaravan' ? 2.4 : 1.8,
-      fuel_type: (vehicleType === 'Electric' ? 'Electric' : 'Unleaded95') as FuelType,
+      fuel_type: (vehicleType === 'Electric' ? 'Electric' : fuelType) as FuelType,
       fuel_capacity_liters: 65,
       fuel_consumption_litres_per_100km: vehicleType === 'Electric' ? 0 : 10,
       is_towing: vehicleType === '4WD_WithCaravan',
@@ -292,6 +293,7 @@ export function ProfileWizard() {
                   tripType={tripType}
                   dietary={dietary} toggleDietary={toggleDietary}
                   vehicleType={vehicleType} setVehicleType={setVehicleType}
+                  fuelType={fuelType} setFuelType={setFuelType}
                   accommodation={accommodation} setAccommodation={setAccommodation}
                   dailyDriveHours={dailyDriveHours} setDailyDriveHours={setDailyDriveHours}
                   departureHour={departureHour} setDepartureHour={setDepartureHour}
@@ -330,6 +332,7 @@ export function ProfileWizard() {
                   tripType={tripType}
                   dietary={dietary} toggleDietary={toggleDietary}
                   vehicleType={vehicleType} setVehicleType={setVehicleType}
+                  fuelType={fuelType} setFuelType={setFuelType}
                   accommodation={accommodation} setAccommodation={setAccommodation}
                   dailyDriveHours={dailyDriveHours} setDailyDriveHours={setDailyDriveHours}
                   departureHour={departureHour} setDepartureHour={setDepartureHour}
@@ -846,6 +849,7 @@ function StepPreferences({
   hasKids, kidsAge, tripType,
   dietary, toggleDietary,
   vehicleType, setVehicleType,
+  fuelType, setFuelType,
   accommodation, setAccommodation,
   dailyDriveHours, setDailyDriveHours,
   departureHour, setDepartureHour,
@@ -857,6 +861,7 @@ function StepPreferences({
   hasKids: boolean; kidsAge: KidsAge | null; tripType: TripType
   dietary: DietaryReq[]; toggleDietary: (r: DietaryReq) => void
   vehicleType: VehicleType; setVehicleType: (v: VehicleType) => void
+  fuelType: FuelType; setFuelType: (f: FuelType) => void
   accommodation: AccommodationPreference; setAccommodation: (a: AccommodationPreference) => void
   dailyDriveHours?: number; setDailyDriveHours?: (n: number) => void
   departureHour: number; setDepartureHour: (h: number) => void
@@ -985,6 +990,27 @@ function StepPreferences({
           ))}
         </div>
       </div>
+
+      {/* Fuel type — hidden for Electric */}
+      {vehicleType !== 'Electric' && (
+        <div>
+          <Label>Fuel type</Label>
+          <div style={{ display: 'flex', gap: 6, marginTop: 10, flexWrap: 'wrap' }}>
+            {([
+              { type: 'Unleaded95' as FuelType, emoji: '⛽', label: 'Unleaded 95' },
+              { type: 'Unleaded98' as FuelType, emoji: '🔵', label: 'Unleaded 98' },
+              { type: 'Diesel'     as FuelType, emoji: '🛢️', label: 'Diesel' },
+            ] as { type: FuelType; emoji: string; label: string }[]).map((f) => (
+              <div key={f.type} className={`option-card ${fuelType === f.type ? 'selected' : ''}`}
+                onClick={() => setFuelType(f.type)}
+                style={{ flexDirection: 'row', padding: '10px 12px', gap: 6, flexShrink: 0 }}>
+                <span style={{ fontSize: 18 }}>{f.emoji}</span>
+                <span style={{ fontSize: 12, fontWeight: 600 }}>{f.label}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Accommodation — multiday only */}
       {tripType === 'multiday' && (
