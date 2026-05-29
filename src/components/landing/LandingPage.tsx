@@ -192,6 +192,16 @@ const VICTORIA_HIGHLIGHTS = [
   'Beechworth\'s intact gold-rush granite streetscape — unchanged since the 1860s?',
   'wild dolphins leaping through the waves off Sorrento on a summer morning?',
   'the Twelve Apostles at golden hour, limestone stacks rising from the Southern Ocean?',
+  'glow-worms turning the cave ceiling at Buchan into a galaxy of cool blue-green light?',
+  'platypus feeding at dusk in the clear pools near Mount Beauty — barely making a ripple?',
+  'Loch Ard Gorge before sunrise — ochre cliffs flushing pink before the crowds arrive?',
+  'sea eagles circling above the Murray at Barmah on a perfectly still autumn morning?',
+  'the King Valley Prosecco Road in autumn — Italian winemakers, chestnut trees, and long lunch tables?',
+  'Cape Otway lighthouse stark white against a building storm — the oldest on mainland Australia?',
+  'snow gums draped in ice crystals after a High Country snowfall, the silence total and absolute?',
+  'the panorama from Arthurs Seat — the entire Mornington Peninsula and bay laid out below you?',
+  'the Prom at low tide, Squeaky Beach sand creaking underfoot, not another soul in sight?',
+  'hot air balloons drifting over the Yarra Valley at first light — baskets skimming the mist?',
 ]
 
 // ── Main landing page ─────────────────────────────────────────────────

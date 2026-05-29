@@ -32,7 +32,7 @@ const FIELD_MASK = [
 const CATEGORY_TYPES: Record<string, string[]> = {
   food:          ['restaurant', 'cafe', 'bar', 'pub', 'winery', 'bakery', 'dessert_shop', 'brewery', 'bistro'],
   activities:    ['tourist_attraction', 'park', 'amusement_park', 'zoo', 'aquarium', 'museum', 'art_gallery', 'farm', 'botanical_garden'],
-  nature:        ['national_park', 'hiking_area', 'beach', 'nature_preserve', 'scenic_spot', 'campground', 'waterfall'],
+  nature:        ['national_park', 'hiking_area', 'park', 'beach', 'nature_preserve', 'scenic_spot', 'scenic_overlook', 'campground', 'waterfall'],
   accommodation: ['hotel', 'resort_hotel', 'bed_and_breakfast', 'hostel', 'campground'],
   essentials:    ['gas_station', 'pharmacy', 'atm', 'parking'],
 }

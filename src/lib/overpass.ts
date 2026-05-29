@@ -51,16 +51,19 @@ const GP_LIVE_TYPE: Record<string, LivePOI['type']> = {
   tourist_attraction: 'attraction', museum: 'attraction',
   park: 'attraction', amusement_park: 'attraction',
   zoo: 'attraction', aquarium: 'attraction',
-  art_gallery: 'attraction', stadium: 'attraction',
+  art_gallery: 'attraction', art_museum: 'attraction', stadium: 'attraction',
   farm: 'attraction', wildlife_park: 'attraction',
   botanical_garden: 'attraction', wildlife_refuge: 'attraction',
   historical_landmark: 'attraction', event_venue: 'attraction',
+  heritage_building: 'attraction', performing_arts_theater: 'attraction',
   // Nature & Outdoors (separate from human attractions)
   national_park: 'hiking', nature_preserve: 'viewpoint',
   beach: 'viewpoint', waterfall: 'viewpoint',
   scenic_spot: 'viewpoint', scenic_overlook: 'viewpoint',
   hiking_area: 'hiking', wilderness_area: 'hiking',
-  campground: 'hiking',
+  campground: 'hiking', picnic_ground: 'viewpoint',
+  // Hotels/pubs that show up with wrong primary type
+  hotel: 'attraction',
 }
 
 interface GPlace {
@@ -151,7 +154,7 @@ async function fetchPlacesForLivePOIs(lat: number, lng: number): Promise<LivePOI
     const [foodPlaces, actPlaces, naturePlaces] = await Promise.all([
       fetchGPlaces(lat, lng, 'food'),
       fetchGPlaces(lat, lng, 'activities'),
-      fetchGPlaces(lat, lng, 'nature'),
+      fetchGPlaces(lat, lng, 'nature', 10000), // nature areas need wider radius
     ])
     const all: GPlace[] = [...foodPlaces, ...actPlaces, ...naturePlaces]
     return gPlacesToLivePOI(all)
