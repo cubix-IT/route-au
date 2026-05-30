@@ -1,0 +1,1 @@
+ALTER TABLE sub_destinations ADD COLUMN IF NOT EXISTS enriched_at TIMESTAMPTZ;

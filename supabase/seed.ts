@@ -140,6 +140,38 @@ const CLUSTERS = [
     image_emoji: '🛶', image_url: 'https://images.unsplash.com/photo-1441974231531-c6227db76b6e',
     gradient_from: '#0a2a4a', gradient_to: '#1a4a3a', display_order: 15,
   },
+  {
+    id: 'melbourne', name: 'Melbourne',
+    tagline: "World-class food, laneways, galleries, and live sport — Victoria's capital has more than enough for a full day or weekend.",
+    drive_time_range: '0 – 1.5 hrs', themes: ['Food','Culture','Art','Sport','Nightlife'],
+    seasonal_scores: { summer:8, autumn:9, winter:7, spring:9 },
+    image_emoji: '🏙️', image_url: 'https://images.unsplash.com/photo-1545044846-351ba102b6d5',
+    gradient_from: '#1a1a2a', gradient_to: '#2a3a5a', display_order: 16,
+  },
+  {
+    id: 'geelong', name: 'Geelong & Surf Coast Gateway',
+    tagline: "Victoria's second city punches well above its weight — waterfront dining, a world-class art gallery, and surf beaches minutes away.",
+    drive_time_range: '1 – 1.5 hrs', themes: ['Food','Art','Surf','Waterfront'],
+    seasonal_scores: { summer:8, autumn:7, winter:6, spring:8 },
+    image_emoji: '⚓', image_url: 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4',
+    gradient_from: '#0a2a4a', gradient_to: '#1a4a6a', display_order: 17,
+  },
+  {
+    id: 'shepparton', name: 'Shepparton & Goulburn Valley',
+    tagline: "Australia's fruit bowl — stone fruit orchards, a remarkable art museum, and Murray country hospitality.",
+    drive_time_range: '2 – 2.5 hrs', themes: ['Food','Art','Nature','History'],
+    seasonal_scores: { summer:6, autumn:8, winter:6, spring:7 },
+    image_emoji: '🍑', image_url: 'https://images.unsplash.com/photo-1500382017468-9049fed747ef',
+    gradient_from: '#3a2a0a', gradient_to: '#5a4a1a', display_order: 18,
+  },
+  {
+    id: 'wodonga', name: 'Wodonga & Albury',
+    tagline: "Twin border cities on the Murray — great food scene, the Snowy Mountains on the doorstep, and Australia's best rail trail.",
+    drive_time_range: '3 – 3.5 hrs', themes: ['Food','Cycling','History','Nature'],
+    seasonal_scores: { summer:6, autumn:7, winter:6, spring:7 },
+    image_emoji: '🚲', image_url: 'https://images.unsplash.com/photo-1464822759023-fed622ff2c3b',
+    gradient_from: '#1a2a1a', gradient_to: '#2a4a2a', display_order: 19,
+  },
 ]
 
 const SUB_DESTINATIONS = [
@@ -247,6 +279,30 @@ const SUB_DESTINATIONS = [
   { id:'buchan', cluster_id:'east-gippsland', name:'Buchan Caves', drive_time_hours:4.0, drive_km:360, lat:-37.500, lng:148.167, themes:['Nature','Wildlife','Camping','Hiking'], highlights:['Buchan Caves — remarkable limestone formations, guided tours daily','Kangaroos and wallabies at the reserve at dusk','Buchan Valley camping ground (riverside)','Snowy River National Park entry point'], display_order:4 },
   { id:'mallacoota', cluster_id:'east-gippsland', name:'Mallacoota', drive_time_hours:5.0, drive_km:530, lat:-37.563, lng:149.745, themes:['Nature','Remote','Wildlife','Beaches'], highlights:['Croajingolong National Park (UNESCO listed biosphere reserve)','Top and Bottom Lakes kayaking','Gipsy Point — kangaroos at dusk on the waterfront','Gabo Island Lighthouse boat excursions'], display_order:5 },
   { id:'errinundra', cluster_id:'east-gippsland', name:'Errinundra Plateau', drive_time_hours:4.5, drive_km:390, lat:-37.435, lng:148.840, themes:['Rainforest','Remote','Nature'], highlights:['Oldest cool-temperate rainforest in Victoria','Big Tree — a 300-yr mountain ash','Adams Creek walk through cathedral-like ferns','Virtually no other tourists'], display_order:6 },
+
+  // Melbourne
+  { id:'melbourne-cbd', cluster_id:'melbourne', name:'Melbourne CBD', drive_time_hours:0, drive_km:0, lat:-37.813, lng:144.963, themes:['Food','Culture','Art','Sport','Laneways'], highlights:['Federation Square & NGV (free entry)','Queen Victoria Market (Tue–Sun)','Iconic laneways — Hosier, Degraves, Centre Place','Rooftop bars and world-class dining'], display_order:1 },
+  { id:'fitzroy-collingwood', cluster_id:'melbourne', name:'Fitzroy & Collingwood', drive_time_hours:0.2, drive_km:3, lat:-37.798, lng:144.978, themes:['Cafes','Art','Bars','Shopping'], highlights:['Brunswick Street cafes and restaurants','Smith Street — boutiques, bars, and live music','Gertrude Contemporary and local galleries','Slow Lane coffee and the Fitzroy bottle shop scene'], display_order:2 },
+  { id:'st-kilda', cluster_id:'melbourne', name:'St Kilda', drive_time_hours:0.3, drive_km:6, lat:-37.868, lng:144.981, themes:['Beach','Food','Nightlife','Art'], highlights:['St Kilda beach and foreshore promenade','Luna Park (iconic heritage fun park)','Acland Street cake shops and restaurants','Sunday market at the Esplanade'], display_order:3 },
+  { id:'south-yarra-prahran', cluster_id:'melbourne', name:'South Yarra & Prahran', drive_time_hours:0.2, drive_km:4, lat:-37.840, lng:144.991, themes:['Shopping','Food','Bars','Fashion'], highlights:['Chapel Street — fashion, dining, and nightlife','Hawksburn Village and local deli scene','Greville Street boutiques and record stores','The Prahran Market (fresh produce, gourmet food)'], display_order:4 },
+  { id:'carlton', cluster_id:'melbourne', name:'Carlton & Lygon Street', drive_time_hours:0.2, drive_km:2, lat:-37.801, lng:144.968, themes:['Food','History','Culture','Gardens'], highlights:['Lygon Street — Melbourne\'s Italian precinct','Royal Exhibition Building (UNESCO World Heritage)','Melbourne Museum and Bunjilaka Cultural Centre','Royal Botanic Gardens (free, extraordinary)'], display_order:5 },
+  { id:'southbank', cluster_id:'melbourne', name:'Southbank & Docklands', drive_time_hours:0.1, drive_km:1, lat:-37.824, lng:144.960, themes:['Arts','Food','Waterfront','Entertainment'], highlights:['Arts Centre Melbourne — concerts, theatre, ballet','Crown precinct — restaurants and entertainment','Southbank promenade and Yarra riverside dining','Melbourne Star observation wheel (Docklands)'], display_order:6 },
+  { id:'richmond', cluster_id:'melbourne', name:'Richmond & Cremorne', drive_time_hours:0.2, drive_km:4, lat:-37.823, lng:144.999, themes:['Food','Sport','Culture'], highlights:['Bridge Road antiques and fashion','Victoria Street — Melbourne\'s Vietnamese precinct','MCG and Melbourne Park (tennis, AFL)','Swan Street restaurants and wine bars'], display_order:7 },
+  { id:'williamstown', cluster_id:'melbourne', name:'Williamstown', drive_time_hours:0.5, drive_km:14, lat:-37.861, lng:144.896, themes:['Heritage','Waterfront','Food','Walking'], highlights:['Historic maritime precinct and heritage streetscape','Williamstown Beach and foreshore walk','Nelson Place restaurants and cafes with bay views','HMAS Castlemaine — WWII naval museum ship'], display_order:8 },
+  { id:'brunswick', cluster_id:'melbourne', name:'Brunswick & Coburg', drive_time_hours:0.3, drive_km:6, lat:-37.769, lng:144.961, themes:['Cafes','Music','Art','Food'], highlights:['Sydney Road — multicultural food and music strip','Brunswick Mechanics Institute and local art spaces','Coburg Lake Reserve and Coburg Market','Best Lebanese, Ethiopian, and Turkish food in Melbourne'], display_order:9 },
+
+  // Geelong
+  { id:'geelong-waterfront', cluster_id:'geelong', name:'Geelong CBD & Waterfront', drive_time_hours:1.1, drive_km:75, lat:-38.148, lng:144.361, themes:['Art','Food','Waterfront','History'], highlights:['Geelong Art Gallery — major regional collection','Geelong waterfront carousel and boardwalk','Little Malop Street food and bar precinct','National Wool Museum in the heritage Wool Store'], display_order:1 },
+  { id:'geelong-newtown', cluster_id:'geelong', name:'Newtown & Pakington Street', drive_time_hours:1.1, drive_km:77, lat:-38.141, lng:144.346, themes:['Cafes','Shopping','Relaxation'], highlights:['Pakington Street — Geelong\'s best cafes and boutiques','Geelong Botanic Gardens (free, beautiful)','Local wine bars and craft beer spots','Tree-lined heritage streetscape'], display_order:2 },
+  { id:'bellarine-peninsula', cluster_id:'geelong', name:'Bellarine Peninsula', drive_time_hours:1.3, drive_km:95, lat:-38.200, lng:144.500, themes:['Wine','Beach','Food','Scenic'], highlights:['Oakdene and Scotchman\'s Hill wineries','Ocean Grove and Barwon Heads beaches','Queenscliff maritime town and ferry terminal','Jack Rabbit Vineyard panoramic views'], display_order:3 },
+
+  // Shepparton
+  { id:'shepparton-cbd', cluster_id:'shepparton', name:'Shepparton', drive_time_hours:2.2, drive_km:185, lat:-36.383, lng:145.399, themes:['Art','Food','Nature','History'], highlights:['Shepparton Art Museum (SAM) — extraordinary regional gallery','Lake Victoria and the Goulburn River walk','Murray to Mountains Rail Trail starting point','Stone fruit orchards and pick-your-own (Dec–Feb)'], display_order:1 },
+  { id:'nagambie', cluster_id:'shepparton', name:'Nagambie & Tahbilk', drive_time_hours:2.0, drive_km:160, lat:-36.788, lng:145.153, themes:['Wine','Nature','History'], highlights:['Tahbilk Winery — one of Australia\'s oldest (1860)','Lake Nagambie water sports and boat hire','Mitchelton Wines and art gallery','Goulburn River paddle and kayak tours'], display_order:2 },
+
+  // Wodonga
+  { id:'albury-wodonga', cluster_id:'wodonga', name:'Albury–Wodonga', drive_time_hours:3.2, drive_km:305, lat:-36.121, lng:146.916, themes:['Food','Cycling','History','Nature'], highlights:['Murray River Precinct — swimming, cycling, cafes','Albury LibraryMuseum and Monument Hill','Hume and Hovell Track (world-class hiking)','Ettamogah Pub and Wodonga arts precinct'], display_order:1 },
+  { id:'mount-beauty', cluster_id:'wodonga', name:'Mount Beauty & Falls Creek', drive_time_hours:4.0, drive_km:380, lat:-36.748, lng:147.175, themes:['Skiing','Cycling','Nature','Village'], highlights:['Falls Creek ski resort (winter)','Kiewa Valley Highway — one of Victoria\'s great scenic drives','Mount Beauty township — good food and craft beer','Alpine cycling — Murray to Mountains and rail trails'], display_order:2 },
 ]
 
 // ── Activities (core set from existing database) ───────────────────
@@ -438,34 +494,63 @@ const ACTIVITIES = [
 ]
 
 // ── Insert functions ────────────────────────────────────────────────
+// Schema uses integer PKs (cluster_id, sub_dest_id) with slug as unique TEXT key.
+// Seed data uses string `id` fields — we rename to `slug` and resolve FK slugs to integers.
 
-async function seedClusters() {
+async function seedClusters(): Promise<Map<string, number>> {
   console.log('Seeding clusters…')
-  const { error } = await supabase.from('clusters').upsert(CLUSTERS, { onConflict: 'id' })
+  const rows = CLUSTERS.map(({ id, name, tagline, image_url, gradient_from, gradient_to, seasonal_scores, display_order }) => ({
+    slug: id, name, tagline, image_url, gradient_from, gradient_to, seasonal_scores, display_order,
+  }))
+  const { error } = await supabase.from('clusters').upsert(rows, { onConflict: 'slug' })
   if (error) throw error
-  console.log(`  ${CLUSTERS.length} clusters inserted`)
+
+  const { data, error: fetchErr } = await supabase.from('clusters').select('cluster_id, slug')
+  if (fetchErr) throw fetchErr
+
+  const slugToId = new Map<string, number>()
+  for (const row of data ?? []) slugToId.set(row.slug, row.cluster_id)
+  console.log(`  ${CLUSTERS.length} clusters — slug map built (${slugToId.size} entries)`)
+  return slugToId
 }
 
-async function seedSubDests() {
+async function seedSubDests(clusterSlugToId: Map<string, number>): Promise<Map<string, number>> {
   console.log('Seeding sub-destinations…')
-  const { error } = await supabase.from('sub_destinations').upsert(SUB_DESTINATIONS, { onConflict: 'id' })
+  const rows = SUB_DESTINATIONS.map(({ id, cluster_id: clusterSlug, ...rest }) => {
+    const cluster_id = clusterSlugToId.get(clusterSlug)
+    if (!cluster_id) throw new Error(`Unknown cluster slug: ${clusterSlug}`)
+    return { slug: id, cluster_id, ...rest }
+  })
+  const { error } = await supabase.from('sub_destinations').upsert(rows, { onConflict: 'slug' })
   if (error) throw error
-  console.log(`  ${SUB_DESTINATIONS.length} sub-destinations inserted`)
+
+  const { data, error: fetchErr } = await supabase.from('sub_destinations').select('sub_dest_id, slug')
+  if (fetchErr) throw fetchErr
+
+  const slugToId = new Map<string, number>()
+  for (const row of data ?? []) slugToId.set(row.slug, row.sub_dest_id)
+  console.log(`  ${SUB_DESTINATIONS.length} sub-destinations — slug map built (${slugToId.size} entries)`)
+  return slugToId
 }
 
-async function seedActivities() {
+async function seedActivities(subDestSlugToId: Map<string, number>) {
   console.log('Seeding activities…')
-  const { error } = await supabase.from('activities').upsert(ACTIVITIES, { onConflict: 'id' })
+  const rows = ACTIVITIES.map(({ id, sub_dest_id: subDestSlug, ...rest }) => {
+    const sub_dest_id = subDestSlugToId.get(subDestSlug)
+    if (!sub_dest_id) throw new Error(`Unknown sub_dest slug: ${subDestSlug} (activity: ${id})`)
+    return { slug: id, sub_dest_id, ...rest }
+  })
+  const { error } = await supabase.from('activities').upsert(rows, { onConflict: 'slug' })
   if (error) throw error
   console.log(`  ${ACTIVITIES.length} activities inserted`)
 }
 
 async function main() {
-  console.log('🌱 Starting seed…')
-  await seedClusters()
-  await seedSubDests()
-  await seedActivities()
-  console.log('✅ Seed complete')
+  console.log('Starting seed…')
+  const clusterMap = await seedClusters()
+  const subDestMap = await seedSubDests(clusterMap)
+  await seedActivities(subDestMap)
+  console.log('Seed complete')
 }
 
 main().catch((e) => { console.error(e); process.exit(1) })

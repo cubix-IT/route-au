@@ -10,10 +10,26 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(400).json({ error: 'subDestId query param required' })
   }
 
+  // subDestId may be a slug (string) or integer — resolve to integer via sub_destinations
+  let numericId: number | null = null
+  const asInt = parseInt(subDestId)
+  if (!isNaN(asInt)) {
+    numericId = asInt
+  } else {
+    const { data: sd } = await adminSupabase
+      .from('sub_destinations')
+      .select('sub_dest_id')
+      .eq('slug', subDestId)
+      .single()
+    numericId = sd?.sub_dest_id ?? null
+  }
+
+  if (!numericId) return res.status(200).json([])
+
   const { data, error } = await adminSupabase
     .from('activities')
     .select('*')
-    .eq('sub_dest_id', subDestId)
+    .eq('sub_dest_id', numericId)
     .order('is_hidden_gem', { ascending: false })
 
   if (error) {
@@ -22,7 +38,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   const result = data.map((a) => ({
-    id: a.id,
+    id: a.activity_id,
     name: a.name,
     category: a.category,
     emoji: a.emoji,

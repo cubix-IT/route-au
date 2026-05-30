@@ -12,17 +12,22 @@ const POI_EMOJI: Record<LivePOI['type'], string> = {
 }
 
 const CAT_TAG: Record<ActivityCategory, { label: string; color: string; bg: string }> = {
-  nature:      { label: 'Nature',       color: '#2D7A4A', bg: '#E8F5EE' },
-  active:      { label: 'Outdoor',      color: '#2563EB', bg: '#EFF6FF' },
-  wildlife:    { label: 'Wildlife',     color: '#047857', bg: '#ECFDF5' },
-  history:     { label: 'History',      color: '#7C3AED', bg: '#F5F3FF' },
-  art:         { label: 'Art & Culture',color: '#DB2777', bg: '#FDF2F8' },
-  family:      { label: 'Family',       color: '#D97706', bg: '#FFFBEB' },
-  relaxation:  { label: 'Leisure',      color: '#0891B2', bg: '#ECFEFF' },
-  food:        { label: 'Food',         color: '#B45309', bg: '#FEF3C7' },
-  drink:       { label: 'Drink',        color: '#B87333', bg: '#FFF5EB' },
-  markets:     { label: 'Markets',      color: '#059669', bg: '#ECFDF5' },
-  viewpoint:   { label: 'Scenic View',  color: '#4338CA', bg: '#EEF2FF' },
+  nature:        { label: 'Nature',        color: '#2D7A4A', bg: '#E8F5EE' },
+  active:        { label: 'Outdoor',       color: '#2563EB', bg: '#EFF6FF' },
+  wildlife:      { label: 'Wildlife',      color: '#047857', bg: '#ECFDF5' },
+  history:       { label: 'History',       color: '#7C3AED', bg: '#F5F3FF' },
+  art:           { label: 'Art & Culture', color: '#DB2777', bg: '#FDF2F8' },
+  family:        { label: 'Family',        color: '#D97706', bg: '#FFFBEB' },
+  relaxation:    { label: 'Leisure',       color: '#0891B2', bg: '#ECFEFF' },
+  food:          { label: 'Food',          color: '#B45309', bg: '#FEF3C7' },
+  drink:         { label: 'Drink',         color: '#B87333', bg: '#FFF5EB' },
+  markets:       { label: 'Markets',       color: '#059669', bg: '#ECFDF5' },
+  viewpoint:     { label: 'Scenic View',   color: '#4338CA', bg: '#EEF2FF' },
+  beach:         { label: 'Beach',         color: '#0369A1', bg: '#E0F2FE' },
+  wellness:      { label: 'Wellness',      color: '#0891B2', bg: '#ECFEFF' },
+  entertainment: { label: 'Entertainment', color: '#9333EA', bg: '#F3E8FF' },
+  sports:        { label: 'Sports',        color: '#15803D', bg: '#DCFCE7' },
+  shopping:      { label: 'Shopping',      color: '#BE185D', bg: '#FCE7F3' },
 }
 
 const POI_TAG: Record<LivePOI['type'], { label: string; color: string; bg: string }> = {

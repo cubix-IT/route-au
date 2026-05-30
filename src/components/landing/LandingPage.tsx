@@ -1,17 +1,104 @@
-import { useState, useRef, useEffect, useMemo } from 'react'
+import { useState, useRef, useEffect, useMemo, useCallback } from 'react'
 import { useAppStore } from '@/store/useAppStore'
 import type { PreselectedDest } from '@/store/useAppStore'
-import { getCurrentSeason, SEASON_META } from '@/utils/season'
+import { getCurrentSeason } from '@/utils/season'
 import type { VicCluster, SubDest } from '@/data/victorianClusters'
 import { useClusters } from '@/hooks/useClusters'
 import { useActivities } from '@/hooks/useActivities'
-import { LogoMark } from '@/components/layout/Header'
 import { DestinationModal } from './DestinationModal'
+import { supabase } from '@/lib/supabase'
 
 const GREEN = '#3A6B4F'
 
 const season = getCurrentSeason()
-const seasonMeta = SEASON_META[season]
+
+// ── Dest search — preloaded fuzzy ────────────────────────────────────
+
+interface SubDestResult { id: string; name: string; clusterSlug: string; lat: number; lng: number }
+
+// Loaded once at startup, shared across all instances
+let ALL_DESTS: SubDestResult[] = []
+let destsLoaded = false
+
+async function preloadDestinations() {
+  if (destsLoaded || !supabase) return
+  destsLoaded = true
+  const { data, error } = await supabase
+    .from('sub_destinations')
+    .select('slug, name, lat, lng, cluster_id')
+    .limit(200)
+  if (error) { console.warn('[preloadDests]', error); return }
+  ALL_DESTS = (data ?? []).map((r) => ({
+    id: r.slug as string,
+    name: r.name as string,
+    clusterSlug: String(r.cluster_id ?? ''),
+    lat: r.lat as number,
+    lng: r.lng as number,
+  }))
+}
+
+// Trigram similarity — splits strings into 3-char grams and measures overlap
+function trigram(s: string): Set<string> {
+  const t = new Set<string>()
+  const p = ` ${s.toLowerCase()} `
+  for (let i = 0; i < p.length - 2; i++) t.add(p.slice(i, i + 3))
+  return t
+}
+
+function trigramSimilarity(a: string, b: string): number {
+  const ta = trigram(a)
+  const tb = trigram(b)
+  let overlap = 0
+  for (const g of ta) if (tb.has(g)) overlap++
+  return (2 * overlap) / (ta.size + tb.size)
+}
+
+// Levenshtein distance for short strings
+function levenshtein(a: string, b: string): number {
+  const m = a.length, n = b.length
+  const dp: number[][] = Array.from({ length: m + 1 }, (_, i) => [i, ...Array(n).fill(0)])
+  for (let j = 0; j <= n; j++) dp[0][j] = j
+  for (let i = 1; i <= m; i++)
+    for (let j = 1; j <= n; j++)
+      dp[i][j] = a[i-1] === b[j-1] ? dp[i-1][j-1] : 1 + Math.min(dp[i-1][j], dp[i][j-1], dp[i-1][j-1])
+  return dp[m][n]
+}
+
+function fuzzyScore(query: string, dest: SubDestResult): number {
+  const q = query.toLowerCase().trim()
+  const name = dest.name.toLowerCase()
+  const nameClean = name.replace(/[^a-z0-9\s]/g, '') // strip &, – etc
+
+  // Exact prefix — highest priority
+  if (name.startsWith(q) || nameClean.startsWith(q)) return 1.0
+
+  // Substring match
+  if (name.includes(q) || nameClean.includes(q)) return 0.9
+
+  // Each word in the destination starts with the query
+  if (name.split(/[\s&–-]+/).some((w) => w.startsWith(q))) return 0.85
+
+  // Trigram similarity (handles transpositions, missing letters)
+  const tg = trigramSimilarity(q, name)
+  if (tg > 0.35) return 0.4 + tg * 0.5
+
+  // Levenshtein — allow 1 edit per 4 chars
+  const maxDist = Math.max(1, Math.floor(q.length / 4))
+  const dist = levenshtein(q, name.slice(0, q.length + 2))
+  if (dist <= maxDist) return 0.3 + (1 - dist / (maxDist + 1)) * 0.3
+
+  return 0
+}
+
+function searchDestinations(q: string): SubDestResult[] {
+  if (q.length < 2 || ALL_DESTS.length === 0) return []
+  return ALL_DESTS
+    .map((d) => ({ d, score: fuzzyScore(q, d) }))
+    .filter(({ score }) => score > 0)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 6)
+    .map(({ d }) => d)
+}
 
 // ── Photon autocomplete ───────────────────────────────────────────────
 
@@ -45,168 +132,280 @@ function featureLabel(f: PhotonFeature): string {
 
 // ── Origin search box ────────────────────────────────────────────────
 
-function OriginSearchBox({
-  onSelect,
-  onOpenWizard,
-}: {
-  onSelect: (name: string, coord: { lng: number; lat: number }) => void
-  onOpenWizard: () => void
+
+// ── Rotating Victoria highlights ─────────────────────────────────────
+
+const VICTORIA_HIGHLIGHTS = [
+  // Phillip Island
+  'hundreds of little penguins waddling ashore at Phillip Island at dusk?',
+  // Grampians
+  'wildflowers blanketing the Grampians from every ridge and gully in spring?',
+  'the sunrise from Boroka Lookout — the entire Grampians spread below you?',
+  'ancient Aboriginal rock art at Brambuk — paintings that predate European settlement by thousands of years?',
+  // Great Ocean Road
+  'dozens of wild koalas in the roadside gums at Kennett River on the Great Ocean Road?',
+  'the Twelve Apostles at golden hour, limestone stacks rising from the Southern Ocean?',
+  'Loch Ard Gorge before sunrise — ochre cliffs flushing pink before the crowds arrive?',
+  'Australia\'s largest fur seal colony just a short walk from Cape Bridgewater?',
+  'Cape Otway lighthouse stark white against a building storm — the oldest on mainland Australia?',
+  // Wilson's Prom
+  'wombats grazing fearlessly around your tent at Wilson\'s Promontory at dusk?',
+  'the Prom at low tide, Squeaky Beach sand creaking underfoot, not another soul in sight?',
+  // Warrnambool
+  'southern right whales nursing their calves from the clifftop at Logans Beach?',
+  // Bright & Alpine
+  'the Ovens River in Bright in May — Japanese maples and elms turning red and gold?',
+  'snow gums draped in ice crystals after a High Country snowfall, the silence total and absolute?',
+  'platypus feeding at dusk in the clear pools near Mount Beauty — barely making a ripple?',
+  'Victoria\'s highest ski resort at Hotham letting you ski through to Falls Creek — longest run in Australia?',
+  // Yarra Valley
+  'misty vineyard rows in the Yarra Valley just after an autumn rain?',
+  'hot air balloons drifting over the Yarra Valley at first light — baskets skimming the mist?',
+  'Four Pillars Gin making some of Australia\'s most awarded spirits in a Yarra Valley shed?',
+  // Mornington Peninsula
+  'steam rising from open-air mineral pools at Peninsula Hot Springs under a winter sky?',
+  'wild dolphins leaping through the waves off Sorrento on a summer morning?',
+  'the panorama from Arthurs Seat — the entire Mornington Peninsula and both bays laid out below you?',
+  // Murray River
+  'a genuine 1860s paddle steamer churning up the Murray at Echuca?',
+  'sea eagles circling above the Murray at Barmah on a perfectly still autumn morning?',
+  // Dandenongs
+  'king parrots eating from your hand at Grants Picnic Ground in the Dandenongs?',
+  'Puffing Billy winding through tree fern gullies — Victoria\'s most-loved steam railway?',
+  // Beechworth & High Country
+  'Beechworth\'s intact gold-rush granite streetscape — unchanged since the 1860s?',
+  'the King Valley Prosecco Road in autumn — Italian winemakers, chestnut trees, and long lunch tables?',
+  // East Gippsland
+  'glow-worms turning the cave ceiling at Buchan into a galaxy of cool blue-green light?',
+  'kayaking the calm channels of the Gippsland Lakes at dawn — the water a perfect mirror?',
+  'Mallacoota\'s Croajingolong — so wild and remote UNESCO declared it a World Biosphere Reserve?',
+  // Ballarat
+  'panning for real gold at Sovereign Hill on the very ground where the rush began in 1851?',
+  'the Eureka Stockade site in Ballarat where miners took on the Crown — and sparked democracy?',
+  // Bendigo
+  'a full-size Chinese processional dragon from 1879 coiled in its own museum in Bendigo?',
+  'Bendigo\'s art gallery hosting major international shows that most Melbourne galleries don\'t get?',
+  // Melbourne
+  'Melbourne\'s laneway street art changing every week — Hosier Lane as a living gallery?',
+  'the Queen Victoria Market running since 1878 — the largest open-air market in the Southern Hemisphere?',
+  'rooftop bars above Melbourne\'s CBD where you can watch the city light up at dusk?',
+  'the Royal Botanic Gardens in Melbourne — 38 hectares of immaculate gardens right in the city?',
+  // Geelong
+  'Geelong\'s waterfront carousel — hand-carved in the 1890s and still spinning today?',
+  'Barwon Heads rivermouth where the Barwon meets the sea — one of Victoria\'s most photogenic spots?',
+  'Geelong Art Gallery holding one of the finest regional collections in the country?',
+  // Shepparton
+  'Shepparton\'s extraordinary art museum — a building so bold it stopped people in the street?',
+  'the Goulburn Valley in February — every orchard dripping with peaches, nectarines, and apricots?',
+  // Wodonga
+  'Lake Hume stretching 20 times the size of Sydney Harbour across the Victoria-NSW border?',
+  'the Murray to Mountains Rail Trail — one of Australia\'s great cycling journeys starting right in Wodonga?',
+  // Daylesford
+  'mineral springs bubbling up from the ground at Hepburn — free to taste straight from the earth?',
+  'Hanging Rock rising from the plains like a fist — the geology that inspired a gothic masterpiece?',
+  // Misc
+  'kangaroos grazing on the fairways at Anglesea Golf Club — wild mobs, free to watch, every day?',
+  'the fossil site at Flat Rocks, Inverloch — where world-class polar dinosaur bones were found?',
+]
+
+// ── Simple From / To search (hero) ────────────────────────────────────
+
+function FromToSearch({ onSearch }: {
+  onSearch: (origin: { name: string; coord: { lat: number; lng: number } | null }, dest: SubDestResult | null) => void
 }) {
-  const originName = useAppStore((s) => s.originName)
-  const [query, setQuery] = useState('')
-  const [suggestions, setSuggestions] = useState<PhotonFeature[]>([])
-  const [loading, setLoading] = useState(false)
-  const [chosen, setChosen] = useState(false)
-  const debounce = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const ref = useRef<HTMLDivElement>(null)
+  const storedOrigin = useAppStore((s) => s.originName)
+  const [fromQuery, setFromQuery] = useState('')
+  const [fromSuggestions, setFromSuggestions] = useState<PhotonFeature[]>([])
+  const [fromChosen, setFromChosen] = useState<{ name: string; coord: { lat: number; lng: number } } | null>(null)
+  const [toQuery, setToQuery] = useState('')
+  const [toSuggestions, setToSuggestions] = useState<SubDestResult[]>([])
+  const [toChosen, setToChosen] = useState<SubDestResult | null>(null)
+  const fromDebounce = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const fromRef = useRef<HTMLDivElement>(null)
+  const toRef = useRef<HTMLDivElement>(null)
+
+  // Preload all destinations once for instant fuzzy search
+  useEffect(() => { preloadDestinations() }, [])
 
   useEffect(() => {
-    function handler(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) {
-        setSuggestions([])
-      }
+    if (storedOrigin && !fromChosen) setFromQuery(storedOrigin)
+  }, [storedOrigin]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (fromRef.current && !fromRef.current.contains(e.target as Node)) setFromSuggestions([])
+      if (toRef.current && !toRef.current.contains(e.target as Node)) setToSuggestions([])
     }
     document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
   }, [])
 
-  const onChange = (val: string) => {
-    setQuery(val)
-    setChosen(false)
-    if (debounce.current) clearTimeout(debounce.current)
-    debounce.current = setTimeout(async () => {
-      setLoading(true)
-      const results = await searchOrigin(val)
-      setSuggestions(results)
-      setLoading(false)
-    }, 280)
+  const onFromChange = (val: string) => {
+    setFromQuery(val); setFromChosen(null)
+    if (fromDebounce.current) clearTimeout(fromDebounce.current)
+    fromDebounce.current = setTimeout(() => searchOrigin(val).then(setFromSuggestions), 280)
+  }
+  const onToChange = (val: string) => {
+    setToQuery(val); setToChosen(null)
+    // Synchronous fuzzy search — instant, no network round-trip
+    setToSuggestions(searchDestinations(val))
   }
 
-  const pick = (f: PhotonFeature) => {
-    const label = featureLabel(f)
-    const [lng, lat] = f.geometry.coordinates
-    setQuery(label)
-    setSuggestions([])
-    setChosen(true)
-    onSelect(label, { lng, lat })
-  }
+  const isMobile = typeof window !== 'undefined' && window.innerWidth < 640
+  const inp: React.CSSProperties = { width: '100%', padding: '14px 14px', border: 'none', outline: 'none', fontSize: 15, color: '#1C1B1F', background: 'transparent', fontFamily: 'inherit', boxSizing: 'border-box' }
+  const lbl: React.CSSProperties = { fontSize: 9.5, fontWeight: 800, color: GREEN, textTransform: 'uppercase', letterSpacing: '0.1em', padding: '10px 14px 0' }
+  const drop: React.CSSProperties = { position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: 0, background: '#fff', borderRadius: 12, border: '1px solid var(--border)', boxShadow: '0 12px 40px rgba(0,0,0,0.14)', zIndex: 200, overflow: 'hidden' }
 
   return (
-    <div ref={ref} style={{ position: 'relative', width: '100%', maxWidth: 480 }}>
-      <div style={{
-        display: 'flex', alignItems: 'stretch',
-        borderRadius: 14,
-        background: '#fff',
-        border: '2px solid rgba(255,255,255,0.6)',
-        boxShadow: '0 8px 32px rgba(0,0,0,0.15)',
-        overflow: 'hidden',
-      }}>
-        <div style={{
-          display: 'flex', alignItems: 'center', paddingLeft: 16,
-          color: '#8C8A87', fontSize: 18, flexShrink: 0,
-        }}>
-          📍
+    <div style={{
+      background: '#fff', borderRadius: 18, boxShadow: '0 8px 40px rgba(0,0,0,0.13)',
+      border: '1px solid rgba(0,0,0,0.06)', maxWidth: 680, width: '100%', margin: '0 auto',
+      display: 'flex', flexDirection: isMobile ? 'column' : 'row', overflow: 'visible',
+    }}>
+
+      {/* FROM */}
+      <div ref={fromRef} style={{ flex: 1, position: 'relative', display: 'flex', flexDirection: 'column', minWidth: 0, borderBottom: isMobile ? '1px solid var(--border)' : 'none' }}>
+        <div style={lbl}>From</div>
+        <div style={{ position: 'relative' }}>
+          <input style={inp} placeholder="Your suburb or city" value={fromQuery}
+            onChange={(e) => onFromChange(e.target.value)}
+            onFocus={() => { if (fromQuery.length >= 2 && !fromChosen) searchOrigin(fromQuery).then(setFromSuggestions) }}
+          />
+          {fromSuggestions.length > 0 && (
+            <div style={drop}>
+              {fromSuggestions.map((f, i) => (
+                <button key={i} onClick={() => { const label = featureLabel(f); const [lng, lat] = f.geometry.coordinates; setFromQuery(label); setFromChosen({ name: label, coord: { lat, lng } }); setFromSuggestions([]) }}
+                  style={{ width: '100%', padding: '11px 16px', background: 'none', border: 'none', textAlign: 'left', fontSize: 13.5, cursor: 'pointer', color: '#1C1B1F', display: 'block' }}
+                  onMouseEnter={(e) => (e.currentTarget.style.background = '#F5F4F1')}
+                  onMouseLeave={(e) => (e.currentTarget.style.background = 'none')}>
+                  📍 {featureLabel(f)}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
-        <input
-          type="text"
-          placeholder={`Travelling from ${originName}…`}
-          value={chosen ? query : query}
-          onChange={(e) => onChange(e.target.value)}
-          onFocus={() => { if (query.length >= 2) searchOrigin(query).then(setSuggestions) }}
-          style={{
-            flex: 1, padding: '16px 14px',
-            border: 'none', outline: 'none',
-            fontSize: 15, color: '#1C1C1A',
-            background: 'transparent',
-          }}
-        />
-        <button
-          onClick={onOpenWizard}
-          style={{
-            flexShrink: 0,
-            padding: '0 22px',
-            background: GREEN, border: 'none',
-            color: '#fff', fontSize: 14, fontWeight: 700,
-            cursor: 'pointer', letterSpacing: '-0.01em',
-            transition: 'background 0.15s',
-          }}
-          onMouseEnter={(e) => (e.currentTarget.style.background = '#2d5440')}
-          onMouseLeave={(e) => (e.currentTarget.style.background = GREEN)}
-        >
-          {loading ? '…' : "Let's plan →"}
-        </button>
       </div>
 
-      {suggestions.length > 0 && (
-        <div style={{
-          position: 'absolute', top: '100%', left: 0, right: 0,
-          marginTop: 6, borderRadius: 12,
-          background: '#fff', border: '1px solid var(--border)',
-          boxShadow: '0 12px 40px rgba(0,0,0,0.15)',
-          zIndex: 100, overflow: 'hidden',
-        }}>
-          {suggestions.map((f, i) => (
-            <button
-              key={i}
-              onClick={() => pick(f)}
-              style={{
-                width: '100%', padding: '11px 18px',
-                background: 'none', border: 'none',
-                textAlign: 'left', cursor: 'pointer',
-                fontSize: 14, color: '#1C1C1A',
-                borderBottom: i < suggestions.length - 1 ? '1px solid var(--border)' : 'none',
-                transition: 'background 0.1s',
-              }}
-              onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--bg-muted)')}
-              onMouseLeave={(e) => (e.currentTarget.style.background = 'none')}
-            >
-              <span style={{ fontWeight: 600 }}>{f.properties.name}</span>
-              {f.properties.city && (
-                <span style={{ color: '#8C8A87', marginLeft: 8 }}>
-                  {[f.properties.city, f.properties.state].filter(Boolean).join(', ')}
-                </span>
-              )}
-            </button>
-          ))}
+      {!isMobile && <div style={{ width: 1, background: 'var(--border)', alignSelf: 'stretch', margin: '10px 0' }} />}
+
+      {/* TO */}
+      <div ref={toRef} style={{ flex: 1, position: 'relative', display: 'flex', flexDirection: 'column', minWidth: 0, borderBottom: isMobile ? '1px solid var(--border)' : 'none' }}>
+        <div style={lbl}>To <span style={{ fontWeight: 400, fontSize: 9, color: '#9CA3AF', textTransform: 'none', letterSpacing: 0 }}>optional</span></div>
+        <div style={{ position: 'relative' }}>
+          <input style={{ ...inp, paddingRight: toChosen ? 36 : undefined }} placeholder="Anywhere in Victoria…"
+            value={toChosen ? toChosen.name : toQuery}
+            onChange={(e) => { setToChosen(null); onToChange(e.target.value) }}
+            onFocus={() => { if (toQuery.length >= 2 && !toChosen) setToSuggestions(searchDestinations(toQuery)) }}
+          />
+          {toChosen && (
+            <button onClick={() => { setToChosen(null); setToQuery('') }} style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', background: '#F3F4F6', border: 'none', borderRadius: '50%', width: 20, height: 20, fontSize: 12, cursor: 'pointer', color: '#6B7280' }}>×</button>
+          )}
+          {toSuggestions.length > 0 && !toChosen && (
+            <div style={drop}>
+              {toSuggestions.map((s) => (
+                <button key={s.id} onClick={() => { setToChosen(s); setToQuery(s.name); setToSuggestions([]) }}
+                  style={{ width: '100%', padding: '11px 16px', background: 'none', border: 'none', textAlign: 'left', fontSize: 13.5, cursor: 'pointer', color: '#1C1B1F', display: 'block' }}
+                  onMouseEnter={(e) => (e.currentTarget.style.background = '#F5F4F1')}
+                  onMouseLeave={(e) => (e.currentTarget.style.background = 'none')}>
+                  📍 {s.name}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
-      )}
+      </div>
+
+      {/* Button */}
+      <button
+        onClick={() => onSearch({ name: fromChosen?.name ?? fromQuery, coord: fromChosen?.coord ?? null }, toChosen)}
+        style={{
+          flexShrink: 0,
+          padding: isMobile ? '14px 24px' : '0 24px',
+          background: GREEN, border: 'none', color: '#fff',
+          fontSize: 14, fontWeight: 700, cursor: 'pointer',
+          borderRadius: isMobile ? '0 0 18px 18px' : '0 18px 18px 0',
+          letterSpacing: '-0.01em', whiteSpace: 'nowrap',
+        }}
+        onMouseEnter={(e) => (e.currentTarget.style.background = '#2d5440')}
+        onMouseLeave={(e) => (e.currentTarget.style.background = GREEN)}
+      >
+        {toChosen ? 'Plan this →' : "Let's go →"}
+      </button>
     </div>
   )
 }
 
-// ── Rotating Victoria highlights ─────────────────────────────────────
-
-const VICTORIA_HIGHLIGHTS = [
-  'hundreds of little penguins waddling ashore at Phillip Island at dusk?',
-  'wildflowers blanketing the Grampians from every ridge and gully in spring?',
-  'dozens of wild koalas in the roadside gums at Kennett River on the Great Ocean Road?',
-  'wombats grazing fearlessly around your tent at Wilson\'s Promontory at dusk?',
-  'southern right whales nursing their calves from the clifftop at Logans Beach?',
-  'the Ovens River in Bright in May — Japanese maples and elms turning red and gold?',
-  'misty vineyard rows in the Yarra Valley just after an autumn rain?',
-  'steam rising from open-air mineral pools at Peninsula Hot Springs under a winter sky?',
-  'a genuine 1860s paddle steamer churning up the Murray at Echuca?',
-  'the sunrise from Boroka Lookout — the entire Grampians spread below you?',
-  'Australia\'s largest fur seal colony just a short walk from Cape Bridgewater?',
-  'king parrots eating from your hand at Grants Picnic Ground in the Dandenongs?',
-  'Beechworth\'s intact gold-rush granite streetscape — unchanged since the 1860s?',
-  'wild dolphins leaping through the waves off Sorrento on a summer morning?',
-  'the Twelve Apostles at golden hour, limestone stacks rising from the Southern Ocean?',
-  'glow-worms turning the cave ceiling at Buchan into a galaxy of cool blue-green light?',
-  'platypus feeding at dusk in the clear pools near Mount Beauty — barely making a ripple?',
-  'Loch Ard Gorge before sunrise — ochre cliffs flushing pink before the crowds arrive?',
-  'sea eagles circling above the Murray at Barmah on a perfectly still autumn morning?',
-  'the King Valley Prosecco Road in autumn — Italian winemakers, chestnut trees, and long lunch tables?',
-  'Cape Otway lighthouse stark white against a building storm — the oldest on mainland Australia?',
-  'snow gums draped in ice crystals after a High Country snowfall, the silence total and absolute?',
-  'the panorama from Arthurs Seat — the entire Mornington Peninsula and bay laid out below you?',
-  'the Prom at low tide, Squeaky Beach sand creaking underfoot, not another soul in sight?',
-  'hot air balloons drifting over the Yarra Valley at first light — baskets skimming the mist?',
-]
-
 // ── Main landing page ─────────────────────────────────────────────────
 
-export function LandingPage() {
+// ── Seasonal watercolour corner washes ───────────────────────────────
+// Dark pigment anchored at top-left and bottom-right, bleeding to white at centre.
+// Each season has two corner colours (they can differ slightly for depth).
+
+const CORNER_PALETTES: Record<string, { c1: string[]; c2: string[] }> = {
+  // Autumn: burnt sienna, amber, deep rust — Victorian deciduous foliage
+  autumn: {
+    c1: ['#8B2500', '#B84010', '#D4600A', '#C03008'],
+    c2: ['#7A1E00', '#A03808', '#C85010', '#B02808'],
+  },
+  // Winter: deep slate indigo, midnight blue — misty ranges and frost
+  winter: {
+    c1: ['#0D1F3C', '#162A50', '#1E3460', '#0A1830'],
+    c2: ['#0A1A30', '#122240', '#1A2C50', '#081428'],
+  },
+  // Spring: wattle gold, wildflower pink, sage — Grampians bloom
+  spring: {
+    c1: ['#7B4F00', '#A06800', '#C88800', '#8E5C00'],
+    c2: ['#7A1E50', '#A03068', '#C04880', '#8A2258'],
+  },
+  // Summer: terracotta, dry ochre, burnt clay — hot Victorian bush
+  summer: {
+    c1: ['#5C2000', '#7A3010', '#9A4818', '#6E2808'],
+    c2: ['#4A1800', '#682808', '#884018', '#5A2008'],
+  },
+}
+
+function SeasonalWatercolour({ season }: { season: string }) {
+  const { c1, c2 } = CORNER_PALETTES[season] ?? CORNER_PALETTES.autumn
+
+  // Each corner: stack several radial-gradient divs with varying radius/offset
+  // to simulate pigment pooling and feathering into white paper
+  const topLeft = [
+    { colors: c1, rx: '55%', ry: '50%', ox: '-8%', oy: '-10%', opacity: 0.32 },
+    { colors: c1, rx: '42%', ry: '38%', ox: '-14%', oy: '-16%', opacity: 0.22 },
+    { colors: c1, rx: '28%', ry: '24%', ox: '-18%', oy: '-20%', opacity: 0.16 },
+  ]
+  const bottomRight = [
+    { colors: c2, rx: '55%', ry: '50%', ox: '108%', oy: '110%', opacity: 0.28 },
+    { colors: c2, rx: '42%', ry: '38%', ox: '114%', oy: '116%', opacity: 0.20 },
+    { colors: c2, rx: '28%', ry: '24%', ox: '118%', oy: '120%', opacity: 0.14 },
+  ]
+
+  const renderWash = (layers: typeof topLeft) =>
+    layers.map((layer, li) =>
+      layer.colors.map((color, ci) => {
+        const jitterX = (ci % 2) * 3 - 1
+        const jitterY = ((ci + li) % 2) * 4 - 2
+        return (
+          <div key={`${li}-${ci}`} style={{
+            position: 'absolute', inset: 0,
+            background: `radial-gradient(ellipse ${layer.rx} ${layer.ry} at calc(${layer.ox} + ${jitterX}px) calc(${layer.oy} + ${jitterY}px), ${color} 0%, ${color}99 18%, ${color}44 38%, ${color}11 58%, transparent 72%)`,
+            opacity: layer.opacity * (0.85 - ci * 0.15),
+            filter: `blur(${4 + ci * 3 + li * 2}px)`,
+            mixBlendMode: 'multiply',
+          }} />
+        )
+      })
+    )
+
+  return (
+    <div aria-hidden style={{ position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 0, overflow: 'hidden' }}>
+      {renderWash(topLeft)}
+      {renderWash(bottomRight)}
+    </div>
+  )
+}
+
+export function LandingPage({ onPrivacy }: { onPrivacy?: () => void } = {}) {
   const { clusters: rawClusters } = useClusters()
   const clusters = [...rawClusters].sort(
     (a, b) => (b.seasonalScores[season] ?? 0) - (a.seasonalScores[season] ?? 0)
@@ -217,10 +416,27 @@ export function LandingPage() {
     [],
   )
 
-  const handleOriginSelect = (name: string, coord: { lng: number; lat: number }) => {
-    setTripPlanState({ originName: name, originCoord: coord })
+  const handleSearch = useCallback((
+    origin: { name: string; coord: { lat: number; lng: number } | null },
+    dest: SubDestResult | null,
+  ) => {
+    const originCoord = origin.coord ?? { lat: -37.8136, lng: 144.9631 }
+    const name = origin.name || 'Melbourne'
+
+    // Always store the origin
+    setTripPlanState({ originName: name, originCoord })
     setOriginSet(true)
-  }
+
+    if (dest) {
+      // Pre-fill dest so wizard uses preselected mode (skips how-far + pick-spot steps)
+      const preset = { corridorId: dest.clusterSlug, destId: dest.id, destName: dest.name, destCoord: { lat: dest.lat, lng: dest.lng } }
+      setPreselectedDest(preset)
+      setTripPlanState({ destId: dest.id, destName: dest.name, destCoord: { lat: dest.lat, lng: dest.lng }, selectedCorridorId: dest.clusterSlug })
+    } else {
+      setPreselectedDest(null)
+    }
+    setWizardOpen(true)
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const openWizard = () => {
     setPreselectedDest(null)
@@ -250,22 +466,21 @@ export function LandingPage() {
       background: 'var(--bg-base)',
       color: 'var(--text-primary)',
       overflowX: 'hidden',
+      position: 'relative',
     }}>
 
       {/* ── Nav ─────────────────────────── */}
       <nav style={{
         position: 'sticky', top: 0, zIndex: 50,
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: '0 28px', height: 56,
-        background: 'rgba(248,247,244,0.92)',
-        backdropFilter: 'blur(12px)',
-        borderBottom: '1px solid var(--border)',
+        padding: '0 28px', height: 60,
+        background: 'rgba(255,255,255,0.82)',
+        backdropFilter: 'blur(24px) saturate(1.2)',
+        WebkitBackdropFilter: 'blur(24px) saturate(1.2)',
+        borderBottom: '1px solid rgba(0,0,0,0.07)',
+        boxShadow: '0 1px 0 rgba(0,0,0,0.04)',
       }}>
-        <div style={{
-          fontFamily: "'Fraunces', Georgia, serif",
-          fontSize: 16, fontWeight: 700,
-          color: '#1C1C1A', lineHeight: 1.2, letterSpacing: '-0.02em',
-        }}>
+        <div style={{ fontFamily: "'Fraunces', Georgia, serif", fontSize: 16, fontWeight: 700, color: '#1C1C1A', lineHeight: 1.2, letterSpacing: '-0.02em' }}>
           Unplanned<span style={{ color: GREEN }}> Escapes</span>
           <span style={{ color: '#8C8A87', fontWeight: 400, fontSize: 13 }}> Victoria</span>
         </div>
@@ -283,9 +498,12 @@ export function LandingPage() {
       <section style={{
         padding: '72px 24px 60px',
         textAlign: 'center',
-        background: `linear-gradient(170deg, ${seasonMeta.palette.from}14 0%, transparent 60%)`,
+        position: 'relative',
         borderBottom: '1px solid var(--border)',
+        background: 'var(--bg-base)',
       }}>
+        <SeasonalWatercolour season={season} />
+        <div style={{ position: 'relative', zIndex: 1 }}>
         <h1 style={{
           fontFamily: "'Fraunces', Georgia, serif",
           fontSize: 'clamp(24px, 4vw, 46px)',
@@ -303,8 +521,8 @@ export function LandingPage() {
           Explore what Victoria has to offer.
         </p>
 
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
-          <OriginSearchBox onSelect={handleOriginSelect} onOpenWizard={openWizard} />
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12, width: '100%' }}>
+          <FromToSearch onSearch={handleSearch} />
           <button
             onClick={() => document.getElementById('clusters')?.scrollIntoView({ behavior: 'smooth' })}
             style={{
@@ -337,6 +555,7 @@ export function LandingPage() {
             </div>
           ))}
         </div>
+        </div>{/* end z-index wrapper */}
       </section>
 
       {/* ── Cluster cards grid ────────────── */}
@@ -375,17 +594,34 @@ export function LandingPage() {
 
       {/* ── Footer ─────────────────────── */}
       <footer style={{
-        borderTop: '1px solid var(--border)',
-        padding: '20px 28px',
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        flexWrap: 'wrap', gap: 12,
-        background: '#fff',
+        background: GREEN,
+        padding: '32px 28px 24px',
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <LogoMark size={24} />
-          <span style={{ fontSize: 12, color: '#8C8A87' }}>Unplanned Escapes — Victorian weekend getaways</span>
+        <div style={{ maxWidth: 1100, margin: '0 auto' }}>
+          {/* Top row */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 16, marginBottom: 24 }}>
+            <div style={{ fontFamily: "'Fraunces', Georgia, serif", fontSize: 16, fontWeight: 700, color: '#fff', letterSpacing: '-0.02em', lineHeight: 1.2 }}>
+              Unplanned Escapes
+              <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.55)', letterSpacing: '0.09em', textTransform: 'uppercase', fontWeight: 500, marginTop: 1 }}>Victoria</div>
+            </div>
+            <div style={{ display: 'flex', gap: 20, alignItems: 'center' }}>
+              <button onClick={onPrivacy} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.7)', fontSize: 12.5, cursor: 'pointer', padding: 0, letterSpacing: '-0.01em' }}>
+                Privacy &amp; Data
+              </button>
+              <span style={{ color: 'rgba(255,255,255,0.2)' }}>·</span>
+              <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)' }}>Maps © OpenStreetMap · © CARTO</span>
+            </div>
+          </div>
+          {/* Bottom row */}
+          <div style={{ borderTop: '1px solid rgba(255,255,255,0.12)', paddingTop: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
+            <span style={{ fontSize: 11.5, color: 'rgba(255,255,255,0.5)' }}>
+              Helping Victorians escape, one weekend at a time.
+            </span>
+            <span style={{ fontSize: 11.5, color: 'rgba(255,255,255,0.5)' }}>
+              Created by <span style={{ color: 'rgba(255,255,255,0.8)', fontWeight: 600 }}>Cubix IT Solutions</span>
+            </span>
+          </div>
         </div>
-        <div style={{ fontSize: 11, color: '#8C8A87' }}>Maps © OpenStreetMap · © CARTO</div>
       </footer>
     </div>
   )
@@ -539,10 +775,12 @@ function ClusterCard({
 }) {
   const [selectedSubIdx, setSelectedSubIdx] = useState(0)
   const [imgError, setImgError] = useState(false)
+  const storedOriginName = useAppStore((s) => s.originName)
   const score = cluster.seasonalScores[season as keyof typeof cluster.seasonalScores]
   const isGreat = score >= 9
   const isGood = score >= 7
   const selectedSub = cluster.subDests[selectedSubIdx]
+  const driveOriginLabel = storedOriginName ? storedOriginName.split(',')[0] : 'Melbourne'
 
   return (
     <div style={{
@@ -601,7 +839,7 @@ function ClusterCard({
           backdropFilter: 'blur(6px)',
           fontSize: 11, fontWeight: 600, color: '#fff',
         }}>
-          {cluster.driveTimeRange} from Melbourne
+          {cluster.driveTimeRange} from {driveOriginLabel}
         </div>
 
         {/* Text overlay — bottom */}

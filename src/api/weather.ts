@@ -10,7 +10,7 @@ export async function fetchWeatherForCoord(
   url.searchParams.set('longitude', String(coord.lng))
   url.searchParams.set('daily', 'temperature_2m_max,temperature_2m_min,precipitation_probability_max,weathercode')
   url.searchParams.set('forecast_days', String(days))
-  url.searchParams.set('timezone', 'Australia/Darwin')
+  url.searchParams.set('timezone', 'Australia/Melbourne')
 
   const res = await fetch(url.toString())
   if (!res.ok) throw new Error('Weather fetch failed')

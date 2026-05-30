@@ -3,7 +3,7 @@ import logoSrc from '@/assets/logo.png'
 
 const GREEN = '#3A6B4F'
 
-export function LogoMark({ size = 40 }: { size?: number }) {
+export function LogoMark({ size = 56 }: { size?: number }) {
   return (
     <img
       src={logoSrc}
@@ -22,35 +22,23 @@ export function Header() {
     <header style={{
       display: 'flex', alignItems: 'center', justifyContent: 'space-between',
       padding: '0 24px',
-      height: 56,
-      background: '#fff',
-      borderBottom: '1px solid var(--border)',
+      height: 64,
+      background: 'rgba(255,255,255,0.82)',
+      backdropFilter: 'blur(24px) saturate(1.2)',
+      WebkitBackdropFilter: 'blur(24px) saturate(1.2)',
+      borderBottom: '1px solid rgba(0,0,0,0.07)',
+      boxShadow: '0 1px 0 rgba(0,0,0,0.04)',
       zIndex: 10, flexShrink: 0,
     }}>
       {/* Logo + wordmark — clicking goes home */}
       <button
         onClick={clearItinerary}
-        style={{ display: 'flex', alignItems: 'center', gap: 10, background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
+        style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
         title="Back to home"
       >
-        <LogoMark size={38} />
-        <div>
-          <div style={{
-            fontFamily: "'Fraunces', Georgia, serif",
-            fontSize: 16, fontWeight: 700,
-            color: '#1C1C1A',
-            lineHeight: 1.15, letterSpacing: '-0.02em',
-          }}>
-            Unplanned<span style={{ color: GREEN }}> Escapes</span>
-          </div>
-          <div style={{
-            fontSize: 9.5, color: '#8C8A87',
-            lineHeight: 1, marginTop: 2,
-            letterSpacing: '0.08em', textTransform: 'uppercase',
-            fontWeight: 500,
-          }}>
-            Victoria
-          </div>
+        <div style={{ fontFamily: "'Fraunces', Georgia, serif", fontSize: 16, fontWeight: 700, color: '#1C1C1A', lineHeight: 1.2, letterSpacing: '-0.02em' }}>
+          Unplanned<span style={{ color: GREEN }}> Escapes</span>
+          <span style={{ color: '#8C8A87', fontWeight: 400, fontSize: 13 }}> Victoria</span>
         </div>
       </button>
 

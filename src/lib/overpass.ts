@@ -94,8 +94,9 @@ const GP_LIVE_TYPE: Record<string, LivePOI['type']> = {
   scenic_spot: 'viewpoint', scenic_overlook: 'viewpoint',
   hiking_area: 'hiking', wilderness_area: 'hiking',
   campground: 'hiking', picnic_ground: 'viewpoint',
-  // Hotels/pubs that show up with wrong primary type
-  hotel: 'attraction',
+  // Hotels in regional Victoria = pub/dining venues
+  hotel: 'pub', resort_hotel: 'pub', motel: 'pub',
+  bed_and_breakfast: 'pub', lodging: 'pub',
 }
 
 interface GPlace {
@@ -183,10 +184,12 @@ function gPlacesToLivePOI(places: GPlace[]): LivePOI[] {
 
 async function fetchPlacesForLivePOIs(lat: number, lng: number): Promise<LivePOI[]> {
   try {
+    // Use 15km radius — covers rural towns where venues are sparse and spread out
+    const radius = 15000
     const [foodPlaces, actPlaces, naturePlaces] = await Promise.all([
-      fetchGPlaces(lat, lng, 'food'),
-      fetchGPlaces(lat, lng, 'activities'),
-      fetchGPlaces(lat, lng, 'nature', 10000), // nature areas need wider radius
+      fetchGPlaces(lat, lng, 'food', radius),
+      fetchGPlaces(lat, lng, 'activities', radius),
+      fetchGPlaces(lat, lng, 'nature', 20000), // nature areas need even wider radius
     ])
     const all: GPlace[] = [...foodPlaces, ...actPlaces, ...naturePlaces]
     return gPlacesToLivePOI(all)
@@ -251,7 +254,7 @@ export async function fetchLivePOIs(cacheKey: string, lat: number, lng: number):
 
     // Overpass: authoritative for natural geography, trails, viewpoints
     (async (): Promise<LivePOI[]> => {
-      const rBig = 5000
+      const rBig = 15000
       const query = `[out:json][timeout:25];
 (
   nwr["tourism"~"^(viewpoint|attraction|museum)$"]["name"](around:${rBig},${lat},${lng});

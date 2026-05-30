@@ -1,18 +1,19 @@
 import { useState, useEffect } from 'react'
 import { Toaster } from 'react-hot-toast'
 import { Header } from '@/components/layout/Header'
-import { ItineraryTimelinePanel } from '@/components/layout/ItineraryTimelinePanel'
 import { MapContainer } from '@/components/map/MapContainer'
+import { FloatingTimeline } from '@/components/planner/FloatingTimeline'
 import { ProfileWizard } from '@/components/wizard/ProfileWizard'
 import { LandingPage } from '@/components/landing/LandingPage'
-import { LoadingScreen } from '@/components/LoadingScreen'
+import { PrivacyPage } from '@/components/PrivacyPage'
 import { ExperiencePanel } from '@/components/planner/ExperiencePanel'
 import { MobilePlanner } from '@/components/planner/MobilePlanner'
 import { PlannerMetrics } from '@/components/planner/PlannerMetrics'
+import { TripSummaryPanel } from '@/components/planner/TripSummaryPanel'
 import { useOfflineSync } from '@/hooks/useOfflineSync'
 import { useAppStore } from '@/store/useAppStore'
 
-type View = 'loading' | 'landing' | 'planner'
+type View = 'landing' | 'planner' | 'privacy'
 
 function useIsMobile() {
   const [mobile, setMobile] = useState(() => window.innerWidth < 768)
@@ -42,23 +43,17 @@ function App() {
   const isMobile = useIsMobile()
   const isWide   = useIsWide()
 
-  const [view, setView] = useState<View>('loading')
+  const [view, setView] = useState<View>(() => activeItinerary ? 'planner' : 'landing')
 
   useEffect(() => {
     if (activeItinerary) setView('planner')
+    else setView('landing')
   }, [activeItinerary])
-
-  useEffect(() => {
-    if (!activeItinerary && view !== 'loading') setView('landing')
-  }, [activeItinerary]) // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <>
-      {view === 'loading' && (
-        <LoadingScreen onDone={() => setView(activeItinerary ? 'planner' : 'landing')} />
-      )}
-
-      {view === 'landing' && <LandingPage />}
+      {view === 'landing' && <LandingPage onPrivacy={() => setView('privacy')} />}
+      {view === 'privacy' && <PrivacyPage onBack={() => setView('landing')} />}
 
       {view === 'planner' && (
         isMobile ? (
@@ -68,7 +63,7 @@ function App() {
             <MobilePlanner />
           </div>
         ) : isWide ? (
-          /* ── 3-Column Command Center (≥1280px) ── */
+          /* ── 2-Column Wide (≥1280px) ── */
           <div style={{
             display: 'flex', flexDirection: 'column', height: '100vh',
             background: '#F8F7F4', color: 'var(--text-primary)', overflow: 'hidden',
@@ -76,27 +71,22 @@ function App() {
             <Header />
             <div style={{ flex: 1, display: 'flex', overflow: 'hidden', minHeight: 0 }}>
 
-              {/* Col 1 — Itinerary Timeline (20%) */}
-              <div style={{ flex: '0 0 20%', minHeight: 0, overflow: 'hidden' }}>
-                <ItineraryTimelinePanel />
-              </div>
-
-              {/* Col 2 — Experience Discovery (50%) */}
+              {/* Col 1 — Experience Discovery (65%) */}
               <div style={{
-                flex: '0 0 50%', display: 'flex', flexDirection: 'column',
+                flex: '0 0 65%', display: 'flex', flexDirection: 'column',
                 overflow: 'hidden', minHeight: 0, borderRight: '1px solid var(--border)',
               }}>
                 <ExperiencePanel hideTimeline />
               </div>
 
-              {/* Col 3 — Map + Metrics (30%) */}
+              {/* Col 2 — Map (floating timeline) + Trip Summary + Metrics (35%) */}
               <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
-                <div style={{ flex: '0 0 65%', position: 'relative', minHeight: 0 }}>
+                <div style={{ flex: 1, position: 'relative', minHeight: 0 }}>
                   <MapContainer />
+                  <FloatingTimeline />
                 </div>
-                <div style={{ flex: '0 0 35%', overflow: 'hidden' }}>
-                  <PlannerMetrics />
-                </div>
+                <TripSummaryPanel />
+                <PlannerMetrics />
               </div>
 
             </div>
@@ -119,11 +109,13 @@ function App() {
                 <ExperiencePanel />
               </div>
 
-              {/* Map panel — 38% */}
+              {/* Map panel — 38%: Map (floating timeline) + Trip Summary + Metrics */}
               <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
                 <div style={{ flex: 1, position: 'relative', minHeight: 0 }}>
                   <MapContainer />
+                  <FloatingTimeline />
                 </div>
+                <TripSummaryPanel />
                 <PlannerMetrics />
               </div>
             </div>

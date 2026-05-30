@@ -1,11 +1,13 @@
 import { useState, useEffect } from 'react'
-import { fetchLivePOIs, fetchWikipediaThumb, fetchWikipediaSummary, type LivePOI } from '@/lib/overpass'
+import { fetchWikipediaThumb, fetchWikipediaSummary } from '@/lib/overpass'
 import { fetchWeatherForCoord } from '@/api/weather'
 import type { Activity } from '@/data/victorianActivities'
 import { useAppStore } from '@/store/useAppStore'
+import { supabase } from '@/lib/supabase'
 
 const GREEN = '#3A6B4F'
 const WARM = '#B87333'
+const PREVIEW_LIMIT = 5
 
 interface SubDest {
   id: string
@@ -13,10 +15,7 @@ interface SubDest {
   coord: { lat: number; lng: number }
 }
 
-interface AISummary {
-  summary: string | null
-  bestFor: string[]
-}
+interface AISummary { summary: string | null; bestFor: string[] }
 
 const SUIT_EMOJI: Record<string, string> = {
   'Couples': '❤️', 'Families': '👨‍👩‍👧', 'Solo travellers': '🧍',
@@ -25,30 +24,35 @@ const SUIT_EMOJI: Record<string, string> = {
   'Adventure seekers': '🏃',
 }
 
-type FoodTab = 'all' | 'cafes' | 'dining' | 'pubs' | 'fast_food' | 'wineries'
-
-const FOOD_TABS: { key: FoodTab; label: string; emoji: string; types: LivePOI['type'][] }[] = [
-  { key: 'all',       label: 'All',      emoji: '🗺',  types: ['cafe','restaurant','pub','fast_food','bakery','winery'] },
-  { key: 'cafes',     label: 'Cafes',    emoji: '☕',  types: ['cafe', 'bakery'] },
-  { key: 'dining',    label: 'Dining',   emoji: '🍽',  types: ['restaurant'] },
-  { key: 'pubs',      label: 'Pubs',     emoji: '🍺',  types: ['pub'] },
-  { key: 'fast_food', label: 'Takeaway', emoji: '🥡',  types: ['fast_food'] },
-  { key: 'wineries',  label: 'Wineries', emoji: '🍷',  types: ['winery'] },
-]
-
-const POI_EMOJI: Record<LivePOI['type'], string> = {
-  cafe: '☕', restaurant: '🍽', pub: '🍺', fast_food: '🥡', bakery: '🥐', winery: '🍷',
-  viewpoint: '👁', attraction: '🏛', hiking: '🥾',
+const CAT_EMOJI: Record<string, string> = {
+  nature: '🌿', viewpoint: '🌄', history: '🏛️', art: '🎨', active: '🏄',
+  wildlife: '🦘', relaxation: '🧖', drink: '🍷', entertainment: '🎵',
+  beach: '🏖️', wellness: '♨️', family: '👨‍👩‍👧', markets: '🛒',
 }
 
-function weatherEmoji(description: string): string {
-  if (description === 'Clear sky') return '☀️'
-  if (description === 'Partly cloudy') return '⛅'
-  if (description === 'Foggy') return '🌫️'
-  if (description === 'Rainy' || description === 'Showers') return '🌧️'
-  if (description === 'Snowfall') return '❄️'
-  if (description === 'Thunderstorm') return '⛈️'
+const FOOD_CAT_EMOJI: Record<string, string> = {
+  Restaurant: '🍽', Cafe: '☕', Winery: '🍷', Brewery: '🍺',
+  Distillery: '🥃', Pub: '🍺', Bakery: '🥐', Bar: '🍸', Other: '🍴',
+}
+
+function weatherEmoji(d: string): string {
+  if (d === 'Clear sky') return '☀️'
+  if (d === 'Partly cloudy') return '⛅'
+  if (d === 'Foggy') return '🌫️'
+  if (d === 'Rainy' || d === 'Showers') return '🌧️'
+  if (d === 'Snowfall') return '❄️'
+  if (d === 'Thunderstorm') return '⛈️'
   return '🌤️'
+}
+
+interface DbActivity {
+  activity_id: number; name: string; category: string; emoji: string
+  description: string; duration: string; cost: string; kids_ok: boolean
+  is_hidden_gem: boolean; maps_url: string
+}
+interface DbFood {
+  food_place_id: number; name: string; category: string
+  address: string | null; attributes: Record<string, unknown>
 }
 
 export function DestinationModal({
@@ -56,123 +60,135 @@ export function DestinationModal({
 }: {
   sub: SubDest
   driveLabel: string
-  activities: Activity[]
+  activities: Activity[]     // static curated — kept for deriveSuitability fallback
   onPlan: () => void
   onClose: () => void
 }) {
   const userProfile = useAppStore((s) => s.userProfile)
-  const [livePOIs, setLivePOIs] = useState<LivePOI[] | null>(null)
   const [heroImg, setHeroImg] = useState<string | null>(null)
   const [aiSummary, setAiSummary] = useState<AISummary | null>(null)
-  const [loading, setLoading] = useState(true)
+  const [summaryLoading, setSummaryLoading] = useState(true)
   const [weather, setWeather] = useState<{ emoji: string; max: number; min: number } | null>(null)
-  const [foodTab, setFoodTab] = useState<FoodTab>('all')
   const [mainTab, setMainTab] = useState<'overview' | 'food' | 'activities'>('overview')
 
-  // MOD-04 speed fix: AI summary starts as soon as wiki arrives, POIs load independently
+  // Supabase data
+  const [dbActivities, setDbActivities] = useState<DbActivity[]>([])
+  const [dbFood, setDbFood] = useState<DbFood[]>([])
+  const [_subDestId, setSubDestId] = useState<number | null>(null)
+  const [dbLoading, setDbLoading] = useState(true)
+
+  // Resolve slug → sub_dest_id, then fetch activities + food + summary from Supabase
   useEffect(() => {
     let cancelled = false
-    setLoading(true)
-    setLivePOIs(null)
+    setDbLoading(true)
+    setDbActivities([])
+    setDbFood([])
     setAiSummary(null)
+    setSummaryLoading(true)
     setHeroImg(null)
 
-    const poiP   = fetchLivePOIs(sub.id, sub.coord.lat, sub.coord.lng)
-    const thumbP = fetchWikipediaThumb(sub.id, sub.name)
-    const wikiP  = fetchWikipediaSummary(sub.id, sub.name)
+    async function load() {
+      // 1. Wikipedia thumbnail (fast, good photos)
+      fetchWikipediaThumb(sub.id, sub.name)
+        .then((t) => { if (!cancelled && t) setHeroImg(t) })
+        .catch(() => {})
 
-    poiP.then((pois) => { if (!cancelled) setLivePOIs(pois) })
-        .catch(() => { if (!cancelled) setLivePOIs([]) })
+      // 2. Supabase data
+      if (supabase) {
+        const { data: sdRow } = await supabase
+          .from('sub_destinations')
+          .select('sub_dest_id')
+          .eq('slug', sub.id)
+          .single()
 
-    thumbP.then((thumb) => { if (!cancelled && thumb) setHeroImg(thumb) })
+        if (!cancelled && sdRow) {
+          const id = sdRow.sub_dest_id
+          setSubDestId(id)
 
-    wikiP
-      .then((wiki) => {
-        if (cancelled) return
-        const params = new URLSearchParams({ dest: sub.name })
-        if (wiki) params.set('wiki', wiki.slice(0, 400))
-        if (userProfile?.has_kids) params.set('hasKids', 'true')
-        if (userProfile?.preferred_vibe?.length) {
-          params.set('interests', userProfile.preferred_vibe.join(','))
-        }
-        const aiCtrl = new AbortController()
-        const aiTimeout = setTimeout(() => aiCtrl.abort(), 8000)
-        return fetch(`/api/destination-summary?${params}`, { signal: aiCtrl.signal })
-          .then((r) => r.json())
-          .then((data: AISummary) => {
-            clearTimeout(aiTimeout)
-            if (!cancelled) { setAiSummary(data); setLoading(false) }
-          })
-          .catch(() => {
-            clearTimeout(aiTimeout)
-            if (!cancelled) {
-              setAiSummary({ summary: wiki, bestFor: deriveSuitability(activities) })
-              setLoading(false)
+          const [actsRes, foodRes, summaryRes] = await Promise.all([
+            supabase.from('activities').select('activity_id,name,category,emoji,description,duration,cost,kids_ok,is_hidden_gem,maps_url').eq('sub_dest_id', id).order('is_hidden_gem', { ascending: false }).limit(100),
+            supabase.from('food_places').select('food_place_id,name,category,address,attributes').eq('sub_dest_id', id).limit(100),
+            supabase.from('destination_summaries').select('ai_summary,best_for').eq('sub_dest_id', id).single(),
+          ])
+
+          if (!cancelled) {
+            setDbActivities((actsRes.data ?? []) as DbActivity[])
+            setDbFood((foodRes.data ?? []) as DbFood[])
+            setDbLoading(false)
+
+            if (summaryRes.data?.ai_summary) {
+              setAiSummary({ summary: summaryRes.data.ai_summary, bestFor: summaryRes.data.best_for ?? [] })
+              setSummaryLoading(false)
+            } else {
+              // Fallback: fetch from live Claude endpoint
+              fetchFromClaude(sub, userProfile, activities, cancelled, setAiSummary, setSummaryLoading)
             }
-          })
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setAiSummary({ summary: null, bestFor: deriveSuitability(activities) })
-          setLoading(false)
+          }
+        } else {
+          // No Supabase row — fall back to live Overpass + Claude
+          if (!cancelled) setDbLoading(false)
+          fetchWikipediaSummary(sub.id, sub.name)
+            .then((wiki) => {
+              if (!cancelled) fetchFromClaude(sub, userProfile, activities, cancelled, setAiSummary, setSummaryLoading, wiki ?? undefined)
+            })
+            .catch(() => { if (!cancelled) setSummaryLoading(false) })
         }
+      } else {
+        if (!cancelled) setDbLoading(false)
+        setSummaryLoading(false)
+      }
+    }
+
+    load().catch(() => { if (!cancelled) { setDbLoading(false); setSummaryLoading(false) } })
+
+    // Weather
+    fetchWeatherForCoord(sub.coord, 3)
+      .then((days) => {
+        const today = days[0]
+        if (today && !cancelled) setWeather({ emoji: weatherEmoji(today.description), max: Math.round(today.temp_max_c), min: Math.round(today.temp_min_c) })
       })
+      .catch(() => {})
 
     return () => { cancelled = true }
   }, [sub.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Weather for destination
-  useEffect(() => {
-    fetchWeatherForCoord(sub.coord, 3)
-      .then((days) => {
-        const today = days[0]
-        if (today) setWeather({ emoji: weatherEmoji(today.description), max: Math.round(today.temp_max_c), min: Math.round(today.temp_min_c) })
-      })
-      .catch(() => {})
-  }, [sub.coord.lat, sub.coord.lng]) // eslint-disable-line react-hooks/exhaustive-deps
+  const suitability = aiSummary?.bestFor?.length ? aiSummary.bestFor : deriveSuitability(activities, dbActivities)
 
-  const pois = livePOIs ?? []
-  const foodPOIs = pois.filter((p) => ['cafe', 'restaurant', 'pub', 'fast_food', 'bakery', 'winery'].includes(p.type))
-  const activityPOIs = pois.filter((p) => ['hiking', 'viewpoint', 'attraction'].includes(p.type))
-  const totalActivities = activities.length + activityPOIs.length
+  // Best 5 for preview + total counts
+  const previewActs = dbActivities.slice(0, PREVIEW_LIMIT)
+  const moreActsCount = Math.max(0, dbActivities.length - PREVIEW_LIMIT)
+  const previewFood = dbFood.slice(0, PREVIEW_LIMIT)
+  const moreFoodCount = Math.max(0, dbFood.length - PREVIEW_LIMIT)
 
-  const activeFoodTypes = FOOD_TABS.filter(
-    (t) => t.key === 'all' || foodPOIs.some((p) => t.types.includes(p.type))
-  )
-  const filteredFood = foodTab === 'all'
-    ? foodPOIs
-    : foodPOIs.filter((p) => FOOD_TABS.find((t) => t.key === foodTab)?.types.includes(p.type))
-
-  const suitability = aiSummary?.bestFor?.length ? aiSummary.bestFor : deriveSuitability(activities)
-
-  // Hide food/activities tabs if loaded with zero results
-  const tabsToShow = (['overview', 'food', 'activities'] as const).filter((tab) => {
-    if (tab === 'food') return livePOIs === null || foodPOIs.length > 0
-    if (tab === 'activities') return livePOIs === null || totalActivities > 0
-    return true
-  })
-  // Keep active tab valid if a tab disappears after loading
-  const activeTab = tabsToShow.includes(mainTab) ? mainTab : 'overview'
+  const isMobile = typeof window !== 'undefined' && window.innerWidth < 640
 
   return (
     <div
-      style={{ position: 'fixed', inset: 0, zIndex: 300, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}
+      style={{ position: 'fixed', inset: 0, zIndex: 300, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: isMobile ? 'flex-end' : 'center', justifyContent: 'center', padding: isMobile ? 0 : 16 }}
       onClick={onClose}
     >
-      <div
-        onClick={(e) => e.stopPropagation()}
-        style={{
-          background: '#fff', borderRadius: 20,
-          width: '100%', maxWidth: 840,  /* MOD-01: wider */
-          maxHeight: '90vh', display: 'flex', flexDirection: 'column',
-          boxShadow: '0 32px 80px rgba(0,0,0,0.22)',
-          overflow: 'hidden',
-        }}
-      >
-        {/* Hero image / gradient header — MOD-01: bigger */}
+      <div onClick={(e) => e.stopPropagation()} style={{
+        background: '#fff',
+        borderRadius: isMobile ? '20px 20px 0 0' : 20,
+        width: '100%', maxWidth: isMobile ? '100%' : 840,
+        height: isMobile ? '92dvh' : undefined,
+        maxHeight: isMobile ? '92dvh' : '90vh',
+        display: 'flex', flexDirection: 'column',
+        boxShadow: '0 32px 80px rgba(0,0,0,0.22)',
+        overflow: 'hidden',
+      }}>
+
+        {/* Drag handle — mobile only */}
+        {isMobile && (
+          <div style={{ display: 'flex', justifyContent: 'center', padding: '10px 0 4px', flexShrink: 0 }}>
+            <div style={{ width: 36, height: 4, borderRadius: 2, background: '#D1CFC9' }} />
+          </div>
+        )}
+
+        {/* Hero */}
         <div style={{
           position: 'relative',
-          height: heroImg ? 220 : 100,  /* MOD-01 */
+          height: heroImg ? 220 : 100,
           flexShrink: 0,
           background: heroImg
             ? `linear-gradient(to bottom, rgba(0,0,0,0.1), rgba(0,0,0,0.55)), url(${heroImg}) center/cover no-repeat`
@@ -180,18 +196,10 @@ export function DestinationModal({
           display: 'flex', flexDirection: 'column', justifyContent: 'flex-end',
           padding: '18px 20px',
         }}>
-          <button
-            onClick={onClose}
-            style={{ position: 'absolute', top: 14, right: 14, background: 'rgba(0,0,0,0.35)', border: 'none', borderRadius: 8, width: 32, height: 32, cursor: 'pointer', fontSize: 18, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-          >
-            ×
-          </button>
-          <div style={{ fontSize: 24, fontWeight: 800, color: '#fff', letterSpacing: '-0.02em', lineHeight: 1.2 }}>
-            {sub.name}
-          </div>
+          <button onClick={onClose} style={{ position: 'absolute', top: 14, right: 14, background: 'rgba(0,0,0,0.35)', border: 'none', borderRadius: 8, width: 32, height: 32, cursor: 'pointer', fontSize: 18, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>×</button>
+          <div style={{ fontSize: 24, fontWeight: 800, color: '#fff', letterSpacing: '-0.02em', lineHeight: 1.2 }}>{sub.name}</div>
           <div style={{ fontSize: 12.5, color: 'rgba(255,255,255,0.8)', marginTop: 3, display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
             <span>{driveLabel} drive · Victoria, AU</span>
-            {/* MOD-04: live weather in hero */}
             {weather && (
               <span style={{ display: 'flex', alignItems: 'center', gap: 4, background: 'rgba(0,0,0,0.25)', padding: '2px 8px', borderRadius: 8 }}>
                 {weather.emoji} {weather.max}°/{weather.min}°
@@ -200,43 +208,35 @@ export function DestinationModal({
           </div>
         </div>
 
-        {/* Tab bar — MOD-03: conditionally hide food tab */}
+        {/* Tabs */}
         <div style={{ display: 'flex', borderBottom: '1px solid var(--border)', background: '#fff', flexShrink: 0 }}>
-          {tabsToShow.map((tab) => (
-            <button
-              key={tab}
-              onClick={() => setMainTab(tab)}
-              style={{
-                flex: 1, padding: '11px 8px', border: 'none', background: 'none',
-                fontSize: 12.5, fontWeight: activeTab === tab ? 700 : 500,
-                color: activeTab === tab ? GREEN : 'var(--text-muted)',
-                borderBottom: activeTab === tab ? `2px solid ${GREEN}` : '2px solid transparent',
-                marginBottom: -1, cursor: 'pointer', transition: 'color 0.12s',
-                textTransform: 'capitalize',
-              }}
-            >
-              {tab === 'food' ? '🍽 Food & Drink' : tab === 'activities' ? '🏕 Activities' : '📍 Overview'}
+          {(['overview', 'activities', 'food'] as const).map((tab) => (
+            <button key={tab} onClick={() => setMainTab(tab)} style={{
+              flex: 1, padding: '11px 8px', border: 'none', background: 'none',
+              fontSize: 12.5, fontWeight: mainTab === tab ? 700 : 500,
+              color: mainTab === tab ? GREEN : 'var(--text-muted)',
+              borderBottom: mainTab === tab ? `2px solid ${GREEN}` : '2px solid transparent',
+              marginBottom: -1, cursor: 'pointer',
+            }}>
+              {tab === 'food' ? '🍽 Eat & Drink' : tab === 'activities' ? '🗺 Things to Do' : '📍 Overview'}
             </button>
           ))}
         </div>
 
-        {/* Scrollable content */}
+        {/* Content */}
         <div style={{ flex: 1, overflowY: 'auto', padding: '18px 20px', display: 'flex', flexDirection: 'column', gap: 16 }}>
 
-          {/* ── OVERVIEW TAB — MOD-04 restructured ── */}
-          {activeTab === 'overview' && (
+          {/* ── OVERVIEW ── */}
+          {mainTab === 'overview' && (
             <>
-              {/* Best For pills — ABOVE summary card */}
-              {!loading && suitability.length > 0 && (
+              {/* Best For */}
+              {!summaryLoading && suitability.length > 0 && (
                 <div>
-                  <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 10 }}>
-                    Best for
-                  </div>
+                  <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 10 }}>Best for</div>
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
                     {suitability.map((s) => (
                       <div key={s} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 14px', borderRadius: 20, background: 'var(--bg-base)', border: '1.5px solid var(--border)', fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>
-                        <span>{SUIT_EMOJI[s] ?? '•'}</span>
-                        <span>{s}</span>
+                        <span>{SUIT_EMOJI[s] ?? '•'}</span><span>{s}</span>
                       </div>
                     ))}
                   </div>
@@ -245,189 +245,127 @@ export function DestinationModal({
 
               {/* AI summary */}
               <div style={{ background: 'linear-gradient(135deg, #F5FAF7, #fff)', border: '1px solid rgba(58,107,79,0.15)', borderRadius: 14, padding: '14px 16px' }}>
-                {loading ? (
+                {summaryLoading ? (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
                       <span className="ai-sparkle" style={{ fontSize: 18 }}>✨</span>
-                      <span style={{ fontSize: 11, fontWeight: 700, color: GREEN, letterSpacing: '0.03em' }}>
-                        AI is crafting your tailored escape summary…
-                      </span>
+                      <span style={{ fontSize: 11, fontWeight: 700, color: GREEN }}>Curating local insights…</span>
                     </div>
                     <div className="ai-skeleton-line" style={{ height: 12, width: '92%' }} />
                     <div className="ai-skeleton-line" style={{ height: 12, width: '78%' }} />
-                    <div className="ai-skeleton-line" style={{ height: 12, width: '86%' }} />
                     <div className="ai-skeleton-line" style={{ height: 12, width: '65%' }} />
                   </div>
                 ) : aiSummary?.summary ? (
                   <>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
                       <span style={{ fontSize: 12 }}>✨</span>
-                      <div style={{ fontSize: 9.5, fontWeight: 700, color: GREEN, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
-                        About {sub.name.split('&')[0].trim()}
-                      </div>
+                      <div style={{ fontSize: 9.5, fontWeight: 700, color: GREEN, textTransform: 'uppercase', letterSpacing: '0.08em' }}>About {sub.name.split('&')[0].trim()}</div>
                     </div>
-                    <p style={{ fontSize: 13.5, color: '#333', lineHeight: 1.75, margin: 0 }}>
-                      {aiSummary.summary}
-                    </p>
+                    <p style={{ fontSize: 13.5, color: '#333', lineHeight: 1.75, margin: 0 }}>{aiSummary.summary}</p>
                   </>
                 ) : (
-                  <p style={{ fontSize: 13, color: 'var(--text-muted)', margin: 0 }}>
-                    Curating local insights…
-                  </p>
+                  <p style={{ fontSize: 13, color: 'var(--text-muted)', margin: 0 }}>No summary available yet.</p>
                 )}
               </div>
 
-              {/* Quick amenity icons */}
-              {pois.length > 0 && (
+              {/* Best 5 attractions preview */}
+              {(previewActs.length > 0 || dbLoading) && (
                 <div>
-                  <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 10 }}>
-                    What's available
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+                    <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Top Attractions</div>
+                    {moreActsCount > 0 && (
+                      <button onClick={() => setMainTab('activities')} style={{ fontSize: 11, fontWeight: 700, color: GREEN, background: 'none', border: 'none', cursor: 'pointer' }}>
+                        +{moreActsCount} more →
+                      </button>
+                    )}
                   </div>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-                    {[
-                      { type: 'cafe', emoji: '☕', label: 'Cafes' },
-                      { type: 'restaurant', emoji: '🍽', label: 'Restaurants' },
-                      { type: 'pub', emoji: '🍺', label: 'Pubs & Bars' },
-                      { type: 'winery', emoji: '🍷', label: 'Wineries' },
-                      { type: 'fast_food', emoji: '🥡', label: 'Takeaway' },
-                      { type: 'hiking', emoji: '🥾', label: 'Hiking' },
-                      { type: 'viewpoint', emoji: '👁', label: 'Scenic Views' },
-                      { type: 'attraction', emoji: '🏛', label: 'Attractions' },
-                    ].filter((a) => pois.some((p) => p.type === a.type)).map((a) => (
-                      <div
-                        key={a.type}
-                        style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5, padding: '10px 14px', borderRadius: 12, background: 'var(--bg-base)', border: '1px solid var(--border)', cursor: 'pointer', minWidth: 64 }}
-                        onClick={() => setMainTab(['cafe','restaurant','pub','winery','fast_food','bakery'].includes(a.type) ? 'food' : 'activities')}
-                      >
-                        <span style={{ fontSize: 24 }}>{a.emoji}</span>
-                        <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-muted)', textAlign: 'center', lineHeight: 1.2 }}>{a.label}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* MOD-04: Activity count button — no teasers */}
-              {totalActivities > 0 && !loading && (
-                <button
-                  onClick={() => setMainTab('activities')}
-                  style={{
-                    padding: '12px 16px', borderRadius: 12, width: '100%',
-                    background: 'var(--green-light)', border: `1.5px solid ${GREEN}40`,
-                    color: GREEN, fontSize: 13, fontWeight: 700, cursor: 'pointer',
-                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                    textAlign: 'left',
-                  }}
-                >
-                  <span>
-                    <span style={{ marginRight: 6 }}>🗺</span>
-                    {totalActivities} {totalActivities === 1 ? 'activity' : 'activities'} curated for this destination
-                  </span>
-                  <span style={{ fontSize: 12, opacity: 0.7 }}>View all →</span>
-                </button>
-              )}
-            </>
-          )}
-
-          {/* ── FOOD TAB ── */}
-          {activeTab === 'food' && (
-            <>
-              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                {activeFoodTypes.map((tab) => (
-                  <button
-                    key={tab.key}
-                    onClick={() => setFoodTab(tab.key)}
-                    style={{
-                      padding: '5px 12px', borderRadius: 8,
-                      background: foodTab === tab.key ? '#1C1C1A' : 'var(--bg-base)',
-                      color: foodTab === tab.key ? '#fff' : 'var(--text-muted)',
-                      border: `1.5px solid ${foodTab === tab.key ? '#1C1C1A' : 'var(--border)'}`,
-                      fontSize: 11.5, fontWeight: foodTab === tab.key ? 700 : 500,
-                      cursor: 'pointer', whiteSpace: 'nowrap',
-                    }}
-                  >
-                    {tab.emoji} {tab.label}
-                  </button>
-                ))}
-              </div>
-
-              {filteredFood.length === 0 ? (
-                <div style={{ textAlign: 'center', padding: '24px 0', color: 'var(--text-muted)', fontSize: 13 }}>
-                  {livePOIs === null ? 'Loading…' : 'No places found in this category'}
-                </div>
-              ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                  {filteredFood.map((poi) => <FoodCard key={poi.id} poi={poi} />)}
-                </div>
-              )}
-            </>
-          )}
-
-          {/* ── ACTIVITIES TAB ── */}
-          {activeTab === 'activities' && (
-            <>
-              {activities.length > 0 && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                  {activities.map((act) => (
-                    <div key={act.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 12, padding: '11px 14px', borderRadius: 12, background: act.isHiddenGem ? '#FFFBF5' : 'var(--bg-base)', border: `1.5px solid ${act.isHiddenGem ? 'rgba(184,115,51,0.25)' : 'var(--border)'}` }}>
-                      <span style={{ fontSize: 22, flexShrink: 0, lineHeight: 1.3 }}>{act.emoji}</span>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', marginBottom: 3 }}>
-                          <span style={{ fontSize: 13, fontWeight: 700, color: '#1C1C1A' }}>{act.name}</span>
-                          {act.isHiddenGem && <span style={{ fontSize: 10, fontWeight: 700, color: WARM, background: '#FFF5EB', padding: '1px 6px', borderRadius: 5 }}>Local gem</span>}
-                          {act.kidsOk && <span style={{ fontSize: 10, color: GREEN, background: 'var(--green-light)', padding: '1px 6px', borderRadius: 5, fontWeight: 600 }}>Kid Friendly</span>}
-                        </div>
-                        <p style={{ fontSize: 12, color: '#4A4948', lineHeight: 1.55, margin: 0 }}>{act.description}</p>
-                        <div style={{ display: 'flex', gap: 10, marginTop: 5, fontSize: 11, color: 'var(--text-muted)' }}>
-                          <span>⏱ {act.duration}</span>
-                          <span>{act.cost === 'free' ? '✓ Free' : act.cost}</span>
-                        </div>
-                      </div>
-                      <a href={act.mapsUrl} target="_blank" rel="noopener noreferrer" style={{ flexShrink: 0, fontSize: 11, fontWeight: 700, color: '#fff', background: '#1C1C1A', padding: '4px 10px', borderRadius: 7, textDecoration: 'none', marginTop: 2 }}>Maps ↗</a>
+                  {dbLoading ? (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                      {[1,2,3].map((i) => <div key={i} className="ai-skeleton-line" style={{ height: 44, borderRadius: 10 }} />)}
                     </div>
-                  ))}
-                </div>
-              )}
-
-              {activityPOIs.length > 0 && (
-                <>
-                  {activities.length > 0 && (
-                    <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.07em' }}>
-                      From OpenStreetMap
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                      {previewActs.map((a) => (
+                        <PreviewActivityRow key={a.activity_id} act={a} />
+                      ))}
                     </div>
                   )}
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                    {activityPOIs.map((poi) => (
-                      <div key={poi.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', borderRadius: 12, background: 'var(--bg-base)', border: '1px solid var(--border)' }}>
-                        <span style={{ fontSize: 20, flexShrink: 0 }}>{POI_EMOJI[poi.type]}</span>
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ fontSize: 13, fontWeight: 700, color: '#1C1C1A', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{poi.name}</div>
-                          {poi.routeLength && <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 1 }}>{poi.routeLength}</div>}
-                        </div>
-                        {poi.website && (
-                          <a href={poi.website.startsWith('http') ? poi.website : `https://${poi.website}`} target="_blank" rel="noopener noreferrer" style={{ fontSize: 11, fontWeight: 700, color: '#4285F4', textDecoration: 'none', flexShrink: 0 }}>Site ↗</a>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </>
-              )}
-
-              {activities.length === 0 && activityPOIs.length === 0 && (
-                <div style={{ textAlign: 'center', padding: '24px', color: 'var(--text-muted)', fontSize: 13 }}>
-                  {livePOIs === null ? 'Loading activities…' : 'No activities found for this destination'}
                 </div>
               )}
+
+              {/* Best 5 food preview */}
+              {(previewFood.length > 0 || dbLoading) && (
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+                    <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Best Places to Eat</div>
+                    {moreFoodCount > 0 && (
+                      <button onClick={() => setMainTab('food')} style={{ fontSize: 11, fontWeight: 700, color: GREEN, background: 'none', border: 'none', cursor: 'pointer' }}>
+                        +{moreFoodCount} more →
+                      </button>
+                    )}
+                  </div>
+                  {dbLoading ? (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                      {[1,2,3].map((i) => <div key={i} className="ai-skeleton-line" style={{ height: 44, borderRadius: 10 }} />)}
+                    </div>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                      {previewFood.map((f) => (
+                        <PreviewFoodRow key={f.food_place_id} food={f} />
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </>
+          )}
+
+          {/* ── THINGS TO DO ── */}
+          {mainTab === 'activities' && (
+            <>
+              {dbLoading && (
+                <div style={{ textAlign: 'center', padding: 24, color: 'var(--text-muted)', fontSize: 13 }}>Loading…</div>
+              )}
+              {!dbLoading && dbActivities.length === 0 && activities.length === 0 && (
+                <div style={{ textAlign: 'center', padding: 24, color: 'var(--text-muted)', fontSize: 13 }}>No activities found yet — check back after our daily refresh.</div>
+              )}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {/* Static curated first */}
+                {activities.map((act) => (
+                  <ActivityFullRow key={act.id} name={act.name} emoji={act.emoji} category={act.category} description={act.description} duration={act.duration} cost={act.cost} isHiddenGem={act.isHiddenGem} kidsOk={act.kidsOk} mapsUrl={act.mapsUrl} />
+                ))}
+                {/* DB activities (dedupe by name) */}
+                {(() => {
+                  const staticNames = new Set(activities.map((a) => a.name.toLowerCase()))
+                  return dbActivities
+                    .filter((a) => !staticNames.has(a.name.toLowerCase()))
+                    .map((a) => (
+                      <ActivityFullRow key={`db-${a.activity_id}`} name={a.name} emoji={a.emoji} category={a.category} description={a.description} duration={a.duration} cost={a.cost} isHiddenGem={a.is_hidden_gem} kidsOk={a.kids_ok} mapsUrl={a.maps_url} />
+                    ))
+                })()}
+              </div>
+            </>
+          )}
+
+          {/* ── EAT & DRINK ── */}
+          {mainTab === 'food' && (
+            <>
+              {dbLoading && (
+                <div style={{ textAlign: 'center', padding: 24, color: 'var(--text-muted)', fontSize: 13 }}>Loading…</div>
+              )}
+              {!dbLoading && dbFood.length === 0 && (
+                <div style={{ textAlign: 'center', padding: 24, color: 'var(--text-muted)', fontSize: 13 }}>No food places found yet — check back after our daily refresh.</div>
+              )}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {dbFood.map((f) => <FoodFullRow key={f.food_place_id} food={f} />)}
+              </div>
             </>
           )}
         </div>
 
-        {/* Sticky CTA */}
+        {/* CTA */}
         <div style={{ padding: '14px 20px', borderTop: '1px solid var(--border)', background: '#fff', flexShrink: 0 }}>
-          <button
-            onClick={onPlan}
-            style={{ width: '100%', padding: '14px', borderRadius: 12, background: GREEN, border: 'none', color: '#fff', fontSize: 15, fontWeight: 700, cursor: 'pointer', letterSpacing: '-0.01em' }}
-          >
+          <button onClick={onPlan} style={{ width: '100%', padding: '14px', borderRadius: 12, background: GREEN, border: 'none', color: '#fff', fontSize: 15, fontWeight: 700, cursor: 'pointer', letterSpacing: '-0.01em' }}>
             Plan this escape →
           </button>
         </div>
@@ -436,35 +374,139 @@ export function DestinationModal({
   )
 }
 
-function FoodCard({ poi }: { poi: LivePOI }) {
-  const mapsUrl = `https://www.google.com/maps/search/${encodeURIComponent(poi.name)}/@${poi.lat},${poi.lng},15z`
+// ── Row components ─────────────────────────────────────────────────────────────
+
+function PreviewActivityRow({ act }: { act: DbActivity }) {
+  const emoji = act.emoji || CAT_EMOJI[act.category] || '📍'
   return (
-    <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '11px 14px', borderRadius: 12, background: 'var(--bg-base)', border: '1px solid var(--border)' }}>
-      <span style={{ fontSize: 22, flexShrink: 0, lineHeight: 1.3 }}>{POI_EMOJI[poi.type]}</span>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderRadius: 10, background: 'var(--bg-base)', border: '1px solid var(--border)' }}>
+      <span style={{ fontSize: 20, flexShrink: 0 }}>{emoji}</span>
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: 13, fontWeight: 700, color: '#1C1C1A', marginBottom: 2 }}>{poi.name}</div>
-        <div style={{ display: 'flex', gap: 8, fontSize: 11, color: 'var(--text-muted)', flexWrap: 'wrap' }}>
-          {poi.cuisine && <span>{poi.cuisine}</span>}
-          {poi.openingHours && <span>{poi.openingHours.split(';')[0]}</span>}
-        </div>
+        <div style={{ fontSize: 13, fontWeight: 700, color: '#1C1C1A', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{act.name}</div>
+        <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>⏱ {act.duration || '1–2 hrs'}</div>
       </div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 4, flexShrink: 0 }}>
-        <a href={mapsUrl} target="_blank" rel="noopener noreferrer" style={{ fontSize: 11, fontWeight: 700, color: '#fff', background: '#1C1C1A', padding: '4px 10px', borderRadius: 7, textDecoration: 'none', textAlign: 'center' }}>Maps ↗</a>
-        {poi.website && (
-          <a href={poi.website.startsWith('http') ? poi.website : `https://${poi.website}`} target="_blank" rel="noopener noreferrer" style={{ fontSize: 10, fontWeight: 600, color: '#4285F4', textDecoration: 'none', textAlign: 'center' }}>Website ↗</a>
-        )}
-      </div>
+      <a href={act.maps_url || `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(act.name + ' Victoria')}`} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} style={{ fontSize: 11, fontWeight: 700, color: '#fff', background: '#1C1C1A', padding: '4px 10px', borderRadius: 7, textDecoration: 'none', flexShrink: 0 }}>
+        View on map ↗
+      </a>
     </div>
   )
 }
 
-function deriveSuitability(activities: Activity[]): string[] {
+function PreviewFoodRow({ food }: { food: DbFood }) {
+  const emoji = FOOD_CAT_EMOJI[food.category] ?? '🍽'
+  const attr = food.attributes as { rating?: number; review_count?: number; google_place_id?: string }
+  const mapsUrl = attr.google_place_id
+    ? `https://www.google.com/maps/place/?q=place_id:${attr.google_place_id}`
+    : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(food.name + ' Victoria')}`
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderRadius: 10, background: 'var(--bg-base)', border: '1px solid var(--border)' }}>
+      <span style={{ fontSize: 20, flexShrink: 0 }}>{emoji}</span>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 13, fontWeight: 700, color: '#1C1C1A', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{food.name}</div>
+        <div style={{ fontSize: 11, color: 'var(--text-muted)', display: 'flex', gap: 6 }}>
+          <span>{food.category}</span>
+          {attr.rating && <span>★ {attr.rating}</span>}
+          {attr.review_count && <span>({attr.review_count.toLocaleString()} reviews)</span>}
+        </div>
+      </div>
+      <a href={mapsUrl} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} style={{ fontSize: 11, fontWeight: 700, color: '#fff', background: '#1C1C1A', padding: '4px 10px', borderRadius: 7, textDecoration: 'none', flexShrink: 0 }}>
+        View on map ↗
+      </a>
+    </div>
+  )
+}
+
+function ActivityFullRow({ name, emoji, category, description, duration, cost, isHiddenGem, kidsOk, mapsUrl }: {
+  name: string; emoji: string; category: string; description: string
+  duration: string; cost: string; isHiddenGem: boolean; kidsOk: boolean; mapsUrl: string
+}) {
+  const displayEmoji = emoji || CAT_EMOJI[category] || '📍'
+  const url = mapsUrl || `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(name + ' Victoria')}`
+  return (
+    <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, padding: '11px 14px', borderRadius: 12, background: isHiddenGem ? '#FFFBF5' : 'var(--bg-base)', border: `1.5px solid ${isHiddenGem ? 'rgba(184,115,51,0.25)' : 'var(--border)'}` }}>
+      <span style={{ fontSize: 22, flexShrink: 0, lineHeight: 1.3 }}>{displayEmoji}</span>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', marginBottom: 3 }}>
+          <span style={{ fontSize: 13, fontWeight: 700, color: '#1C1C1A' }}>{name}</span>
+          {isHiddenGem && <span style={{ fontSize: 10, fontWeight: 700, color: WARM, background: '#FFF5EB', padding: '1px 6px', borderRadius: 5 }}>Local gem</span>}
+          {kidsOk && <span style={{ fontSize: 10, color: GREEN, background: 'var(--green-light)', padding: '1px 6px', borderRadius: 5, fontWeight: 600 }}>Kid Friendly</span>}
+        </div>
+        {description && <p style={{ fontSize: 12, color: '#4A4948', lineHeight: 1.55, margin: 0 }}>{description}</p>}
+        <div style={{ display: 'flex', gap: 10, marginTop: 5, fontSize: 11, color: 'var(--text-muted)' }}>
+          <span>⏱ {duration}</span>
+          <span>{cost === 'free' ? '✓ Free' : cost}</span>
+        </div>
+      </div>
+      <a href={url} target="_blank" rel="noopener noreferrer" style={{ flexShrink: 0, fontSize: 11, fontWeight: 700, color: '#fff', background: '#1C1C1A', padding: '4px 10px', borderRadius: 7, textDecoration: 'none', marginTop: 2 }}>
+        View on map ↗
+      </a>
+    </div>
+  )
+}
+
+function FoodFullRow({ food }: { food: DbFood }) {
+  const emoji = FOOD_CAT_EMOJI[food.category] ?? '🍽'
+  const attr = food.attributes as { rating?: number; review_count?: number; cuisine_tags?: string[]; google_place_id?: string }
+  const mapsUrl = attr.google_place_id
+    ? `https://www.google.com/maps/place/?q=place_id:${attr.google_place_id}`
+    : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(food.name + ' Victoria')}`
+  return (
+    <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, padding: '11px 14px', borderRadius: 12, background: 'var(--bg-base)', border: '1px solid var(--border)' }}>
+      <span style={{ fontSize: 22, flexShrink: 0, lineHeight: 1.3 }}>{emoji}</span>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 13, fontWeight: 700, color: '#1C1C1A', marginBottom: 2 }}>{food.name}</div>
+        <div style={{ display: 'flex', gap: 8, fontSize: 11, color: 'var(--text-muted)', flexWrap: 'wrap' }}>
+          <span>{food.category}</span>
+          {attr.cuisine_tags?.length ? <span>{attr.cuisine_tags.slice(0, 2).join(', ')}</span> : null}
+          {attr.rating && <span style={{ color: '#D97706', fontWeight: 700 }}>★ {attr.rating}</span>}
+          {attr.review_count && <span>({attr.review_count.toLocaleString()})</span>}
+        </div>
+        {food.address && <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>{food.address}</div>}
+      </div>
+      <a href={mapsUrl} target="_blank" rel="noopener noreferrer" style={{ flexShrink: 0, fontSize: 11, fontWeight: 700, color: '#fff', background: '#1C1C1A', padding: '4px 10px', borderRadius: 7, textDecoration: 'none', marginTop: 2 }}>
+        View on map ↗
+      </a>
+    </div>
+  )
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+async function fetchFromClaude(
+  sub: SubDest,
+  userProfile: { has_kids?: boolean; preferred_vibe?: string[] } | null,
+  activities: Activity[],
+  cancelled: boolean,
+  setAiSummary: (s: AISummary) => void,
+  setSummaryLoading: (b: boolean) => void,
+  wiki?: string,
+) {
+  try {
+    const params = new URLSearchParams({ dest: sub.name, slug: sub.id })
+    if (wiki) params.set('wiki', wiki.slice(0, 400))
+    if (userProfile?.has_kids) params.set('hasKids', 'true')
+    if (userProfile?.preferred_vibe?.length) params.set('interests', userProfile.preferred_vibe.join(','))
+    const ctrl = new AbortController()
+    const timeout = setTimeout(() => ctrl.abort(), 8000)
+    const r = await fetch(`/api/destination-summary?${params}`, { signal: ctrl.signal })
+    clearTimeout(timeout)
+    const data = await r.json() as AISummary
+    if (!cancelled) setAiSummary(data)
+  } catch {
+    if (!cancelled) setAiSummary({ summary: wiki ?? null, bestFor: deriveSuitability(activities, []) })
+  } finally {
+    if (!cancelled) setSummaryLoading(false)
+  }
+}
+
+function deriveSuitability(activities: Activity[], dbActs: DbActivity[]): string[] {
   const result: string[] = ['Couples']
-  if (activities.some((a) => a.kidsOk || a.category === 'family')) result.push('Families')
-  if (activities.some((a) => a.category === 'active')) result.push('Adventure seekers')
-  if (activities.some((a) => a.category === 'wildlife' || a.category === 'nature')) result.push('Nature lovers')
-  if (activities.some((a) => a.category === 'food' || a.category === 'drink')) result.push('Foodies')
-  if (activities.some((a) => a.category === 'history')) result.push('History buffs')
+  const allCats = [...activities.map((a) => a.category), ...dbActs.map((a) => a.category)]
+  if (activities.some((a) => a.kidsOk) || allCats.includes('family')) result.push('Families')
+  if (allCats.includes('active') || allCats.includes('beach')) result.push('Adventure seekers')
+  if (allCats.includes('wildlife') || allCats.includes('nature')) result.push('Nature lovers')
+  if (allCats.includes('drink') || activities.some((a) => a.category === 'drink')) result.push('Wine lovers')
+  if (allCats.includes('history')) result.push('History buffs')
   if (result.length < 3) result.push('Solo travellers')
   return result.slice(0, 4)
 }

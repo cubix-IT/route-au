@@ -1,4 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
+import { adminSupabase } from './_lib/supabase.js'
 
 // Static system instructions — marked ephemeral so Anthropic caches them
 // across repeated calls, cutting token spend on the fixed portion.
@@ -17,10 +18,33 @@ const SYSTEM_PROMPT =
   'Hikers, History buffs, Beach lovers, Adventure seekers"]}'
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  const { dest, wiki, hasKids, interests } = req.query as {
-    dest?: string; wiki?: string; hasKids?: string; interests?: string
+  const { dest, slug, wiki, hasKids, interests } = req.query as {
+    dest?: string; slug?: string; wiki?: string; hasKids?: string; interests?: string
   }
   if (!dest) return res.status(400).json({ error: 'dest required' })
+
+  // Check destination_summaries table first — serve cached, skip Claude call
+  if (adminSupabase && slug) {
+    const { data: subDest } = await adminSupabase
+      .from('sub_destinations')
+      .select('sub_dest_id')
+      .eq('slug', slug)
+      .single()
+
+    if (subDest) {
+      const { data: summary } = await adminSupabase
+        .from('destination_summaries')
+        .select('ai_summary, best_for')
+        .eq('sub_dest_id', subDest.sub_dest_id)
+        .single()
+
+      if (summary?.ai_summary) {
+        res.setHeader('Cache-Control', 's-maxage=86400, stale-while-revalidate')
+        return res.status(200).json({ summary: summary.ai_summary, bestFor: summary.best_for ?? [] })
+      }
+    }
+  }
+  // No cached summary — fall through to live Claude call below
 
   const apiKey = process.env.ANTHROPIC_API_KEY
   if (!apiKey) {

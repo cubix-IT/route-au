@@ -4,6 +4,13 @@ const GREEN = '#3A6B4F'
 const WARM  = '#B87333'
 const BLUE  = '#1D4ED8'
 
+function formatDriveTime(hours: number): string {
+  if (hours < 1) return `${Math.round(hours * 60)} min`
+  const h = Math.floor(hours)
+  const m = Math.round((hours - h) * 60)
+  return m === 0 ? `${h}h` : `${h}h ${m}min`
+}
+
 export function PlannerMetrics() {
   const d = usePlannerData()
   if (!d.activeItinerary) return null
@@ -25,7 +32,7 @@ export function PlannerMetrics() {
       <MetricTile
         emoji="🚗"
         label="Drive Time"
-        value={`${d.driveHours}h`}
+        value={formatDriveTime(d.driveHours)}
         accent={GREEN}
         bg="rgba(232,245,238,0.75)"
         border="rgba(58,107,79,0.18)"

@@ -90,12 +90,14 @@ export function ProfileWizard() {
   const [dailyDriveHours, setDailyDriveHours] = useState(3)
   const [departureHour, setDepartureHour] = useState(8)
   const [diningPrefs, setDiningPrefs] = useState<DiningPref[]>([])
-  const [dietary, setDietary] = useState<DietaryReq[]>([])
+  const [dietary] = useState<DietaryReq[]>([])
   const [vehicleType, setVehicleType] = useState<VehicleType>('AWD')
   const [fuelType, setFuelType] = useState<FuelType>('Unleaded95')
+  const [fuelBrand, setFuelBrand] = useState<string>('Any')
+  const [skipFuel, setSkipFuel] = useState(false)
   const [accommodation, setAccommodation] = useState<AccommodationPreference>('Any')
 
-  const totalSteps = isPreselected ? 3 : 5 // 0..2 for preselect, 0..4 for discovery
+  const totalSteps = isPreselected ? 4 : 6 // 0..3 for preselect, 0..5 for discovery
 
   if (!isWizardOpen) return null
 
@@ -109,8 +111,6 @@ export function ProfileWizard() {
   const toggleInterest = (id: TripInterest) =>
     setInterests((p) => p.includes(id) ? p.filter((i) => i !== id) : [...p, id])
 
-  const toggleDietary = (r: DietaryReq) =>
-    setDietary((prev) => prev.includes(r) ? prev.filter((d) => d !== r) : [...prev, r])
 
   const handleBack = () => {
     if (step === 0) { setPreselectedDest(null); setWizardOpen(false); return }
@@ -118,7 +118,7 @@ export function ProfileWizard() {
   }
 
   const handleNext = async () => {
-    const lastStep = isPreselected ? 2 : 4
+    const lastStep = isPreselected ? 3 : 5
 
     // Step 1 in discovery mode → compute suggestions, derive dining prefs, advance
     if (!isPreselected && step === 1) {
@@ -184,7 +184,9 @@ export function ProfileWizard() {
       id: 'vehicle-1',
       type: vehicleType,
       clearance_height_meters: vehicleType === 'HighClearance4WD' || vehicleType === '4WD_WithCaravan' ? 2.4 : 1.8,
-      fuel_type: (vehicleType === 'Electric' ? 'Electric' : fuelType) as FuelType,
+      fuel_type: (skipFuel || vehicleType === 'Electric' ? 'Electric' : fuelType) as FuelType,
+      fuel_brand: skipFuel ? null : fuelBrand,
+      skip_fuel: skipFuel,
       fuel_capacity_liters: 65,
       fuel_consumption_litres_per_100km: vehicleType === 'Electric' ? 0 : 10,
       is_towing: vehicleType === '4WD_WithCaravan',
@@ -299,17 +301,22 @@ export function ProfileWizard() {
                 <StepPreferences
                   hasKids={hasKids} kidsAge={kidsAge}
                   tripType={tripType}
-                  dietary={dietary} toggleDietary={toggleDietary}
-                  vehicleType={vehicleType} setVehicleType={setVehicleType}
-                  fuelType={fuelType} setFuelType={setFuelType}
+
                   accommodation={accommodation} setAccommodation={setAccommodation}
                   dailyDriveHours={dailyDriveHours} setDailyDriveHours={setDailyDriveHours}
                   departureHour={departureHour} setDepartureHour={setDepartureHour}
                   destCoord={preselectedDest?.destCoord ?? undefined}
-                  hideDepartureTime={true}
                 />
               )}
               {step === 2 && (
+                <StepVehicle
+                  vehicleType={vehicleType} setVehicleType={setVehicleType}
+                  fuelType={fuelType} setFuelType={setFuelType}
+                  fuelBrand={fuelBrand} setFuelBrand={setFuelBrand}
+                  skipFuel={skipFuel} setSkipFuel={setSkipFuel}
+                />
+              )}
+              {step === 3 && (
                 <StepSummary
                   effectiveDest={effectiveDest}
                   startDate={startDate}
@@ -317,7 +324,9 @@ export function ProfileWizard() {
                   tripType={tripType}
                   crewType={crewType}
                   vehicleType={vehicleType}
-                  fuelType={fuelType}
+                  fuelType={skipFuel ? 'Electric' : fuelType}
+                  fuelBrand={skipFuel ? null : fuelBrand}
+                  skipFuel={skipFuel}
                 />
               )}
             </>
@@ -351,9 +360,7 @@ export function ProfileWizard() {
                 <StepPreferences
                   hasKids={hasKids} kidsAge={kidsAge}
                   tripType={tripType}
-                  dietary={dietary} toggleDietary={toggleDietary}
-                  vehicleType={vehicleType} setVehicleType={setVehicleType}
-                  fuelType={fuelType} setFuelType={setFuelType}
+
                   accommodation={accommodation} setAccommodation={setAccommodation}
                   dailyDriveHours={dailyDriveHours} setDailyDriveHours={setDailyDriveHours}
                   departureHour={departureHour} setDepartureHour={setDepartureHour}
@@ -361,6 +368,14 @@ export function ProfileWizard() {
                 />
               )}
               {step === 4 && (
+                <StepVehicle
+                  vehicleType={vehicleType} setVehicleType={setVehicleType}
+                  fuelType={fuelType} setFuelType={setFuelType}
+                  fuelBrand={fuelBrand} setFuelBrand={setFuelBrand}
+                  skipFuel={skipFuel} setSkipFuel={setSkipFuel}
+                />
+              )}
+              {step === 5 && (
                 <StepSummary
                   effectiveDest={effectiveDest}
                   startDate={startDate}
@@ -368,7 +383,9 @@ export function ProfileWizard() {
                   tripType={tripType}
                   crewType={crewType}
                   vehicleType={vehicleType}
-                  fuelType={fuelType}
+                  fuelType={skipFuel ? 'Electric' : fuelType}
+                  fuelBrand={skipFuel ? null : fuelBrand}
+                  skipFuel={skipFuel}
                 />
               )}
             </>
@@ -449,7 +466,7 @@ function StepHowFarAndWho({
         border: '1px solid var(--border-active)',
       }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 14 }}>
-          <Label>How far from Melbourne are you happy to drive?</Label>
+          <Label>Max distance from home — how far will you travel?</Label>
           <span style={{ fontSize: 22, fontWeight: 800, color: GREEN, letterSpacing: '-0.04em', fontFamily: "'Fraunces', Georgia, serif", minWidth: 80, textAlign: 'right' }}>
             {driveLabel}
           </span>
@@ -733,6 +750,7 @@ function StepPickDest({ suggestions, picked, onPick }: {
     : []
 
   const previewImgUrl = preview ? (preview.sub.imageUrl ?? preview.cluster.imageUrl) : null
+  const [imgError, setImgError] = useState<string | null>(null) // stores the URL that failed
   const previewHrs = preview ? preview.sub.driveTimeHours : 0
   const previewDriveLabel = previewHrs < 1
     ? `${Math.round(previewHrs * 60)} min drive`
@@ -784,12 +802,23 @@ function StepPickDest({ suggestions, picked, onPick }: {
               key={preview.sub.id}
               style={{
                 height: 190, flexShrink: 0, position: 'relative', overflow: 'hidden',
-                backgroundImage: previewImgUrl ? `url(${previewImgUrl})` : undefined,
+                backgroundImage: (previewImgUrl && imgError !== previewImgUrl) ? `url(${previewImgUrl})` : undefined,
                 backgroundSize: 'cover', backgroundPosition: 'center',
-                background: previewImgUrl ? undefined : `linear-gradient(145deg, ${preview.cluster.gradientFrom}, ${preview.cluster.gradientTo})`,
+                background: (!previewImgUrl || imgError === previewImgUrl)
+                  ? `linear-gradient(145deg, ${preview.cluster.gradientFrom}, ${preview.cluster.gradientTo})`
+                  : undefined,
                 transition: 'background-image 0.25s',
               }}
             >
+              {/* Hidden img to detect load failure */}
+              {previewImgUrl && imgError !== previewImgUrl && (
+                <img
+                  src={previewImgUrl}
+                  alt=""
+                  onError={() => setImgError(previewImgUrl)}
+                  style={{ position: 'absolute', width: 1, height: 1, opacity: 0, pointerEvents: 'none' }}
+                />
+              )}
               {/* Drive + match badges */}
               <div style={{ position: 'absolute', top: 10, left: 12, display: 'flex', gap: 5 }}>
                 <span style={{
@@ -986,19 +1015,8 @@ function DateDayStrip({
 
 // ── Step 3 (Discovery) / Step 1 (Preselect): Preferences ─────────
 
-const DIETARY: { req: DietaryReq; emoji: string; label: string }[] = [
-  { req: 'Vegetarian', emoji: '🥦', label: 'Vegetarian' },
-  { req: 'Vegan',      emoji: '🌱', label: 'Vegan' },
-  { req: 'GlutenFree', emoji: '🌾', label: 'Gluten-free' },
-  { req: 'Halal',      emoji: '☪️', label: 'Halal' },
-  { req: 'DairyFree',  emoji: '🥛', label: 'Dairy-free' },
-]
-
 function StepPreferences({
   hasKids, kidsAge, tripType,
-  dietary, toggleDietary,
-  vehicleType, setVehicleType,
-  fuelType, setFuelType,
   accommodation, setAccommodation,
   dailyDriveHours, setDailyDriveHours,
   departureHour, setDepartureHour,
@@ -1008,9 +1026,6 @@ function StepPreferences({
   hideDepartureTime,
 }: {
   hasKids: boolean; kidsAge: KidsAge | null; tripType: TripType
-  dietary: DietaryReq[]; toggleDietary: (r: DietaryReq) => void
-  vehicleType: VehicleType; setVehicleType: (v: VehicleType) => void
-  fuelType: FuelType; setFuelType: (f: FuelType) => void
   accommodation: AccommodationPreference; setAccommodation: (a: AccommodationPreference) => void
   dailyDriveHours?: number; setDailyDriveHours?: (n: number) => void
   departureHour: number; setDepartureHour: (h: number) => void
@@ -1020,14 +1035,6 @@ function StepPreferences({
   hideDepartureTime?: boolean
 }) {
   void hasKids; void kidsAge
-
-  const vehicles = [
-    { type: 'Sedan' as VehicleType,            emoji: '🚗', label: 'Sedan / Hatch' },
-    { type: 'AWD' as VehicleType,              emoji: '🚙', label: 'SUV / AWD' },
-    { type: 'HighClearance4WD' as VehicleType, emoji: '🛻', label: '4WD' },
-    { type: '4WD_WithCaravan' as VehicleType,  emoji: '🚐', label: 'Van / Caravan' },
-    { type: 'Electric' as VehicleType,         emoji: '⚡', label: 'Electric' },
-  ]
 
   const stays: { type: AccommodationPreference; emoji: string; label: string }[] = [
     { type: 'Hotel',       emoji: '🏨', label: 'Hotel / motel' },
@@ -1041,9 +1048,9 @@ function StepPreferences({
     <div style={{ display: 'flex', flexDirection: 'column', gap: 22 }}>
       <div>
         <h2 style={{ fontSize: 20, fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-0.5px', marginBottom: 4 }}>
-          A few finishing touches
+          When are you leaving?
         </h2>
-        <p style={{ fontSize: 13, color: 'var(--text-muted)' }}>Quick preferences to personalise your day.</p>
+        <p style={{ fontSize: 13, color: 'var(--text-muted)' }}>Pick your date and departure time.</p>
       </div>
 
       {/* Dates — shown here for discovery flow */}
@@ -1106,61 +1113,6 @@ function StepPreferences({
         </div>
       )}
 
-      {/* Dietary */}
-      <div>
-        <Label>Dietary <span style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 400 }}>optional</span></Label>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
-          {DIETARY.map((d) => (
-            <button key={d.req} onClick={() => toggleDietary(d.req)} style={{
-              display: 'flex', alignItems: 'center', gap: 5,
-              padding: '6px 12px', borderRadius: 20,
-              background: dietary.includes(d.req) ? 'var(--green-light)' : 'var(--bg-muted)',
-              border: `1.5px solid ${dietary.includes(d.req) ? 'var(--border-active)' : 'var(--border)'}`,
-              color: dietary.includes(d.req) ? GREEN : 'var(--text-muted)',
-              fontSize: 12, fontWeight: 600, cursor: 'pointer', transition: 'all 0.15s',
-            }}>
-              {d.emoji} {d.label}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Vehicle */}
-      <div>
-        <Label>Your vehicle</Label>
-        <div style={{ display: 'flex', gap: 6, marginTop: 10, flexWrap: 'wrap' }}>
-          {vehicles.map((v) => (
-            <div key={v.type} className={`option-card ${vehicleType === v.type ? 'selected' : ''}`}
-              onClick={() => setVehicleType(v.type)}
-              style={{ flexDirection: 'row', padding: '10px 12px', gap: 6, flexShrink: 0 }}>
-              <span style={{ fontSize: 18 }}>{v.emoji}</span>
-              <span style={{ fontSize: 12, fontWeight: 600 }}>{v.label}</span>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Fuel type — hidden for Electric */}
-      {vehicleType !== 'Electric' && (
-        <div>
-          <Label>Fuel type</Label>
-          <div style={{ display: 'flex', gap: 6, marginTop: 10, flexWrap: 'wrap' }}>
-            {([
-              { type: 'Unleaded95' as FuelType, emoji: '⛽', label: 'Unleaded 95' },
-              { type: 'Unleaded98' as FuelType, emoji: '🔵', label: 'Unleaded 98' },
-              { type: 'Diesel'     as FuelType, emoji: '🛢️', label: 'Diesel' },
-            ] as { type: FuelType; emoji: string; label: string }[]).map((f) => (
-              <div key={f.type} className={`option-card ${fuelType === f.type ? 'selected' : ''}`}
-                onClick={() => setFuelType(f.type)}
-                style={{ flexDirection: 'row', padding: '10px 12px', gap: 6, flexShrink: 0 }}>
-                <span style={{ fontSize: 18 }}>{f.emoji}</span>
-                <span style={{ fontSize: 12, fontWeight: 600 }}>{f.label}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
       {/* Accommodation — multiday only */}
       {tripType === 'multiday' && (
         <div>
@@ -1180,6 +1132,142 @@ function StepPreferences({
   )
 }
 
+// ── Vehicle & fuel step ───────────────────────────────────────────
+
+const FUEL_BRANDS = [
+  { id: 'Any',      label: 'No preference', color: '#6B7280', bg: '#F3F4F6' },
+  { id: 'BP',       label: 'BP',            color: '#006B3F', bg: '#DCFCE7' },
+  { id: 'Ampol',    label: 'Ampol',         color: '#C41230', bg: '#FEE2E2' },
+  { id: 'Shell',    label: 'Shell',         color: '#DD1D21', bg: '#FEE2E2' },
+  { id: 'Caltex',   label: 'Caltex',        color: '#B8860B', bg: '#FEF9C3' },
+  { id: 'Liberty',  label: 'Liberty',       color: '#E65100', bg: '#FFF3E0' },
+  { id: 'Metro',    label: 'Metro',         color: '#7C3AED', bg: '#F5F3FF' },
+  { id: '7-Eleven', label: '7-Eleven',      color: '#007A33', bg: '#DCFCE7' },
+  { id: 'Mobil',    label: 'Mobil',         color: '#1D4ED8', bg: '#EFF6FF' },
+  { id: 'United',   label: 'United',        color: '#1565C0', bg: '#E3F2FD' },
+  { id: 'OTR',      label: 'OTR',           color: '#EA580C', bg: '#FFF7ED' },
+  { id: 'Astron',   label: 'Astron',        color: '#0F766E', bg: '#F0FDFA' },
+  { id: 'Pacific',  label: 'Pacific',       color: '#0369A1', bg: '#E0F2FE' },
+]
+
+function StepVehicle({
+  vehicleType, setVehicleType,
+  fuelType, setFuelType,
+  fuelBrand, setFuelBrand,
+  skipFuel, setSkipFuel,
+}: {
+  vehicleType: VehicleType; setVehicleType: (v: VehicleType) => void
+  fuelType: FuelType; setFuelType: (f: FuelType) => void
+  fuelBrand: string; setFuelBrand: (b: string) => void
+  skipFuel: boolean; setSkipFuel: (s: boolean) => void
+}) {
+  const vehicles = [
+    { type: 'Sedan' as VehicleType,            emoji: '🚗', label: 'Sedan / Hatch' },
+    { type: 'AWD' as VehicleType,              emoji: '🚙', label: 'SUV / AWD' },
+    { type: 'HighClearance4WD' as VehicleType, emoji: '🛻', label: '4WD' },
+    { type: '4WD_WithCaravan' as VehicleType,  emoji: '🚐', label: 'Van / Caravan' },
+    { type: 'Electric' as VehicleType,         emoji: '⚡', label: 'Electric' },
+  ]
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 22 }}>
+      <div>
+        <h2 style={{ fontSize: 20, fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-0.5px', marginBottom: 4 }}>
+          Your vehicle & fuel
+        </h2>
+        <p style={{ fontSize: 13, color: 'var(--text-muted)' }}>
+          We'll show cheapest fuel stations on your route and estimate your drive cost.
+        </p>
+      </div>
+
+      {/* Vehicle type */}
+      <div>
+        <Label>What are you driving?</Label>
+        <div style={{ display: 'flex', gap: 6, marginTop: 10, flexWrap: 'wrap' }}>
+          {vehicles.map((v) => (
+            <div key={v.type} className={`option-card ${vehicleType === v.type ? 'selected' : ''}`}
+              onClick={() => setVehicleType(v.type)}
+              style={{ flexDirection: 'row', padding: '10px 14px', gap: 8, flexShrink: 0 }}>
+              <span style={{ fontSize: 20 }}>{v.emoji}</span>
+              <span style={{ fontSize: 13, fontWeight: 600 }}>{v.label}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {vehicleType !== 'Electric' && !skipFuel && (
+        <>
+          {/* Fuel type */}
+          <div>
+            <Label>Fuel type</Label>
+            <div style={{ display: 'flex', gap: 6, marginTop: 10, flexWrap: 'wrap' }}>
+              {([
+                { type: 'Unleaded95' as FuelType, emoji: '⛽', label: 'Unleaded 95' },
+                { type: 'Unleaded98' as FuelType, emoji: '🔵', label: 'Unleaded 98' },
+                { type: 'Diesel'     as FuelType, emoji: '🛢️', label: 'Diesel' },
+              ] as { type: FuelType; emoji: string; label: string }[]).map((f) => (
+                <div key={f.type} className={`option-card ${fuelType === f.type ? 'selected' : ''}`}
+                  onClick={() => setFuelType(f.type)}
+                  style={{ flexDirection: 'row', padding: '10px 14px', gap: 8, flexShrink: 0 }}>
+                  <span style={{ fontSize: 20 }}>{f.emoji}</span>
+                  <span style={{ fontSize: 13, fontWeight: 600 }}>{f.label}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Fuel brand preference */}
+          <div>
+            <Label>Preferred fuel brand <span style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 400 }}>optional</span></Label>
+            <p style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 10, marginTop: 4 }}>
+              We'll prioritise this brand when showing cheapest stations on your route.
+            </p>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+              {FUEL_BRANDS.map((b) => {
+                const selected = fuelBrand === b.id
+                return (
+                  <button
+                    key={b.id}
+                    onClick={() => setFuelBrand(b.id)}
+                    style={{
+                      padding: '8px 16px', borderRadius: 20, cursor: 'pointer',
+                      background: selected ? b.bg : '#fff',
+                      border: `1.5px solid ${selected ? b.color : 'var(--border)'}`,
+                      color: selected ? b.color : 'var(--text-muted)',
+                      fontSize: 13, fontWeight: selected ? 700 : 500,
+                      transition: 'all 0.15s',
+                    }}
+                  >
+                    {b.label}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* Skip fuel option */}
+      {vehicleType !== 'Electric' && (
+        <button
+          onClick={() => setSkipFuel(!skipFuel)}
+          style={{
+            display: 'flex', alignItems: 'center', gap: 10,
+            padding: '12px 16px', borderRadius: 12,
+            background: skipFuel ? '#F3F4F6' : 'transparent',
+            border: `1.5px dashed ${skipFuel ? '#9CA3AF' : 'var(--border)'}`,
+            color: skipFuel ? '#6B7280' : 'var(--text-muted)',
+            fontSize: 13, fontWeight: 600, cursor: 'pointer', width: '100%', textAlign: 'left',
+          }}
+        >
+          <span style={{ fontSize: 18 }}>{skipFuel ? '✓' : '⏭'}</span>
+          {skipFuel ? "Skipped — fuel prices won't be shown" : 'Skip fuel preferences'}
+        </button>
+      )}
+    </div>
+  )
+}
+
 // ── Trip summary step ─────────────────────────────────────────────
 
 interface SummaryFuelStation {
@@ -1194,7 +1282,7 @@ interface SummaryFuelStation {
   distanceKm: number
 }
 
-function StepSummary({ effectiveDest, startDate, endDate, tripType, crewType, vehicleType, fuelType }: {
+function StepSummary({ effectiveDest, startDate, endDate, tripType, crewType, vehicleType, fuelType, fuelBrand, skipFuel }: {
   effectiveDest: { name: string; coord: Coordinate } | null
   startDate: string
   endDate: string
@@ -1202,6 +1290,8 @@ function StepSummary({ effectiveDest, startDate, endDate, tripType, crewType, ve
   crewType: CrewType
   vehicleType: VehicleType
   fuelType: FuelType
+  fuelBrand?: string | null
+  skipFuel?: boolean
 }) {
   const originCoord = useAppStore((s) => s.originCoord)
   const originName = useAppStore((s) => s.originName)
@@ -1212,21 +1302,22 @@ function StepSummary({ effectiveDest, startDate, endDate, tripType, crewType, ve
   const straightKm = destCoord ? haversinKm(originCoord, destCoord) : 0
   const estKm = Math.round(straightKm * 1.3)
   const estKmRound = estKm * 2
-  const fuelUsedL = vehicleType === 'Electric' ? 0 : (estKmRound * 10) / 100
+  const fuelUsedL = vehicleType === 'Electric' || skipFuel ? 0 : (estKmRound * 10) / 100
 
   useEffect(() => {
-    if (vehicleType === 'Electric' || !destCoord) return
+    if (skipFuel || vehicleType === 'Electric' || !destCoord) return
     const lat = (originCoord.lat + destCoord.lat) / 2
     const lng = (originCoord.lng + destCoord.lng) / 2
     setLoadingFuel(true)
+    const brandParam = fuelBrand && fuelBrand !== 'Any' ? `&brand=${encodeURIComponent(fuelBrand)}` : ''
     // Try midpoint first with 40km radius; fallback to near origin if empty
-    fetch(`/api/fuel?lat=${lat}&lng=${lng}&fuelType=${fuelType}&limit=3&radius=40`)
+    fetch(`/api/fuel?lat=${lat}&lng=${lng}&fuelType=${fuelType}&limit=3&radius=40${brandParam}`)
       .then((r) => r.json())
       .then(async (data) => {
         const stations = (data as { stations: SummaryFuelStation[] }).stations ?? []
         if (stations.length > 0) return setFuelStations(stations)
         // Midpoint (possibly over water) found nothing — try near origin
-        const fallback = await fetch(`/api/fuel?lat=${originCoord.lat}&lng=${originCoord.lng}&fuelType=${fuelType}&limit=3&radius=25`).then((r) => r.json())
+        const fallback = await fetch(`/api/fuel?lat=${originCoord.lat}&lng=${originCoord.lng}&fuelType=${fuelType}&limit=3&radius=25${brandParam}`).then((r) => r.json())
         setFuelStations((fallback as { stations: SummaryFuelStation[] }).stations ?? [])
       })
       .catch(() => {})
@@ -1278,7 +1369,11 @@ function StepSummary({ effectiveDest, startDate, endDate, tripType, crewType, ve
       </div>
 
       {/* Fuel stops */}
-      {vehicleType === 'Electric' ? (
+      {skipFuel ? (
+        <div style={{ textAlign: 'center', padding: '14px', background: 'var(--bg-muted)', borderRadius: 12, color: 'var(--text-muted)', fontSize: 13 }}>
+          ⛽ Fuel preferences skipped — fill up wherever suits you
+        </div>
+      ) : vehicleType === 'Electric' ? (
         <div style={{ textAlign: 'center', padding: '16px', background: 'var(--bg-muted)', borderRadius: 12, color: 'var(--text-muted)', fontSize: 13 }}>
           ⚡ No fuel stops needed for your electric vehicle
         </div>
@@ -1308,7 +1403,7 @@ function StepSummary({ effectiveDest, startDate, endDate, tripType, crewType, ve
                   }}>{RANK_LABELS[i]}</div>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {st.brand} · {st.name}
+                      {st.name}
                     </div>
                     <div style={{ fontSize: 10, color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{st.address}</div>
                   </div>
