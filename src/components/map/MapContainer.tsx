@@ -96,7 +96,9 @@ export function MapContainer() {
       el.textContent = emoji
 
       const typeLabel = pin.type.replace(/_/g, ' ')
-      const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(pin.name)}`
+      const mapsUrl = pin.placeId
+        ? `https://www.google.com/maps/place/?q=place_id:${pin.placeId}`
+        : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(pin.name)}`
       const popup = new maplibregl.Popup({ offset: 18, closeButton: true, maxWidth: '220px', closeOnClick: false })
         .setHTML(`
           <div style="padding:4px 0;font-family:system-ui,sans-serif">

@@ -22,6 +22,7 @@ export interface LivePOI {
   source?: 'google' | 'osm'
   editorialSummary?: string
   openingHoursPeriods?: OpenHoursPeriod[]
+  placeId?: string
 }
 
 const OVERPASS = 'https://overpass-api.de/api/interpreter'

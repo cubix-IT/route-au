@@ -219,8 +219,16 @@ export function ExperiencePanel({ hideTimeline = false }: { hideTimeline?: boole
         actPins = d.dbNature.filter((n) => n.lat && n.lng).slice(0, 8)
       }
       setDisplayedMapPins([
-        ...foodPins.map((f) => ({ id: String(f.food_place_id), lat: f.lat!, lng: f.lng!, type: f.category.toLowerCase() as LivePOI['type'], name: f.name })),
-        ...actPins.map((n) => ({ id: `nature-${n.nature_spot_id}`, lat: n.lat!, lng: n.lng!, type: (n.type === 'viewpoint' ? 'viewpoint' : 'attraction') as LivePOI['type'], name: n.name })),
+        ...foodPins.map((f) => {
+          const a = (f.attributes as Record<string, unknown>) ?? {}
+          return { id: String(f.food_place_id), lat: f.lat!, lng: f.lng!, type: f.category.toLowerCase() as LivePOI['type'], name: f.name, placeId: a.google_place_id as string | undefined }
+        }),
+        ...actPins.map((n) => ({
+          id: `nature-${n.nature_spot_id}`, lat: n.lat!, lng: n.lng!,
+          type: (n.type === 'viewpoint' ? 'viewpoint' : 'attraction') as LivePOI['type'],
+          name: n.name,
+          placeId: n.slug?.startsWith('gp-') ? n.slug.slice(3) : undefined,
+        })),
       ])
       return
     }
@@ -410,7 +418,9 @@ export function ExperiencePanel({ hideTimeline = false }: { hideTimeline?: boole
             cost: 'free' as Activity['cost'],
             kidsOk: true,
             isHiddenGem: false,
-            mapsUrl: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(n.name + ' Victoria')}`,
+            mapsUrl: n.slug?.startsWith('gp-')
+              ? `https://www.google.com/maps/place/?q=place_id:${n.slug.slice(3)}`
+              : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(n.name + ' Victoria')}`,
             tags: [n.type],
           }))
 
@@ -601,11 +611,11 @@ export function ExperiencePanel({ hideTimeline = false }: { hideTimeline?: boole
                     ))}
                     {displayed.map((f) => {
                       const attr = (f.attributes as Record<string, unknown>) ?? {}
-                      const website = attr.website as string | undefined
                       const placeId = attr.google_place_id as string | undefined
-                      const primaryUrl = website || (placeId ? `https://www.google.com/maps/place/?q=place_id:${placeId}` : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(f.name + ' ' + d.shortDest)}`)
                       const cuisineTags = attr.cuisine_tags as string[] | undefined
                       const pinId = String(f.food_place_id)
+                      // website: only the actual business URL, not a google maps link
+                      const websiteUri = attr.website_uri as string | undefined
                       return (
                         <FoodCard key={f.food_place_id} poi={{
                           id: pinId,
@@ -615,7 +625,8 @@ export function ExperiencePanel({ hideTimeline = false }: { hideTimeline?: boole
                           rating: attr.rating as number | undefined,
                           totalRatings: attr.review_count as number | undefined,
                           cuisine: cuisineTags?.join(' · '),
-                          website: (attr.website_uri as string | undefined) || (attr.google_place_id ? `https://www.google.com/maps/place/?q=place_id:${attr.google_place_id}` : primaryUrl),
+                          website: websiteUri && !websiteUri.includes('google.com') ? websiteUri : undefined,
+                          placeId,
                           editorialSummary: attr.editorial_summary as string | undefined,
                           openingHoursPeriods: attr.opening_hours_periods as import('@/lib/overpass').OpenHoursPeriod[] | undefined,
                         }} destName={d.shortDest}
@@ -640,15 +651,15 @@ export function ExperiencePanel({ hideTimeline = false }: { hideTimeline?: boole
                       <div className="activity-grid">
                         {unratedFood.map((f) => {
                           const attr = (f.attributes as Record<string, unknown>) ?? {}
-                          const mapsUrl = attr.google_place_id
-                            ? `https://www.google.com/maps/place/?q=place_id:${attr.google_place_id}`
-                            : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(f.name + ' ' + d.shortDest)}`
+                          const placeId = attr.google_place_id as string | undefined
+                          const websiteUri = attr.website_uri as string | undefined
                           return (
                             <FoodCard key={f.food_place_id} poi={{
                               id: String(f.food_place_id),
                               type: f.category.toLowerCase() as LivePOI['type'],
                               name: f.name, lat: f.lat, lng: f.lng,
-                              website: mapsUrl,
+                              placeId,
+                              website: websiteUri && !websiteUri.includes('google.com') ? websiteUri : undefined,
                             }} destName={d.shortDest} />
                           )
                         })}
@@ -882,8 +893,8 @@ function FoodCard({ poi, destName, highlighted, onMapPin, isLocalFav }: {
   poi: LivePOI; destName: string; highlighted?: boolean; onMapPin?: () => void; isLocalFav?: boolean
 }) {
   const tag = POI_TAG[poi.type] ?? { emoji: '🍽', label: poi.type, color: '#B45309', bg: '#FEF3C7' }
-  const mapsUrl = poi.lat && poi.lng
-    ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(poi.name)}`
+  const mapsUrl = poi.placeId
+    ? `https://www.google.com/maps/place/?q=place_id:${poi.placeId}`
     : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(poi.name + ' ' + destName)}`
 
   const openStatus = getOpenStatus(poi.openingHoursPeriods)
@@ -1067,10 +1078,11 @@ function ActivityCard({ act, expanded, highlighted, onToggle, isAdded, onAdd, on
 
 function AccommodationGridCard({ poi, destName }: { poi: AccommodationPOI; destName: string }) {
   const cfg = ACCOM_POI_CFG[poi.type]
-  const mapsUrl = poi.lat && poi.lng
-    ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(poi.name)}`
-    : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(poi.name + ' ' + destName)}`
   const attr = (poi as unknown as { attributes?: Record<string, unknown> }).attributes ?? {}
+  const accomPlaceId = attr.google_place_id as string | undefined
+  const mapsUrl = accomPlaceId
+    ? `https://www.google.com/maps/place/?q=place_id:${accomPlaceId}`
+    : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(poi.name + ' ' + destName)}`
   const editorialSummary = attr.editorial_summary as string | undefined
   const websiteUri = attr.website_uri as string | undefined
   const websiteUrl = websiteUri && !websiteUri.includes('google.com') ? websiteUri : null

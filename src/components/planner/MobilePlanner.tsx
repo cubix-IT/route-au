@@ -280,7 +280,9 @@ export function MobilePlanner() {
     emoji: NATURE_EMOJI[n.type] ?? '🌿', description: n.description || '',
     duration: n.type === 'hiking' ? '1–3 hrs' : '30–60 min',
     cost: 'free' as Activity['cost'], kidsOk: true, isHiddenGem: false,
-    mapsUrl: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(n.name + ' Victoria')}`,
+    mapsUrl: n.slug?.startsWith('gp-')
+      ? `https://www.google.com/maps/place/?q=place_id:${n.slug.slice(3)}`
+      : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(n.name + ' Victoria')}`,
     tags: [n.type],
   }))
   const staticActs = d.activities.filter((a) => a.category !== 'food' && a.category !== 'drink')
