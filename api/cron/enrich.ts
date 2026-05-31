@@ -8,7 +8,7 @@ import { adminSupabase } from '../_lib/supabase.js'
 // Pass ?limit=N to override batch size (max 10 to stay in free tier).
 const BATCH_SIZE = 5
 const REFRESH_DAYS = 7
-const RADIUS = 10000  // 10km
+const RADIUS = 20000  // 20km — wide enough to capture remote area attractions
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST' && req.method !== 'GET') {

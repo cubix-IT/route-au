@@ -125,8 +125,8 @@ async function fetchDestinationFromDB(
   const cLat = destCoord?.lat ?? (subDest as any).lat
   const cLng = destCoord?.lng ?? (subDest as any).lng
 
-  // ~15km bounding box in degrees
-  const DELTA = 0.14
+  // ~25km bounding box in degrees (covers remote areas with sparse neighbours)
+  const DELTA = 0.23
   const latMin = cLat - DELTA, latMax = cLat + DELTA
   const lngMin = cLng - DELTA, lngMax = cLng + DELTA
 
