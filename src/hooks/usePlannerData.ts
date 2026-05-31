@@ -148,11 +148,20 @@ async function fetchDestinationFromDB(
           .eq('sub_dest_id', id)
           .limit(200)
     ),
-    supabase
-      .from('food_places')
-      .select('food_place_id,slug,name,category,description,lat,lng,address,attributes,source')
-      .eq('sub_dest_id', id)
-      .limit(200),
+    // Food: bounding box so bakeries/restaurants enriched under nearby sub_dests still show
+    (cLat && cLng
+      ? supabase
+          .from('food_places')
+          .select('food_place_id,slug,name,category,description,lat,lng,address,attributes,source')
+          .gte('lat', latMin).lte('lat', latMax)
+          .gte('lng', lngMin).lte('lng', lngMax)
+          .limit(200)
+      : supabase
+          .from('food_places')
+          .select('food_place_id,slug,name,category,description,lat,lng,address,attributes,source')
+          .eq('sub_dest_id', id)
+          .limit(200)
+    ),
     // Nature spots: same bounding box approach
     (cLat && cLng
       ? supabase
@@ -167,11 +176,20 @@ async function fetchDestinationFromDB(
           .eq('sub_dest_id', id)
           .limit(200)
     ),
-    supabase
-      .from('accommodation')
-      .select('accommodation_id,slug,name,type,description,lat,lng,address')
-      .eq('sub_dest_id', id)
-      .limit(100),
+    // Accommodation: bounding box consistent with activities/food
+    (cLat && cLng
+      ? supabase
+          .from('accommodation')
+          .select('accommodation_id,slug,name,type,description,lat,lng,address')
+          .gte('lat', latMin).lte('lat', latMax)
+          .gte('lng', lngMin).lte('lng', lngMax)
+          .limit(100)
+      : supabase
+          .from('accommodation')
+          .select('accommodation_id,slug,name,type,description,lat,lng,address')
+          .eq('sub_dest_id', id)
+          .limit(100)
+    ),
     supabase
       .from('destination_summaries')
       .select('wiki_text,ai_summary')
@@ -386,6 +404,9 @@ export function usePlannerData() {
   // Generic low-value names from OSM / unrated Google Places
   const JUNK_ACT_PATTERN = /^(corni|unnamed|track\b|path\b|trail\b|road\b|street\b|lane\b|reserve\b|locality\b|area\b|\d+\s)/i
 
+  // Descriptions masquerading as venue names (OSM tags, event blurbs, etc.)
+  const JUNK_PHRASE_PATTERN = /\bat dusk\b|\bat dawn\b|\bat night\b|\bviewing area\b|\bwombats?\s+(at|near)\b/i
+
   const openActivities = (() => {
     const byStatus = dbActivities.filter((a) => {
       const attr = (a as unknown as { attributes?: Record<string, unknown> }).attributes ?? {}
@@ -395,6 +416,7 @@ export function usePlannerData() {
       // Drop junk names
       if (!a.name || a.name.trim().length < 3) return false
       if (JUNK_ACT_PATTERN.test(a.name.trim())) return false
+      if (JUNK_PHRASE_PATTERN.test(a.name)) return false
       // If activity has rating stored in attributes, enforce minimum quality
       const rating = attr.rating as number | undefined
       const reviewCount = attr.review_count as number | undefined

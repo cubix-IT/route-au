@@ -158,20 +158,10 @@ export const VICTORIAN_CLUSTERS: VicCluster[] = [
         name: 'Mornington',
         driveTimeHours: 1.0,
         driveKm: 60,
-        highlights: ['Mornington Main Street cafes', 'Mills Beach and pier', 'Arthur\'s Seat Eagle gondola (views over Port Phillip Bay)', 'Peninsula Hot Springs (25 min further south)'],
-        themes: ['Beach', 'Food', 'Relaxation'],
+        highlights: ['Mornington Main Street cafes', 'Mills Beach and pier', 'Arthur\'s Seat Eagle gondola and TreeTop Adventure', 'Peninsula Hot Springs (open-air geothermal pools, 25 min south)'],
+        themes: ['Beach', 'Food', 'Relaxation', 'Wellness', 'Hot springs'],
         coord: { lng: 145.037, lat: -38.219 },
-        nearbyIds: ['peninsula-hot-springs', 'red-hill'],
-      },
-      {
-        id: 'peninsula-hot-springs',
-        name: 'Peninsula Hot Springs',
-        driveTimeHours: 1.4,
-        driveKm: 90,
-        highlights: ['Open-air geothermal mineral pools with bay views', 'Cave pool and hillside bathing terraces', 'Café Salso on-site dining', 'Bathhouse and spa treatments'],
-        themes: ['Wellness', 'Relaxation', 'Hot springs'],
-        coord: { lng: 144.954, lat: -38.416 },
-        nearbyIds: ['red-hill', 'flinders'],
+        nearbyIds: ['red-hill', 'sorrento'],
       },
       {
         id: 'red-hill',
@@ -646,7 +636,7 @@ export const VICTORIAN_CLUSTERS: VicCluster[] = [
         nearbyIds: ['halls-gap', 'boroka-pinnacle'],
       },
       {
-        id: 'halls-gap',
+        id: 'wartook',
         name: 'Wartook & Northern Grampians',
         driveTimeHours: 3.3,
         driveKm: 290,
@@ -1335,6 +1325,118 @@ export const VICTORIAN_CLUSTERS: VicCluster[] = [
       },
     ],
   },
+
+  // ── 25. Melbourne Inner Suburbs ──────────────────────────────────
+  {
+    id: 'melbourne-inner',
+    name: 'Melbourne Inner Suburbs',
+    tagline: 'Street art, world-class food, iconic sports venues, and beach suburbs — all within 30 min of the CBD.',
+    driveTimeRange: '15 – 40 min',
+    themes: ['Food', 'Culture', 'Art', 'Sports', 'Markets', 'Beach'],
+    seasonalScores: { summer: 8, autumn: 8, winter: 7, spring: 8 },
+    image: '🏙️',
+    imageUrl: 'https://images.unsplash.com/photo-1514395462421-57f8b8e7f4b4?w=1200&q=80',
+    gradientFrom: '#1a1a2e',
+    gradientTo: '#16213e',
+    subDests: [
+      {
+        id: 'melbourne-cbd',
+        name: 'Melbourne CBD',
+        driveTimeHours: 0.25,
+        driveKm: 4,
+        highlights: ['Federation Square and Birrarung Marr', 'St Paul\'s Cathedral and the Block Arcade', 'Melbourne laneways — Hosier, AC/DC, Degraves', 'Queen Victoria Market (open Tue–Sun)'],
+        themes: ['Culture', 'Food', 'History', 'Markets', 'Art'],
+        coord: { lng: 144.963, lat: -37.814 },
+        nearbyIds: ['fitzroy', 'st-kilda'],
+      },
+      {
+        id: 'st-kilda',
+        name: 'St Kilda',
+        driveTimeHours: 0.4,
+        driveKm: 9,
+        highlights: ['Luna Park (heritage amusement park, open weekends)', 'Acland Street cake shops and cafes', 'St Kilda Beach and pier with Little Penguins at dusk', 'The Espy and live music strip'],
+        themes: ['Beach', 'Food', 'Entertainment', 'Family'],
+        coord: { lng: 144.979, lat: -37.868 },
+        nearbyIds: ['melbourne-cbd', 'williamstown'],
+      },
+      {
+        id: 'richmond',
+        name: 'Richmond & MCG Precinct',
+        driveTimeHours: 0.25,
+        driveKm: 4,
+        highlights: ['MCG — tours of Australia\'s most iconic stadium', 'Rod Laver Arena and Melbourne Park (Grand Slam tennis)', 'Yarra Park and Birrarung Marr riverside walks', 'Bridge Road cafe strip and boutique shopping'],
+        themes: ['Sports', 'Food', 'Culture', 'Walking'],
+        coord: { lng: 144.984, lat: -37.821 },
+        nearbyIds: ['melbourne-cbd', 'fitzroy'],
+      },
+      {
+        id: 'fitzroy-collingwood',
+        name: 'Fitzroy & Collingwood',
+        driveTimeHours: 0.25,
+        driveKm: 4,
+        highlights: ['Brunswick Street — galleries, vintage, and some of Melbourne\'s best cafes', 'Smith Street restaurants and bars', 'Gertrude Street boutiques', 'Collingwood Arts Precinct'],
+        themes: ['Art', 'Food', 'Culture', 'Markets'],
+        coord: { lng: 144.978, lat: -37.800 },
+        nearbyIds: ['melbourne-cbd', 'brunswick'],
+      },
+      {
+        id: 'brunswick',
+        name: 'Brunswick',
+        driveTimeHours: 0.3,
+        driveKm: 6,
+        highlights: ['Sydney Road — multicultural food strip with A1 Bakery', 'Marios Cafe (Melbourne icon)', 'Brunswick Ballroom and live music', 'Vintage stores and independent bookshops'],
+        themes: ['Food', 'Culture', 'Markets', 'Art'],
+        coord: { lng: 144.960, lat: -37.770 },
+        nearbyIds: ['fitzroy', 'melbourne-cbd'],
+      },
+      {
+        id: 'williamstown',
+        name: 'Williamstown',
+        driveTimeHours: 0.4,
+        driveKm: 14,
+        highlights: ['Williamstown Beach and foreshore promenade', 'Craft beer at Robb Pier and Point Gellibrand', 'Ferry to Docklands across the bay', 'Nelson Place heritage streetscape and restaurants'],
+        themes: ['Beach', 'Food', 'History', 'Walking'],
+        coord: { lng: 144.900, lat: -37.866 },
+        nearbyIds: ['st-kilda', 'melbourne-cbd'],
+      },
+    ],
+  },
+
+  // ── 26. Alpine Snowfields — Baw Baw ─────────────────────────────
+  {
+    id: 'baw-baw',
+    name: 'Mount Baw Baw',
+    tagline: 'Victoria\'s most accessible ski resort — snow in winter, wildflower walks and forest drives in summer.',
+    driveTimeRange: '2 – 2.5 hrs',
+    themes: ['Snow', 'Hiking', 'Nature', 'Wildlife', 'Scenic'],
+    seasonalScores: { summer: 6, autumn: 7, winter: 9, spring: 7 },
+    image: '⛷️',
+    imageUrl: 'https://images.unsplash.com/photo-1551524559-8af4e6624178?w=1200&q=80',
+    gradientFrom: '#0d2137',
+    gradientTo: '#1a3a5c',
+    subDests: [
+      {
+        id: 'mount-baw-baw',
+        name: 'Mount Baw Baw',
+        driveTimeHours: 2.2,
+        driveKm: 175,
+        highlights: ['Ski and snowboard runs (June–September)', 'Mount Baw Baw Alpine Resort village', 'Cascades Nature Walk and alpine wildflowers (spring/summer)', 'Mountain ash forests and lyrebird habitat'],
+        themes: ['Snow', 'Hiking', 'Nature', 'Wildlife'],
+        coord: { lng: 146.270, lat: -37.838 },
+        nearbyIds: ['walhalla', 'fish-creek'],
+      },
+      {
+        id: 'rawson',
+        name: 'Rawson & Thomson River',
+        driveTimeHours: 2.0,
+        driveKm: 165,
+        highlights: ['Thomson River trout fishing', 'Rawson township with local cafe', 'Scenic drive through Tyers and Rawson', 'Gateway to Baw Baw National Park'],
+        themes: ['Nature', 'Hiking', 'Scenic'],
+        coord: { lng: 146.482, lat: -37.897 },
+        nearbyIds: ['mount-baw-baw', 'walhalla'],
+      },
+    ],
+  },
 ]
 
 /** Return clusters sorted by seasonal score (desc) for the given season */
@@ -1436,20 +1538,33 @@ export function matchDestinations(opts: {
       if (seasonScore >= 9) matchReasons.push(`Perfect for ${season}`)
       else if (seasonScore >= 7) matchReasons.push(`Great in ${season}`)
 
-      const allThemes = [...cluster.themes, ...sub.themes].map((t) => t.toLowerCase())
+      const clusterThemes = cluster.themes.map((t) => t.toLowerCase())
+      const subThemes = sub.themes.map((t) => t.toLowerCase())
+      const subNameLower = sub.name.toLowerCase()
       let activityMatches = 0
       for (const interest of interests) {
-        const matched = INTEREST_THEMES[interest].some((t) =>
-          allThemes.some((at) => at.includes(t.toLowerCase()))
-        )
-        if (matched) { score += 10; activityMatches++ }
+        const interestKeys = INTEREST_THEMES[interest].map((t) => t.toLowerCase())
+        const subMatch = interestKeys.some((t) => subThemes.some((at) => at.includes(t)))
+        const clusterOnlyMatch = !subMatch && interestKeys.some((t) => clusterThemes.some((at) => at.includes(t)))
+        // HotSprings: require sub-dest direct match or name match to avoid Kyneton
+        // (which inherits cluster 'Wellness'/'Spa' themes without actually having hot springs)
+        if (interest === 'HotSprings') {
+          const nameMatch = /hot spring|thermal|mineral spring|bathhouse/.test(subNameLower)
+          if (subMatch || nameMatch) { score += 15; activityMatches++ }
+          // no points for cluster-only match on HotSprings
+        } else if (subMatch) {
+          score += 10; activityMatches++
+        } else if (clusterOnlyMatch) {
+          score += 4 // partial credit for cluster theme only
+        }
       }
       if (activityMatches >= 2) matchReasons.push('Matches your interests')
       else if (activityMatches === 1) matchReasons.push("Has what you're after")
 
       if (hasKids) {
         const kidsThemes = ['wildlife', 'family', 'beach', 'history', 'nature']
-        const kidsMatch = allThemes.some((t) => kidsThemes.some((k) => t.includes(k)))
+        const allThemesCombined = [...clusterThemes, ...subThemes]
+        const kidsMatch = allThemesCombined.some((t) => kidsThemes.some((k) => t.includes(k)))
         if (kidsMatch) { score += 12; matchReasons.push('Great for kids') }
       }
 

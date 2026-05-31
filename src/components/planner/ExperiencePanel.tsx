@@ -10,6 +10,14 @@ import type { GuardrailWarning } from '@/types'
 const GREEN = '#3A6B4F'
 const WARM  = '#B87333'
 
+// Sanitize maps_url: old DB records may have broken formats (coordinate-only, cid=, etc.)
+// Prefer the stored URL if it looks like the current query+place_id format; otherwise
+// fall back to a name-based search which always works.
+function safeMapsUrl(mapsUrl: string | undefined | null, name: string): string {
+  if (mapsUrl && (mapsUrl.includes('query_place_id=') || mapsUrl.includes('api=1'))) return mapsUrl
+  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(name + ' Victoria')}`
+}
+
 // ── Category tag config ────────────────────────────────────────────────────────
 
 const CAT_TAG: Record<string, { label: string; color: string; bg: string }> = {
@@ -401,7 +409,7 @@ export function ExperiencePanel({ hideTimeline = false }: { hideTimeline?: boole
               cost: (a.cost as Activity['cost']) || 'free',
               kidsOk: a.kids_ok,
               isHiddenGem: a.is_hidden_gem,
-              mapsUrl: a.maps_url || '',
+              mapsUrl: safeMapsUrl(a.maps_url, a.name),
               tags: a.tags ?? [],
               websiteUri: aAttr.website_uri as string | undefined,
               editorialSummary: aAttr.editorial_summary as string | undefined,

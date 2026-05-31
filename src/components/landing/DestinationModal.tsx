@@ -97,7 +97,7 @@ export function DestinationModal({
       if (supabase) {
         const { data: sdRow } = await supabase
           .from('sub_destinations')
-          .select('sub_dest_id')
+          .select('sub_dest_id,lat,lng')
           .eq('slug', sub.id)
           .single()
 
@@ -105,9 +105,22 @@ export function DestinationModal({
           const id = sdRow.sub_dest_id
           setSubDestId(id)
 
+          // Bounding box for food/activities: use sub_dest coords
+          const cLat = (sdRow as any).lat as number | null
+          const cLng = (sdRow as any).lng as number | null
+          const MELB_CBD_LAT = -37.814, MELB_CBD_LNG = 144.963
+          const distFromCBD = cLat && cLng ? Math.abs(cLat - MELB_CBD_LAT) + Math.abs(cLng - MELB_CBD_LNG) : 1
+          const DELTA = distFromCBD < 0.5 ? 0.08 : 0.23
+          const latMin = (cLat ?? 0) - DELTA, latMax = (cLat ?? 0) + DELTA
+          const lngMin = (cLng ?? 0) - DELTA, lngMax = (cLng ?? 0) + DELTA
+
           const [actsRes, foodRes, summaryRes] = await Promise.all([
             supabase.from('activities').select('activity_id,name,category,emoji,description,duration,cost,kids_ok,is_hidden_gem,maps_url').eq('sub_dest_id', id).order('is_hidden_gem', { ascending: false }).limit(100),
-            supabase.from('food_places').select('food_place_id,name,category,address,attributes').eq('sub_dest_id', id).limit(100),
+            // Food by bounding box so places enriched under nearby sub_dests still show
+            (cLat && cLng
+              ? supabase.from('food_places').select('food_place_id,name,category,address,attributes').gte('lat', latMin).lte('lat', latMax).gte('lng', lngMin).lte('lng', lngMax).limit(100)
+              : supabase.from('food_places').select('food_place_id,name,category,address,attributes').eq('sub_dest_id', id).limit(100)
+            ),
             supabase.from('destination_summaries').select('ai_summary,best_for').eq('sub_dest_id', id).single(),
           ])
 
@@ -385,7 +398,7 @@ function PreviewActivityRow({ act }: { act: DbActivity }) {
         <div style={{ fontSize: 13, fontWeight: 700, color: '#1C1C1A', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{act.name}</div>
         <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>⏱ {act.duration || '1–2 hrs'}</div>
       </div>
-      <a href={act.maps_url || `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(act.name + ' Victoria')}`} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} style={{ fontSize: 11, fontWeight: 700, color: '#fff', background: '#1C1C1A', padding: '4px 10px', borderRadius: 7, textDecoration: 'none', flexShrink: 0 }}>
+      <a href={(act.maps_url && (act.maps_url.includes('query_place_id=') || act.maps_url.includes('api=1'))) ? act.maps_url : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(act.name + ' Victoria')}`} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} style={{ fontSize: 11, fontWeight: 700, color: '#fff', background: '#1C1C1A', padding: '4px 10px', borderRadius: 7, textDecoration: 'none', flexShrink: 0 }}>
         View on map ↗
       </a>
     </div>

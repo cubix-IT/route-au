@@ -172,6 +172,14 @@ const CLUSTERS = [
     image_emoji: '🚲', image_url: 'https://images.unsplash.com/photo-1464822759023-fed622ff2c3b',
     gradient_from: '#1a2a1a', gradient_to: '#2a4a2a', display_order: 19,
   },
+  {
+    id: 'baw-baw', name: 'Mount Baw Baw',
+    tagline: "Victoria's most accessible alpine resort — snow in winter, wildflower walks and giant tree ferns in summer.",
+    drive_time_range: '2 – 2.5 hrs', themes: ['Snow','Hiking','Nature','Wildlife','Scenic'],
+    seasonal_scores: { summer:6, autumn:7, winter:9, spring:7 },
+    image_emoji: '⛷️', image_url: 'https://images.unsplash.com/photo-1551524559-8af4e6624178?w=1200&q=80',
+    gradient_from: '#0d2137', gradient_to: '#1a3a5c', display_order: 20,
+  },
 ]
 
 const SUB_DESTINATIONS = [
@@ -279,6 +287,10 @@ const SUB_DESTINATIONS = [
   { id:'buchan', cluster_id:'east-gippsland', name:'Buchan Caves', drive_time_hours:4.0, drive_km:360, lat:-37.500, lng:148.167, themes:['Nature','Wildlife','Camping','Hiking'], highlights:['Buchan Caves — remarkable limestone formations, guided tours daily','Kangaroos and wallabies at the reserve at dusk','Buchan Valley camping ground (riverside)','Snowy River National Park entry point'], display_order:4 },
   { id:'mallacoota', cluster_id:'east-gippsland', name:'Mallacoota', drive_time_hours:5.0, drive_km:530, lat:-37.563, lng:149.745, themes:['Nature','Remote','Wildlife','Beaches'], highlights:['Croajingolong National Park (UNESCO listed biosphere reserve)','Top and Bottom Lakes kayaking','Gipsy Point — kangaroos at dusk on the waterfront','Gabo Island Lighthouse boat excursions'], display_order:5 },
   { id:'errinundra', cluster_id:'east-gippsland', name:'Errinundra Plateau', drive_time_hours:4.5, drive_km:390, lat:-37.435, lng:148.840, themes:['Rainforest','Remote','Nature'], highlights:['Oldest cool-temperate rainforest in Victoria','Big Tree — a 300-yr mountain ash','Adams Creek walk through cathedral-like ferns','Virtually no other tourists'], display_order:6 },
+
+  // Baw Baw
+  { id:'mount-baw-baw', cluster_id:'baw-baw', name:'Mount Baw Baw', drive_time_hours:2.2, drive_km:175, lat:-37.838, lng:146.270, themes:['Snow','Hiking','Nature','Wildlife'], highlights:['Ski and snowboard runs (June–September)','Mount Baw Baw Alpine Resort village','Cascades Nature Walk and alpine wildflowers (spring/summer)','Mountain ash forests and lyrebird habitat'], display_order:1 },
+  { id:'rawson', cluster_id:'baw-baw', name:'Rawson & Thomson River', drive_time_hours:2.0, drive_km:165, lat:-37.897, lng:146.482, themes:['Nature','Hiking','Scenic'], highlights:['Thomson River trout fishing','Rawson township','Scenic drive through Tyers and Rawson','Gateway to Baw Baw National Park'], display_order:2 },
 
   // Melbourne
   { id:'melbourne-cbd', cluster_id:'melbourne', name:'Melbourne CBD', drive_time_hours:0, drive_km:0, lat:-37.813, lng:144.963, themes:['Food','Culture','Art','Sport','Laneways'], highlights:['Federation Square & NGV (free entry)','Queen Victoria Market (Tue–Sun)','Iconic laneways — Hosier, Degraves, Centre Place','Rooftop bars and world-class dining'], display_order:1 },
