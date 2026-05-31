@@ -30,3 +30,8 @@ public/tiles/*.pmtiles
 *.sln
 *.sw?
 .vercel
+.env
+CODEBASE_AUDIT.txt
+PRODUCT_BRIEF.txt
+SESSION_PLAN.md
+.claudecode/
