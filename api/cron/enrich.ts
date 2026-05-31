@@ -441,7 +441,7 @@ function categoryFromPlace(name: string, types: string[], primaryType?: string):
     return { category: 'drink', emoji: '🍷' }
   if (/brewery|brew|beer/.test(n))
     return { category: 'drink', emoji: '🍺' }
-  if (/distillery|gin|whisky|whiskey/.test(n))
+  if (/distillery|\bgin\b|whisky|whiskey/.test(n))
     return { category: 'drink', emoji: '🥃' }
   if (/hot spring|mineral spring|thermal|bathhouse/.test(n))
     return { category: 'wellness', emoji: '♨️' }
@@ -453,7 +453,9 @@ function categoryFromPlace(name: string, types: string[], primaryType?: string):
     return { category: 'markets', emoji: '🛒' }
   if (/zoo|sanctuary|wildlife|animal|koala|penguin/.test(n))
     return { category: 'wildlife', emoji: '🦘' }
-  if (/park|reserve|garden|forest|national/.test(n))
+  // 'park' excluded — type-based fallback handles amusement_park → 🎢 and park → 🌳 correctly
+  // (bare 'park' name-check would misclassify "Luna Park" as nature)
+  if (/reserve|garden|forest|national/.test(n))
     return { category: 'nature', emoji: '🌿' }
   if (/adventure|treetop|ropes|zipline|climb/.test(n))
     return { category: 'active', emoji: '🧗' }
