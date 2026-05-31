@@ -27,7 +27,7 @@ const REFRESH_DAYS = 28    // re-enrich each destination once a month
 
 // ── Usage hard limits ────────────────────────────────────────────────────────
 const OVERPASS_DAILY_LIMIT  = 9_000   // stop run if daily total hits this
-const OVERPASS_TIMEOUT_MS   = 12_000  // stop run if a query takes longer
+const OVERPASS_TIMEOUT_MS   = 8_000   // stop run if a query takes longer (Vercel fn limit is 60s)
 const WIKIPEDIA_SLEEP_MS    = 350     // min gap between Wikipedia calls
 const USER_AGENT = 'UnplannedEscapes/1.0 (unplanned-escapes.vercel.app; contact@unplannedescapes.com.au)'
 
