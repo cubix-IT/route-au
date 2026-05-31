@@ -353,10 +353,9 @@ export function usePlannerData() {
     ? `${activeItinerary!.total_days}-Day Escape`
     : 'Day Escape'
 
-  // Categories that are experiences, not food venues — excluded from Eat & Drink
+  // Categories that are experiences — excluded from Eat & Drink, shown in Things to Do
   const NON_FOOD_CATS = new Set([
     'spa', 'wellness', 'beauty_salon', 'beauty', 'gym', 'fitness',
-    'market', 'markets', 'farmers_market', 'flea_market', 'night_market',
     'shopping_mall', 'department_store', 'supermarket',
   ])
 
@@ -366,8 +365,6 @@ export function usePlannerData() {
       const status = (f as unknown as { attributes?: { business_status?: string } }).attributes?.business_status
       if (status && status !== 'OPERATIONAL') return false
       if (NON_FOOD_CATS.has(f.category.toLowerCase())) return false
-      // Catch markets by name regardless of category (e.g. "Daylesford Sunday Market")
-      if (/\bmarkets?\b/i.test(f.name)) return false
       if (/\b(spa|wellness|bathhouse|hot\s*spring|retreat|ryokan|onsen)\b/i.test(f.name)) return false
       return true
     })

@@ -38,7 +38,7 @@ const FOOD_CRAFT   = new Set(['brewery','cider','winery','wine','distillery'])
 const FOOD_TOURISM = new Set(['winery','wine_cellar'])
 
 const NATURE_NATURAL  = new Set(['peak','beach','waterfall','hot_spring','cliff','cave_entrance','volcano','coastline'])
-const NATURE_LEISURE  = new Set(['nature_reserve','park','garden','common','pitch','dog_park'])
+const NATURE_LEISURE  = new Set(['nature_reserve','common','pitch','dog_park'])
 const NATURE_BOUNDARY = new Set(['national_park','protected_area'])
 
 const ACT_TOURISM = new Set(['attraction','museum','artwork','gallery','viewpoint','theme_park','zoo','aquarium','alpine_hut'])
@@ -54,7 +54,17 @@ function osmCategory(tags: Record<string,string>): 'food'|'nature'|'activity'|nu
   if (FOOD_CRAFT.has(tags.craft))        return 'food'
   if (FOOD_TOURISM.has(tags.tourism))    return 'food'
   // Hot springs / mineral springs → activity (wellness), not nature
-  if (tags.natural === 'hot_spring')     return 'activity'
+  if (tags.natural === 'hot_spring' || tags.natural === 'spring') return 'activity'
+  // Railways, historic sites → activity
+  if (tags.railway === 'station')        return 'activity'
+  if (tags.historic)                     return 'activity'
+  // Lakes, waterfalls → activity (scenic)
+  if (tags.waterway === 'waterfall')     return 'activity'
+  if (tags.waterway === 'lake' || tags.waterway === 'reservoir' || tags.waterway === 'dam') return 'activity'
+  // Parks and gardens → activity (nature walk / scenic)
+  if (tags.leisure === 'park' || tags.leisure === 'garden') return 'activity'
+  // Markets → activity
+  if (tags.amenity === 'marketplace')    return 'activity'
   if (NATURE_NATURAL.has(tags.natural))  return 'nature'
   if (NATURE_LEISURE.has(tags.leisure) && !ACT_LEISURE.has(tags.leisure)) return 'nature'
   if (NATURE_BOUNDARY.has(tags.boundary)) return 'nature'
@@ -74,10 +84,14 @@ function activityCategory(tags: Record<string,string>, name: string): string {
   if (tags.natural === 'beach' || tags.leisure === 'beach_resort' || /\bbeach\b|\bcoast\b/.test(n)) return 'beach'
   if (tags.natural === 'hot_spring' || /hot spring|mineral spring|thermal|bathhouse|day spa/.test(n)) return 'wellness'
   // Culture & history
-  if (tags.tourism === 'museum' || tags.amenity === 'museum' || /museum|heritage|historic|history|colonial/.test(n)) return 'history'
+  if (tags.railway === 'station' || /railway|train station|historic station/.test(n)) return 'history'
+  if (tags.historic || /museum|heritage|historic|history|colonial|ruins|memorial|courthouse|gaol/.test(n)) return 'history'
   if (tags.tourism === 'gallery' || tags.amenity === 'arts_centre' || /gallery|art centre|art space/.test(n)) return 'art'
-  // Markets & social
-  if (tags.amenity === 'marketplace' || /\bmarket\b|farmers market|night market/.test(n)) return 'markets'
+  // Markets
+  if (tags.amenity === 'marketplace' || /\bmarket\b|farmers market|night market|sunday market/.test(n)) return 'markets'
+  // Lakes & water features
+  if (tags.waterway === 'lake' || tags.waterway === 'reservoir' || /\blake\b|\breservoir\b/.test(n)) return 'nature'
+  if (tags.waterway === 'waterfall' || /waterfall|falls(?!.?creek)/.test(n)) return 'nature'
   // Wildlife
   if (/wildlife|sanctuary|zoo|koala|penguin|seal|dolphin|animal park/.test(n)) return 'wildlife'
   // Parks & nature reserves
@@ -304,14 +318,18 @@ async function enrichSubDest(
   const query = `[out:json][timeout:25];
 (
   nwr["tourism"~"^(attraction|museum|gallery|viewpoint|theme_park|zoo|aquarium|artwork)$"]["name"](around:${r},${lat},${lng});
-  nwr["leisure"~"^(nature_reserve|sports_centre|stadium|golf_course|miniature_golf|water_park|marina)$"]["name"](around:${r},${lat},${lng});
+  nwr["leisure"~"^(nature_reserve|sports_centre|stadium|golf_course|miniature_golf|water_park|marina|garden|park)$"]["name"](around:${r},${lat},${lng});
   nwr["boundary"~"^(national_park|protected_area)$"]["name"](around:${r},${lat},${lng});
-  nwr["natural"~"^(peak|beach|waterfall|hot_spring|cliff)$"]["name"](around:${r},${lat},${lng});
-  nwr["amenity"~"^(theatre|cinema|marketplace)$"]["name"](around:${r},${lat},${lng});
+  nwr["natural"~"^(peak|beach|waterfall|hot_spring|cliff|spring)$"]["name"](around:${r},${lat},${lng});
+  nwr["amenity"~"^(theatre|cinema|marketplace|spa)$"]["name"](around:${r},${lat},${lng});
+  nwr["amenity"="marketplace"]["name"](around:${r},${lat},${lng});
   nwr["amenity"~"^(cafe|restaurant|pub|bar|bakery|winery|fast_food|biergarten)$"]["name"](around:${r},${lat},${lng});
   nwr["shop"~"^(bakery|pastry|deli|coffee)$"]["name"](around:${r},${lat},${lng});
   nwr["craft"~"^(brewery|cider|winery|wine|distillery)$"]["name"](around:${r},${lat},${lng});
   nwr["tourism"~"^(winery|wine_cellar)$"]["name"](around:${r},${lat},${lng});
+  nwr["railway"="station"]["name"](around:${r},${lat},${lng});
+  nwr["historic"~"^(yes|building|monument|memorial|ruins|railway_station)$"]["name"](around:${r},${lat},${lng});
+  nwr["waterway"~"^(waterfall|lake|reservoir|dam)$"]["name"](around:${r},${lat},${lng});
 );
 out center tags 200;`
 
