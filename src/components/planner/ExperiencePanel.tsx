@@ -525,10 +525,7 @@ export function ExperiencePanel({ hideTimeline = false }: { hideTimeline?: boole
                       </button>
                     )}
                     {showAllActivities && unratedActs.length > 0 && ratedActs.length > 0 && (
-                      <div style={{ margin: '12px 16px 0' }}>
-                        <div style={{ fontSize: 10, fontWeight: 700, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 8 }}>No reviews yet</div>
-                        <div className="activity-grid">{unratedActs.map(renderCard)}</div>
-                      </div>
+                      <div className="activity-grid" style={{ padding: '0 16px', marginTop: 8 }}>{unratedActs.map(renderCard)}</div>
                     )}
                   </>
                 )

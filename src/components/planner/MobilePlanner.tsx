@@ -422,12 +422,7 @@ export function MobilePlanner() {
                       return (
                         <>
                           {primary.map(renderCard)}
-                          {unrated.length > 0 && rated.length > 0 && (
-                            <div style={{ paddingTop: 4 }}>
-                              <div style={{ fontSize: 10, fontWeight: 700, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.09em', marginBottom: 8 }}>No reviews yet</div>
-                              {unrated.map(renderCard)}
-                            </div>
-                          )}
+                          {unrated.length > 0 && rated.length > 0 && unrated.map(renderCard)}
                         </>
                       )
                     })()}
