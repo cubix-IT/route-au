@@ -551,10 +551,10 @@ async function enrichSubDest(
         source: 'google',
       })
     } else {
-      // Quality filter for activities: 4.5★ + 1,000+ reviews
+      // Quality filter: 4.5★ + 200+ reviews (regional attractions rarely have 1000+)
       const rating = place.rating ?? 0
       const reviewCount = place.user_ratings_total ?? 0
-      if (rating < 4.5 || reviewCount < 1000) continue
+      if (rating < 4.5 || reviewCount < 200) continue
 
       // Exclude generic beauty/spa places — only keep genuine experience venues
       // (hot springs, wellness retreats are fine; nail salons and hair salons are not)
@@ -566,6 +566,7 @@ async function enrichSubDest(
       const { category, emoji } = categoryFromPlace(place.name, place.types)
       activities.push({
         slug: placeSlug, sub_dest_id: subDestId, name: place.name,
+        lat: pLat, lng: pLng,
         category, emoji, description: place.editorial_summary ?? '', duration: '1–2 hrs', cost: '$',
         kids_ok: true, is_hidden_gem: false,
         maps_url: `https://www.google.com/maps/place/?q=place_id:${place.place_id}`,
@@ -612,6 +613,7 @@ async function enrichSubDest(
 
 interface ActivityRow {
   slug: string; sub_dest_id: number; name: string; category: string
+  lat: number; lng: number
   emoji: string; description: string; duration: string; cost: string
   kids_ok: boolean; is_hidden_gem: boolean; maps_url: string
   tags: string[]; source: string

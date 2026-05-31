@@ -57,6 +57,8 @@ export interface DbActivity {
   tags: string[]
   source: string
   attributes: Record<string, unknown>
+  lat: number | null
+  lng: number | null
 }
 
 export interface DbFoodPlace {
@@ -94,8 +96,13 @@ export interface DbAccommodation {
   address: string | null
 }
 
-// Fetch all content for a sub-destination from Supabase by slug
-async function fetchDestinationFromDB(destSlug: string): Promise<{
+// Fetch all content for a sub-destination from Supabase
+// Activities + nature queried by lat/lng bounding box (not sub_dest_id) so nearby
+// attractions show regardless of which destination's enrichment created the record.
+async function fetchDestinationFromDB(
+  destSlug: string,
+  destCoord?: { lat: number; lng: number },
+): Promise<{
   activities: DbActivity[]
   food: DbFoodPlace[]
   nature: DbNatureSpot[]
@@ -107,29 +114,56 @@ async function fetchDestinationFromDB(destSlug: string): Promise<{
   // Resolve slug → integer sub_dest_id
   const { data: subDest, error: sdErr } = await supabase
     .from('sub_destinations')
-    .select('sub_dest_id')
+    .select('sub_dest_id,lat,lng')
     .eq('slug', destSlug)
     .single()
 
   if (sdErr || !subDest) return null
   const id = subDest.sub_dest_id
 
+  // Use destCoord if provided, otherwise fall back to sub_dest lat/lng
+  const cLat = destCoord?.lat ?? (subDest as any).lat
+  const cLng = destCoord?.lng ?? (subDest as any).lng
+
+  // ~15km bounding box in degrees
+  const DELTA = 0.14
+  const latMin = cLat - DELTA, latMax = cLat + DELTA
+  const lngMin = cLng - DELTA, lngMax = cLng + DELTA
+
   const [activitiesRes, foodRes, natureRes, accomRes, summaryRes] = await Promise.all([
-    supabase
-      .from('activities')
-      .select('activity_id,slug,name,category,emoji,description,duration,cost,kids_ok,is_hidden_gem,maps_url,tags,source,attributes')
-      .eq('sub_dest_id', id)
-      .limit(200),
+    // Activities: query by bounding box when lat/lng available, else fall back to sub_dest_id
+    (cLat && cLng
+      ? supabase
+          .from('activities')
+          .select('activity_id,slug,name,category,emoji,description,duration,cost,kids_ok,is_hidden_gem,maps_url,tags,source,attributes,lat,lng')
+          .gte('lat', latMin).lte('lat', latMax)
+          .gte('lng', lngMin).lte('lng', lngMax)
+          .limit(200)
+      : supabase
+          .from('activities')
+          .select('activity_id,slug,name,category,emoji,description,duration,cost,kids_ok,is_hidden_gem,maps_url,tags,source,attributes,lat,lng')
+          .eq('sub_dest_id', id)
+          .limit(200)
+    ),
     supabase
       .from('food_places')
       .select('food_place_id,slug,name,category,description,lat,lng,address,attributes,source')
       .eq('sub_dest_id', id)
       .limit(200),
-    supabase
-      .from('nature_spots')
-      .select('nature_spot_id,slug,name,type,description,lat,lng,source')
-      .eq('sub_dest_id', id)
-      .limit(200),
+    // Nature spots: same bounding box approach
+    (cLat && cLng
+      ? supabase
+          .from('nature_spots')
+          .select('nature_spot_id,slug,name,type,description,lat,lng,source')
+          .gte('lat', latMin).lte('lat', latMax)
+          .gte('lng', lngMin).lte('lng', lngMax)
+          .limit(200)
+      : supabase
+          .from('nature_spots')
+          .select('nature_spot_id,slug,name,type,description,lat,lng,source')
+          .eq('sub_dest_id', id)
+          .limit(200)
+    ),
     supabase
       .from('accommodation')
       .select('accommodation_id,slug,name,type,description,lat,lng,address')
@@ -202,7 +236,7 @@ export function usePlannerData() {
     setDbLoading(true)
 
     // Primary: fetch everything from Supabase DB (instant, no per-user API cost)
-    fetchDestinationFromDB(destId).then((result) => {
+    fetchDestinationFromDB(destId, destCoord ?? undefined).then((result) => {
       if (signal.aborted) return
       if (result) {
         setDbActivities(result.activities)
