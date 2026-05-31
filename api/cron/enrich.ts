@@ -359,6 +359,13 @@ out center tags 200;`
         source: 'osm',
       })
     } else if (cat === 'nature') {
+      // Filter out unnamed survey parcels (e.g. "Shicer Hill", "I85 Bushland Reserve")
+      // Keep: has website OR description OR is a named park/reserve people actually visit
+      const isRealNatureSpot = website || tags.description ||
+        /national park|state park|regional park|scenic reserve|falls|waterfall|lake |spring|beach|botanic|gardens?$|lookout|gorge|creek streamside(?! reserve)|conservation reserve/i.test(name_) ||
+        (tags.boundary === 'national_park') ||
+        (tags.natural === 'waterfall' || tags.natural === 'hot_spring' || tags.natural === 'beach' || tags.natural === 'peak')
+      if (!isRealNatureSpot) continue
       nature.push({
         slug: elSlug, sub_dest_id: subDestId,
         name: name_,
