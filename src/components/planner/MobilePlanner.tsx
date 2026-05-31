@@ -266,14 +266,23 @@ export function MobilePlanner() {
 
 
   // Build merged activity list (same logic as desktop)
-  const dbActs: Activity[] = d.dbActivities.map((a) => ({
-    id: String(a.activity_id), name: a.name,
-    category: a.category as Activity['category'],
-    emoji: a.emoji || '📍', description: a.description || '',
-    duration: a.duration || '', cost: (a.cost as Activity['cost']) || 'free',
-    kidsOk: a.kids_ok, isHiddenGem: a.is_hidden_gem,
-    mapsUrl: a.maps_url || '', tags: a.tags ?? [],
-  }))
+  const dbActs: Activity[] = d.dbActivities.map((a) => {
+    const aAttr = (a.attributes as Record<string, unknown>) ?? {}
+    return {
+      id: String(a.activity_id), name: a.name,
+      category: a.category as Activity['category'],
+      emoji: a.emoji || '📍',
+      description: (aAttr.editorial_summary as string | undefined) || a.description || '',
+      duration: a.duration || '', cost: (a.cost as Activity['cost']) || 'free',
+      kidsOk: a.kids_ok, isHiddenGem: a.is_hidden_gem,
+      mapsUrl: a.maps_url || '', tags: a.tags ?? [],
+      websiteUri: aAttr.website_uri as string | undefined,
+      editorialSummary: aAttr.editorial_summary as string | undefined,
+      openingHoursPeriods: aAttr.opening_hours_periods as import('@/lib/overpass').OpenHoursPeriod[] | undefined,
+      rating: aAttr.rating as number | undefined,
+      reviewCount: aAttr.review_count as number | undefined,
+    }
+  })
   const dbNatureActs: Activity[] = d.dbNature.map((n) => ({
     id: `nature-${n.nature_spot_id}`, name: n.name,
     category: (n.type === 'viewpoint' ? 'viewpoint' : n.type === 'beach' ? 'beach' : 'nature') as Activity['category'],
