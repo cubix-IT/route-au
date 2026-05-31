@@ -424,16 +424,9 @@ export function ExperiencePanel({ hideTimeline = false }: { hideTimeline?: boole
             tags: [n.type],
           }))
 
-          // Static curated activities (non-food)
-          const staticActs = d.activities.filter((a) => a.category !== 'food' && a.category !== 'drink')
-
-          // Merge: static first (highest quality), then DB (deduplicate by name)
-          const staticNames = new Set(staticActs.map((a) => a.name.toLowerCase()))
-          const freshActs = dbActs.filter((a) => !staticNames.has(a.name.toLowerCase()))
-          const freshNature = dbNatureActs.filter((a) => !staticNames.has(a.name.toLowerCase()))
-          // Final dedup by name — catches same place appearing in both dbActivities AND dbNature
+          // All activities from Google Places API — no static data
           const seenNames = new Set<string>()
-          const allThingsToDo = [...staticActs, ...freshActs, ...freshNature].filter((a) => {
+          const allThingsToDo = [...dbActs, ...dbNatureActs].filter((a) => {
             const key = a.name.toLowerCase()
             if (seenNames.has(key)) return false
             seenNames.add(key)
@@ -548,19 +541,13 @@ export function ExperiencePanel({ hideTimeline = false }: { hideTimeline?: boole
               const SPA_CATS = new Set(['spa','wellness','beauty_salon','beauty','gym','fitness','market','markets','farmers_market','flea_market','night_market','shopping_mall','department_store','supermarket'])
               const foodOnly = d.dbFood.filter((f) => !SPA_CATS.has(f.category.toLowerCase()) && !/\bmarkets?\b/i.test(f.name))
 
-              // Curated local favs injected at top of the same list — marked with localFav flag
-              const activityFood = d.activities.filter((a) => a.category === 'food' || a.category === 'drink')
+              // Curated local favs from foodDrink.ts (hand-picked signature spots)
               type CuratedItem = { id: string; type: LivePOI['type']; name: string; lat?: number; lng?: number; description?: string; website?: string; isLocalFav: true }
               const curatedItems: CuratedItem[] = [
                 ...d.curatedDining.map((f) => ({
                   id: f.id, type: (f.category?.toLowerCase() ?? 'restaurant') as LivePOI['type'],
                   name: f.name, lat: f.coord?.lat, lng: f.coord?.lng,
                   description: f.signature_dish ? `★ ${f.signature_dish}` : f.description,
-                  isLocalFav: true as const,
-                })),
-                ...activityFood.map((a) => ({
-                  id: a.id, type: (a.category === 'drink' ? 'winery' : 'restaurant') as LivePOI['type'],
-                  name: a.name, website: a.mapsUrl, description: a.description,
                   isLocalFav: true as const,
                 })),
               ]
@@ -862,7 +849,7 @@ export function ExperiencePanel({ hideTimeline = false }: { hideTimeline?: boole
             <span style={{ fontSize: 10, color: '#C8C4BD', fontWeight: 600 }}>v1.3.6</span>
           </div>
           <div style={{ display: 'flex', gap: 12 }}>
-            <a href="/privacy" style={{ fontSize: 11, color: '#9CA3AF', textDecoration: 'none', fontWeight: 500 }}>Privacy & Attribution</a>
+            <button onClick={() => window.dispatchEvent(new CustomEvent('show-privacy'))} style={{ fontSize: 11, color: '#9CA3AF', background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontWeight: 500 }}>Privacy & Attribution</button>
             <a href="mailto:support@cubixit.com.au" style={{ fontSize: 11, color: '#9CA3AF', textDecoration: 'none', fontWeight: 500 }}>Feedback</a>
           </div>
         </div>

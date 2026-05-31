@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Toaster } from 'react-hot-toast'
 import { Header } from '@/components/layout/Header'
 import { MapContainer } from '@/components/map/MapContainer'
@@ -44,16 +44,24 @@ function App() {
   const isWide   = useIsWide()
 
   const [view, setView] = useState<View>(() => activeItinerary ? 'planner' : 'landing')
+  const prevView = useRef<View>(view)
 
   useEffect(() => {
     if (activeItinerary) setView('planner')
     else setView('landing')
   }, [activeItinerary])
 
+  // Allow result page footer to show privacy page via custom event
+  useEffect(() => {
+    const handler = () => { prevView.current = view; setView('privacy') }
+    window.addEventListener('show-privacy', handler)
+    return () => window.removeEventListener('show-privacy', handler)
+  }, [view])
+
   return (
     <>
       {view === 'landing' && <LandingPage onPrivacy={() => setView('privacy')} />}
-      {view === 'privacy' && <PrivacyPage onBack={() => setView('landing')} />}
+      {view === 'privacy' && <PrivacyPage onBack={() => setView(prevView.current === 'planner' ? 'planner' : 'landing')} />}
 
       {view === 'planner' && (
         isMobile ? (

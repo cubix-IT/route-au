@@ -1,6 +1,5 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useAppStore } from '@/store/useAppStore'
-import { useActivities } from '@/hooks/useActivities'
 import { supabase } from '@/lib/supabase'
 import {
   fetchLivePOIs, fetchWikipediaSummary, fetchRouteFoodStops,
@@ -204,8 +203,6 @@ export function usePlannerData() {
   const addedActivities = useAppStore((s) => s.addedActivities)
   const addActivity = useAppStore((s) => s.addActivity)
   const removeActivity = useAppStore((s) => s.removeActivity)
-
-  const { activities } = useActivities(destId)
 
   // DB-sourced state (Supabase — primary)
   const [dbActivities, setDbActivities] = useState<DbActivity[]>([])
@@ -457,7 +454,7 @@ export function usePlannerData() {
     dbActivities: openActivities, dbFood: openFood, dbNature: uniqueNature, dbAccommodation, accommodationPOIs,
     dbLoading, dbFoodCount, dbActivityCount, dbAccomCount,
     // legacy Overpass (fallback + route food)
-    activities, livePOIs, wikiSummary, routeFood,
+    livePOIs, wikiSummary, routeFood,
     foodPOIs, activityPOIs, naturePOIs, hazards,
   }
 }

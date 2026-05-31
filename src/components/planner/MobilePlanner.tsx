@@ -294,14 +294,11 @@ export function MobilePlanner() {
       : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(n.name + ' Victoria')}`,
     tags: [n.type],
   }))
-  const staticActs = d.activities.filter((a) => a.category !== 'food' && a.category !== 'drink')
-  const staticNames = new Set(staticActs.map((a) => a.name.toLowerCase()))
-  const seenNames = new Set<string>(staticNames)
-  const allActivities = [
-    ...staticActs,
-    ...dbActs.filter((a) => { const k = a.name.toLowerCase(); if (seenNames.has(k)) return false; seenNames.add(k); return true }),
-    ...dbNatureActs.filter((a) => { const k = a.name.toLowerCase(); if (seenNames.has(k)) return false; seenNames.add(k); return true }),
-  ]
+  // All activities from Google Places API — 100% DB, no static data
+  const seenNames = new Set<string>()
+  const allActivities = [...dbActs, ...dbNatureActs].filter((a) => {
+    const k = a.name.toLowerCase(); if (seenNames.has(k)) return false; seenNames.add(k); return true
+  })
 
   // Category chips
   const catCounts = new Map<string, number>()
@@ -663,7 +660,7 @@ export function MobilePlanner() {
         <div style={{ padding: '20px 16px', borderTop: '1px solid rgba(0,0,0,0.07)', marginTop: 8, textAlign: 'center' }}>
           <div style={{ fontSize: 11, color: '#9CA3AF', marginBottom: 6 }}>Place data © Google · Map © OpenStreetMap · <span style={{ fontWeight: 600 }}>v1.3.6</span></div>
           <div style={{ display: 'flex', justifyContent: 'center', gap: 16 }}>
-            <a href="/privacy" style={{ fontSize: 11, color: '#9CA3AF', textDecoration: 'none', fontWeight: 500 }}>Privacy & Attribution</a>
+            <button onClick={() => window.dispatchEvent(new CustomEvent('show-privacy'))} style={{ fontSize: 11, color: '#9CA3AF', background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontWeight: 500 }}>Privacy & Attribution</button>
             <a href="mailto:support@cubixit.com.au" style={{ fontSize: 11, color: '#9CA3AF', textDecoration: 'none', fontWeight: 500 }}>Feedback</a>
           </div>
         </div>
