@@ -316,9 +316,23 @@ const PRIMARY_TYPE_ACCOMMODATION = new Set([
   'campground', 'rv_park',
 ])
 
+// Nature spots: specific natural features + protected areas worth visiting
 const PRIMARY_TYPE_NATURE = new Set([
-  'park', 'national_park', 'nature_reserve', 'natural_feature', 'state_park',
-  'forest', 'campground', 'beach', 'hiking_area',
+  'national_park', 'state_park', 'nature_reserve', 'hiking_area', 'beach',
+])
+
+// Skip entirely — generic local infrastructure, not trip-worthy attractions
+const PRIMARY_TYPE_SKIP = new Set([
+  'park',                         // small suburban/local parks (Cornish Hill Reserve etc.)
+  'natural_feature',              // too vague
+  'forest',                       // generic forest entry
+  'campground', 'rv_park',        // accommodation handled separately
+  // Sport/community facilities tourists don't visit
+  'sports_club', 'sports_complex', 'stadium', 'golf_course', 'tennis_court',
+  'fitness_center', 'gym', 'bowling_alley',
+  // Civic/government
+  'city_hall', 'courthouse', 'embassy', 'local_government_office',
+  'community_center', 'convention_center',
 ])
 
 const PRIMARY_TYPE_SERVICE = new Set([
@@ -335,16 +349,16 @@ const PRIMARY_TYPE_SERVICE = new Set([
 // amusement_park, spa, market, etc.) → activity
 function classifyGPlace(types: string[], primaryType?: string): 'activity' | 'food' | 'nature' | 'accommodation' | 'service' | null {
   const pt = primaryType ?? ''
+  if (PRIMARY_TYPE_SKIP.has(pt)) return null       // generic park/reserve — skip
   if (PRIMARY_TYPE_SERVICE.has(pt)) return 'service'
   if (PRIMARY_TYPE_FOOD.has(pt)) return 'food'
   if (PRIMARY_TYPE_ACCOMMODATION.has(pt)) return 'accommodation'
-  if (PRIMARY_TYPE_NATURE.has(pt)) return 'nature'
-  if (pt) return 'activity'  // any other primaryType = it's an attraction
-  // No primaryType at all — fall back to types array conservatively
+  if (PRIMARY_TYPE_NATURE.has(pt)) return 'nature' // hiking_area, beach only
+  if (pt) return 'activity'  // tourist_attraction, museum, zoo, spa, etc.
+  // No primaryType — conservative fallback
   if (types.some(t => PRIMARY_TYPE_FOOD.has(t))) return 'food'
   if (types.includes('lodging')) return 'accommodation'
-  if (types.includes('park') || types.includes('natural_feature')) return 'nature'
-  if (types.includes('tourist_attraction') || types.includes('point_of_interest')) return 'activity'
+  if (types.includes('tourist_attraction')) return 'activity'
   return null
 }
 
