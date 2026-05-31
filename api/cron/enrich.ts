@@ -294,51 +294,57 @@ function extractCuisineTags(types: string[]): string[] {
     .filter(Boolean)
 }
 
-// Explicit food/drink — take priority over point_of_interest which Google adds to everything
-const EXPLICIT_FOOD = new Set([
-  'restaurant', 'cafe', 'bar', 'bakery', 'fast_food',
-  'meal_takeaway', 'meal_delivery', 'winery',
-  // Places API v1 cuisine types — all map to food
+// Classification based exclusively on primaryType from Google Places API v1.
+// The same place always has the same primaryType → deterministic, no cross-table duplicates.
+
+const PRIMARY_TYPE_FOOD = new Set([
+  'restaurant', 'cafe', 'bar', 'bakery', 'fast_food', 'meal_takeaway', 'meal_delivery',
+  'winery', 'bar_and_grill', 'coffee_shop', 'tea_house', 'ice_cream_shop',
+  'dessert_shop', 'pub', 'wine_bar', 'cocktail_bar', 'sports_bar', 'gastropub',
+  'brewery', 'distillery', 'food_court', 'sandwich_shop', 'pizza_restaurant',
+  'burger_restaurant', 'steak_house', 'seafood_restaurant', 'sushi_restaurant',
+  'ramen_restaurant', 'chinese_restaurant', 'italian_restaurant', 'japanese_restaurant',
+  'thai_restaurant', 'vietnamese_restaurant', 'korean_restaurant', 'indian_restaurant',
+  'french_restaurant', 'greek_restaurant', 'mediterranean_restaurant', 'mexican_restaurant',
+  'american_restaurant', 'vegetarian_restaurant', 'vegan_restaurant',
+  'breakfast_restaurant', 'brunch_restaurant', 'fine_dining_restaurant',
   ...Object.keys(CUISINE_TYPE_MAP),
 ])
 
-// Strong activity types that override park/nature classification
-const STRONG_ACTIVITY = new Set([
-  'tourist_attraction', 'zoo', 'aquarium', 'amusement_park', 'amusement_center',
-  'museum', 'art_gallery', 'bowling_alley', 'casino', 'stadium', 'spa',
-  'movie_theater', 'night_club',
+const PRIMARY_TYPE_ACCOMMODATION = new Set([
+  'lodging', 'hotel', 'motel', 'bed_and_breakfast', 'hostel', 'resort',
+  'campground', 'rv_park',
 ])
 
-// Nature types (parks, reserves, natural features)
-const NATURE_TYPES = new Set(['campground', 'natural_feature', 'park', 'rv_park'])
-
-// Accommodation types
-const ACCOMMODATION_TYPES = new Set(['lodging', 'campground', 'rv_park'])
-
-// Service types — NOT searched by default, but classified if they appear.
-// To enable: add the type to the searches array in enrichSubDest.
-const SERVICE_TYPES = new Set([
-  'bank', 'atm', 'hospital', 'pharmacy', 'police',
-  'doctor', 'dentist', 'veterinary_care', 'fire_station',
-  'post_office', 'local_government_office',
+const PRIMARY_TYPE_NATURE = new Set([
+  'park', 'national_park', 'nature_reserve', 'natural_feature', 'state_park',
+  'forest', 'campground', 'beach', 'hiking_area',
 ])
 
-// Types that are experiences/destinations — override food classification even if cafe/restaurant also in types
-const EXPERIENCE_PRIMARY = new Set([
-  'market', 'tourist_attraction', 'farm', 'garden', 'historical_landmark',
-  'historical_place', 'cultural_landmark', 'national_park', 'zoo', 'aquarium',
-  'amusement_park', 'art_gallery', 'museum', 'vineyard', 'winery',
+const PRIMARY_TYPE_SERVICE = new Set([
+  'bank', 'atm', 'hospital', 'pharmacy', 'police', 'fire_station',
+  'doctor', 'dentist', 'veterinary_care', 'post_office', 'local_government_office',
+  'beauty_salon', 'hair_care', 'nail_salon', 'hair_salon', 'barber',
+  'tattoo_parlor', 'gym', 'fitness_center', 'laundry', 'car_wash',
+  'gas_station', 'electric_vehicle_charging_station', 'supermarket',
+  'grocery_store', 'convenience_store', 'clothing_store', 'furniture_store',
+  'hardware_store', 'car_dealer', 'car_rental',
 ])
 
+// Everything else (tourist_attraction, zoo, aquarium, museum, art_gallery,
+// amusement_park, spa, market, etc.) → activity
 function classifyGPlace(types: string[], primaryType?: string): 'activity' | 'food' | 'nature' | 'accommodation' | 'service' | null {
-  // Primary type wins — a market with a cafe corner is still a market
-  if (primaryType && EXPERIENCE_PRIMARY.has(primaryType)) return 'activity'
-  if (types.some((t) => EXPLICIT_FOOD.has(t))) return 'food'
-  if (types.some((t) => ACCOMMODATION_TYPES.has(t))) return 'accommodation'
-  if (types.some((t) => SERVICE_TYPES.has(t))) return 'service'
-  if (types.some((t) => STRONG_ACTIVITY.has(t))) return 'activity'
-  if (types.some((t) => NATURE_TYPES.has(t))) return 'nature'
-  if (types.includes('point_of_interest')) return 'activity'
+  const pt = primaryType ?? ''
+  if (PRIMARY_TYPE_SERVICE.has(pt)) return 'service'
+  if (PRIMARY_TYPE_FOOD.has(pt)) return 'food'
+  if (PRIMARY_TYPE_ACCOMMODATION.has(pt)) return 'accommodation'
+  if (PRIMARY_TYPE_NATURE.has(pt)) return 'nature'
+  if (pt) return 'activity'  // any other primaryType = it's an attraction
+  // No primaryType at all — fall back to types array conservatively
+  if (types.some(t => PRIMARY_TYPE_FOOD.has(t))) return 'food'
+  if (types.includes('lodging')) return 'accommodation'
+  if (types.includes('park') || types.includes('natural_feature')) return 'nature'
+  if (types.includes('tourist_attraction') || types.includes('point_of_interest')) return 'activity'
   return null
 }
 
@@ -574,12 +580,19 @@ async function enrichSubDest(
     }
   }
 
+  // Cross-table dedup: same place_id can only go into one table.
+  // Priority: food > activity > nature > accommodation
+  const foodSlugsLocal = new Set(foods.map(f => f.slug))
+  const actSlugsLocal = new Set(activities.map(a => a.slug))
+  const filteredNature = nature.filter(n => !foodSlugsLocal.has(n.slug) && !actSlugsLocal.has(n.slug))
+  const filteredActivities = activities.filter(a => !foodSlugsLocal.has(a.slug))
+
   let total = 0
 
   const upserts: Array<{ table: string; rows: unknown[] }> = [
-    { table: 'activities', rows: activities },
+    { table: 'activities', rows: filteredActivities },
     { table: 'food_places', rows: foods },
-    { table: 'nature_spots', rows: nature },
+    { table: 'nature_spots', rows: filteredNature },
     { table: 'accommodation', rows: accommodation },
   ]
 
