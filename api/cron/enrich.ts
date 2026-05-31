@@ -438,8 +438,8 @@ const PRIMARY_TYPE_SERVICE = new Set([
 function classifyGPlace(types: string[], primaryType?: string, reviewCount?: number): 'activity' | 'food' | 'nature' | 'accommodation' | 'service' | null {
   const pt = primaryType ?? ''
   if (PRIMARY_TYPE_SKIP.has(pt)) return null
-  // park: only skip if low review count (local reserves); high-review parks are real destinations
-  if (pt === 'park') return (reviewCount ?? 0) >= 300 ? 'activity' : null
+  // park: only skip if very low review count (unnamed local reserves); real parks qualify as activity
+  if (pt === 'park') return (reviewCount ?? 0) >= 50 ? 'activity' : null
   if (PRIMARY_TYPE_SERVICE.has(pt)) return 'service'
   if (PRIMARY_TYPE_FOOD.has(pt)) return 'food'
   if (PRIMARY_TYPE_ACCOMMODATION.has(pt)) return 'accommodation'
@@ -671,12 +671,14 @@ async function enrichSubDest(
       })
     } else {
       // Quality filter:
-      // Standard: 4.5★ + 200+ reviews
-      // Iconic exception: 4.0★ + 5000+ reviews (MCG 4.7/30k, Luna Park 4.1/9k, Crown etc.)
+      // Standard: 4.3★ + 30+ reviews (permissive enough for rural Victorian towns)
+      // Well-known: 4.0★ + 1000+ reviews (popular places that may have mixed reviews)
+      // Iconic: 4.0★ + 5000+ reviews (MCG 4.7/30k, Luna Park 4.1/9k, Crown etc.)
       const rating = place.rating ?? 0
       const reviewCount = place.user_ratings_total ?? 0
+      const isWellKnown = rating >= 4.0 && reviewCount >= 1000
       const isIconic = rating >= 4.0 && reviewCount >= 5000
-      if (!isIconic && (rating < 4.5 || reviewCount < 200)) continue
+      if (!isIconic && !isWellKnown && (rating < 4.3 || reviewCount < 30)) continue
 
       // Exclude pure accommodation venues leaking as tourist_attraction (e.g. RACV Resort)
       // Only skip if both: has lodging in types AND name suggests it's primarily a hotel

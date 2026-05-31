@@ -50,6 +50,10 @@ interface DbActivity {
   description: string; duration: string; cost: string; kids_ok: boolean
   is_hidden_gem: boolean; maps_url: string
 }
+interface DbNature {
+  nature_spot_id: number; name: string; type: string; description: string
+  lat: number | null; lng: number | null; attributes: Record<string, unknown> | null
+}
 interface DbFood {
   food_place_id: number; name: string; category: string
   address: string | null; attributes: Record<string, unknown>
@@ -73,6 +77,7 @@ export function DestinationModal({
 
   // Supabase data
   const [dbActivities, setDbActivities] = useState<DbActivity[]>([])
+  const [dbNature, setDbNature] = useState<DbNature[]>([])
   const [dbFood, setDbFood] = useState<DbFood[]>([])
   const [_subDestId, setSubDestId] = useState<number | null>(null)
   const [dbLoading, setDbLoading] = useState(true)
@@ -82,6 +87,7 @@ export function DestinationModal({
     let cancelled = false
     setDbLoading(true)
     setDbActivities([])
+    setDbNature([])
     setDbFood([])
     setAiSummary(null)
     setSummaryLoading(true)
@@ -114,8 +120,13 @@ export function DestinationModal({
           const latMin = (cLat ?? 0) - DELTA, latMax = (cLat ?? 0) + DELTA
           const lngMin = (cLng ?? 0) - DELTA, lngMax = (cLng ?? 0) + DELTA
 
-          const [actsRes, foodRes, summaryRes] = await Promise.all([
+          const [actsRes, natureRes, foodRes, summaryRes] = await Promise.all([
             supabase.from('activities').select('activity_id,name,category,emoji,description,duration,cost,kids_ok,is_hidden_gem,maps_url').eq('sub_dest_id', id).order('is_hidden_gem', { ascending: false }).limit(100),
+            // Nature spots by bounding box — catches parks/reserves enriched under nearby sub_dests
+            (cLat && cLng
+              ? supabase.from('nature_spots').select('nature_spot_id,name,type,description,lat,lng,attributes').gte('lat', latMin).lte('lat', latMax).gte('lng', lngMin).lte('lng', lngMax).limit(50)
+              : supabase.from('nature_spots').select('nature_spot_id,name,type,description,lat,lng,attributes').eq('sub_dest_id', id).limit(50)
+            ),
             // Food by bounding box so places enriched under nearby sub_dests still show
             (cLat && cLng
               ? supabase.from('food_places').select('food_place_id,name,category,address,attributes').gte('lat', latMin).lte('lat', latMax).gte('lng', lngMin).lte('lng', lngMax).limit(100)
@@ -126,6 +137,7 @@ export function DestinationModal({
 
           if (!cancelled) {
             setDbActivities((actsRes.data ?? []) as DbActivity[])
+            setDbNature((natureRes.data ?? []) as DbNature[])
             setDbFood((foodRes.data ?? []) as DbFood[])
             setDbLoading(false)
 
@@ -167,9 +179,26 @@ export function DestinationModal({
 
   const suitability = aiSummary?.bestFor?.length ? aiSummary.bestFor : deriveSuitability(activities, dbActivities)
 
-  // Best 5 for preview + total counts
-  const previewActs = dbActivities.slice(0, PREVIEW_LIMIT)
-  const moreActsCount = Math.max(0, dbActivities.length - PREVIEW_LIMIT)
+  // Merge activities + nature spots for "Things to Do" — activities first, then nature
+  const allThingsToDo = [
+    ...dbActivities,
+    ...dbNature.map((n) => ({
+      activity_id: -(n.nature_spot_id),
+      name: n.name,
+      category: n.type === 'national_park' ? 'nature' : 'nature',
+      emoji: '🌿',
+      description: n.description,
+      duration: '',
+      cost: 'Free',
+      kids_ok: true,
+      is_hidden_gem: false,
+      maps_url: n.attributes?.google_place_id
+        ? `https://www.google.com/maps/place/?q=place_id:${n.attributes.google_place_id}`
+        : `https://www.google.com/maps/search/?q=${encodeURIComponent(n.name + ' Victoria')}`,
+    } as DbActivity)),
+  ]
+  const previewActs = allThingsToDo.slice(0, PREVIEW_LIMIT)
+  const moreActsCount = Math.max(0, allThingsToDo.length - PREVIEW_LIMIT)
   const previewFood = dbFood.slice(0, PREVIEW_LIMIT)
   const moreFoodCount = Math.max(0, dbFood.length - PREVIEW_LIMIT)
 
@@ -339,7 +368,7 @@ export function DestinationModal({
               {dbLoading && (
                 <div style={{ textAlign: 'center', padding: 24, color: 'var(--text-muted)', fontSize: 13 }}>Loading…</div>
               )}
-              {!dbLoading && dbActivities.length === 0 && activities.length === 0 && (
+              {!dbLoading && allThingsToDo.length === 0 && activities.length === 0 && (
                 <div style={{ textAlign: 'center', padding: 24, color: 'var(--text-muted)', fontSize: 13 }}>No activities found yet — check back after our daily refresh.</div>
               )}
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -347,10 +376,10 @@ export function DestinationModal({
                 {activities.map((act) => (
                   <ActivityFullRow key={act.id} name={act.name} emoji={act.emoji} category={act.category} description={act.description} duration={act.duration} cost={act.cost} isHiddenGem={act.isHiddenGem} kidsOk={act.kidsOk} mapsUrl={act.mapsUrl} />
                 ))}
-                {/* DB activities (dedupe by name) */}
+                {/* DB activities + nature spots (dedupe by name) */}
                 {(() => {
                   const staticNames = new Set(activities.map((a) => a.name.toLowerCase()))
-                  return dbActivities
+                  return allThingsToDo
                     .filter((a) => !staticNames.has(a.name.toLowerCase()))
                     .map((a) => (
                       <ActivityFullRow key={`db-${a.activity_id}`} name={a.name} emoji={a.emoji} category={a.category} description={a.description} duration={a.duration} cost={a.cost} isHiddenGem={a.is_hidden_gem} kidsOk={a.kids_ok} mapsUrl={a.maps_url} />
