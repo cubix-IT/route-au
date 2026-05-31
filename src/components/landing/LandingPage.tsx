@@ -617,9 +617,12 @@ export function LandingPage({ onPrivacy }: { onPrivacy?: () => void } = {}) {
             <span style={{ fontSize: 11.5, color: 'rgba(255,255,255,0.5)' }}>
               Helping Victorians escape, one weekend at a time.
             </span>
-            <span style={{ fontSize: 11.5, color: 'rgba(255,255,255,0.5)' }}>
-              Created by <span style={{ color: 'rgba(255,255,255,0.8)', fontWeight: 600 }}>Cubix IT Solutions</span>
-            </span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)' }}>v1.3.6</span>
+              <span style={{ fontSize: 11.5, color: 'rgba(255,255,255,0.5)' }}>
+                Created by <span style={{ color: 'rgba(255,255,255,0.8)', fontWeight: 600 }}>Cubix IT Solutions</span>
+              </span>
+            </div>
           </div>
         </div>
       </footer>
