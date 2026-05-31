@@ -316,10 +316,12 @@ const PRIMARY_TYPE_ACCOMMODATION = new Set([
   'campground', 'rv_park',
 ])
 
-// Nature spots: specific natural features + protected areas worth visiting
+// Nature spots: only protected area entries (location-level, no rating needed)
 const PRIMARY_TYPE_NATURE = new Set([
-  'national_park', 'state_park', 'nature_reserve', 'hiking_area', 'beach',
+  'national_park', 'state_park', 'nature_reserve',
 ])
+// Beaches and hiking areas are things to DO — classify as activity so rating/description shows
+// (activities table has full attributes; nature_spots does not)
 
 // Skip entirely — generic local infrastructure, not trip-worthy attractions
 const PRIMARY_TYPE_SKIP = new Set([
@@ -349,12 +351,18 @@ const PRIMARY_TYPE_SERVICE = new Set([
 // amusement_park, spa, market, etc.) → activity
 function classifyGPlace(types: string[], primaryType?: string): 'activity' | 'food' | 'nature' | 'accommodation' | 'service' | null {
   const pt = primaryType ?? ''
-  if (PRIMARY_TYPE_SKIP.has(pt)) return null       // generic park/reserve — skip
+  if (PRIMARY_TYPE_SKIP.has(pt)) return null
   if (PRIMARY_TYPE_SERVICE.has(pt)) return 'service'
   if (PRIMARY_TYPE_FOOD.has(pt)) return 'food'
   if (PRIMARY_TYPE_ACCOMMODATION.has(pt)) return 'accommodation'
-  if (PRIMARY_TYPE_NATURE.has(pt)) return 'nature' // hiking_area, beach only
-  if (pt) return 'activity'  // tourist_attraction, museum, zoo, spa, etc.
+  if (PRIMARY_TYPE_NATURE.has(pt)) return 'nature'
+  if (pt) {
+    // Even if primaryType is tourist_attraction, check secondary types —
+    // highly-rated local cafes/kebabs/burger joints often get tagged tourist_attraction
+    if (types.some(t => PRIMARY_TYPE_FOOD.has(t))) return 'food'
+    if (types.some(t => PRIMARY_TYPE_ACCOMMODATION.has(t))) return 'accommodation'
+    return 'activity'
+  }
   // No primaryType — conservative fallback
   if (types.some(t => PRIMARY_TYPE_FOOD.has(t))) return 'food'
   if (types.includes('lodging')) return 'accommodation'
@@ -570,17 +578,18 @@ async function enrichSubDest(
       const reviewCount = place.user_ratings_total ?? 0
       if (rating < 4.5 || reviewCount < 200) continue
 
-      // Exclude accommodation showing as tourist_attraction (e.g. RACV Resort)
+      // Exclude accommodation leaking as tourist_attraction (e.g. RACV Resort)
       const isAccommodation = place.types.some((t) =>
         ['lodging', 'hotel', 'motel', 'resort', 'bed_and_breakfast', 'hostel'].includes(t)
       )
       if (isAccommodation) continue
 
-      // Exclude generic beauty/spa — only keep genuine experience venues
-      const isGenericBeauty = place.types.some((t) =>
-        ['beauty_salon', 'hair_care', 'nail_salon', 'hair_salon', 'barber', 'tattoo_parlor'].includes(t)
+      // Exclude beauty/personal services — not tourist destinations
+      const isService = place.types.some((t) =>
+        ['beauty_salon', 'hair_care', 'nail_salon', 'hair_salon', 'barber',
+         'tattoo_parlor', 'massage', 'physiotherapist', 'chiropractor'].includes(t)
       )
-      if (isGenericBeauty) continue
+      if (isService) continue
 
       const { category, emoji } = categoryFromPlace(place.name, place.types)
       activities.push({
