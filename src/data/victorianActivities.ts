@@ -1,5 +1,5 @@
 // Types only — static activity data removed.
-// All activities come from Google Places API via the enrichment cron.
+// All activities come from Overpass API (OSM) via the enrichment cron.
 // See api/cron/enrich.ts and usePlannerData.ts → d.dbActivities.
 
 export type ActivityCategory =
@@ -49,7 +49,7 @@ export interface SubDestActivities {
   activities: Activity[]
 }
 
-// Returns empty — all activity data comes from Google Places API
+// Returns empty — all activity data comes from Overpass OSM enrichment
 export function getActivitiesForSubDest(_subDestId: string): Activity[] { return [] }
 export function getHiddenGems(_subDestId: string): Activity[] { return [] }
 export function getActivitiesForKids(_subDestId: string): Activity[] { return [] }

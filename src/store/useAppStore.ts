@@ -121,7 +121,7 @@ interface AppState {
   selectedPinId: string | null
   setSelectedPinId: (id: string | null) => void
 
-  // Google Places budget failover
+  // Overpass/OSM data mode
   placesLimitedMode: boolean
   setPlacesLimitedMode: (v: boolean) => void
 }

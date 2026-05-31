@@ -294,7 +294,7 @@ export function MobilePlanner() {
       : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(n.name + ' Victoria')}`,
     tags: [n.type],
   }))
-  // All activities from Google Places API — 100% DB, no static data
+  // All activities from Supabase (enriched via Overpass/OSM)
   const seenNames = new Set<string>()
   const allActivities = [...dbActs, ...dbNatureActs].filter((a) => {
     const k = a.name.toLowerCase(); if (seenNames.has(k)) return false; seenNames.add(k); return true

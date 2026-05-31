@@ -101,7 +101,7 @@ function sortAccomByPref(pois: AccommodationPOI[], pref?: string): Accommodation
   })
 }
 
-// ── Open/closed status from Google Places regularOpeningHours.periods ─────────
+// ── Open/closed status from opening_hours (OSM) ─────────
 
 interface OpenPeriod {
   open: { day: number; hour: number; minute: number }
@@ -175,7 +175,7 @@ export function ExperiencePanel({ hideTimeline = false }: { hideTimeline?: boole
   const d = usePlannerData()
   const setDisplayedMapPins = useAppStore((s) => s.setDisplayedMapPins)
   const setActivePOIFilter = useAppStore((s) => s.setActivePOIFilter)
-  const placesLimitedMode = useAppStore((s) => s.placesLimitedMode)
+  const placesLimitedMode = false // Google Places removed — always Overpass/Supabase
   const selectedPinId = useAppStore((s) => s.selectedPinId)
   const setSelectedPinId = useAppStore((s) => s.setSelectedPinId)
   const panelRef = useRef<HTMLDivElement>(null)
@@ -436,7 +436,7 @@ export function ExperiencePanel({ hideTimeline = false }: { hideTimeline?: boole
             tags: [n.type],
           }))
 
-          // All activities from Google Places API — no static data
+          // All activities from Supabase (enriched via Overpass/OSM)
           const seenNames = new Set<string>()
           const allThingsToDo = [...dbActs, ...dbNatureActs].filter((a) => {
             const key = a.name.toLowerCase()
