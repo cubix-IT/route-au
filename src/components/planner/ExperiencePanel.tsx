@@ -431,7 +431,14 @@ export function ExperiencePanel({ hideTimeline = false }: { hideTimeline?: boole
           const staticNames = new Set(staticActs.map((a) => a.name.toLowerCase()))
           const freshActs = dbActs.filter((a) => !staticNames.has(a.name.toLowerCase()))
           const freshNature = dbNatureActs.filter((a) => !staticNames.has(a.name.toLowerCase()))
-          const allThingsToDo = [...staticActs, ...freshActs, ...freshNature]
+          // Final dedup by name — catches same place appearing in both dbActivities AND dbNature
+          const seenNames = new Set<string>()
+          const allThingsToDo = [...staticActs, ...freshActs, ...freshNature].filter((a) => {
+            const key = a.name.toLowerCase()
+            if (seenNames.has(key)) return false
+            seenNames.add(key)
+            return true
+          })
 
           // Derive available categories for filter chips
           const catCounts = new Map<string, number>()
@@ -559,8 +566,9 @@ export function ExperiencePanel({ hideTimeline = false }: { hideTimeline?: boole
                 const a = (f.attributes as Record<string, unknown>) ?? {}
                 return !((a.rating as number | undefined) && (a.review_count as number | undefined))
               })
-              const hasEnoughRated = ratedFood.length >= 2
-              const primaryFood = (hasEnoughRated ? ratedFood : foodOnly)
+              const hasEnoughRated = ratedFood.length >= 1
+              // Always show rated food first — unrated food hidden under "Show more"
+              const primaryFood = ratedFood
                 .filter((f) => !curatedNames.has(f.name.toLowerCase())) // don't duplicate curated items
 
               const FOOD_CAT_LABEL: Record<string, string> = {

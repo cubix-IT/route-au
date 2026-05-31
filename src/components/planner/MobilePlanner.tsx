@@ -296,10 +296,11 @@ export function MobilePlanner() {
   }))
   const staticActs = d.activities.filter((a) => a.category !== 'food' && a.category !== 'drink')
   const staticNames = new Set(staticActs.map((a) => a.name.toLowerCase()))
+  const seenNames = new Set<string>(staticNames)
   const allActivities = [
     ...staticActs,
-    ...dbActs.filter((a) => !staticNames.has(a.name.toLowerCase())),
-    ...dbNatureActs.filter((a) => !staticNames.has(a.name.toLowerCase())),
+    ...dbActs.filter((a) => { const k = a.name.toLowerCase(); if (seenNames.has(k)) return false; seenNames.add(k); return true }),
+    ...dbNatureActs.filter((a) => { const k = a.name.toLowerCase(); if (seenNames.has(k)) return false; seenNames.add(k); return true }),
   ]
 
   // Category chips
