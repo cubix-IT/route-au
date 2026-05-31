@@ -45,11 +45,16 @@ const ACT_TOURISM = new Set(['attraction','museum','artwork','gallery','viewpoin
 const ACT_LEISURE = new Set(['sports_centre','stadium','golf_course','miniature_golf','swimming_pool','marina','picnic_ground','water_park','amusement_arcade'])
 const ACT_AMENITY = new Set(['theatre','cinema','arts_centre','library','marketplace'])
 
+// Fast food chains — never useful for a weekend getaway app
+const CHAIN_BLACKLIST = /\b(mcdonald'?s|hungry jack'?s|kfc|subway|domino'?s|pizza hut|red rooster|oporto|nando'?s|grill'?d|betty'?s burgers|guzman|taco bell|carl'?s jr|burger king|wendy'?s|seven.?eleven|7.?eleven|bp|caltex|shell|ampol|united petroleum|woolworths|coles|aldi|chemist warehouse)\b/i
+
 function osmCategory(tags: Record<string,string>): 'food'|'nature'|'activity'|null {
   if (FOOD_AMENITY.has(tags.amenity))    return 'food'
   if (FOOD_SHOP.has(tags.shop))          return 'food'
   if (FOOD_CRAFT.has(tags.craft))        return 'food'
   if (FOOD_TOURISM.has(tags.tourism))    return 'food'
+  // Hot springs / mineral springs → activity (wellness), not nature
+  if (tags.natural === 'hot_spring')     return 'activity'
   if (NATURE_NATURAL.has(tags.natural))  return 'nature'
   if (NATURE_LEISURE.has(tags.leisure) && !ACT_LEISURE.has(tags.leisure)) return 'nature'
   if (NATURE_BOUNDARY.has(tags.boundary)) return 'nature'
@@ -61,20 +66,33 @@ function osmCategory(tags: Record<string,string>): 'food'|'nature'|'activity'|nu
 
 function activityCategory(tags: Record<string,string>, name: string): string {
   const n = name.toLowerCase()
-  if (tags.tourism === 'viewpoint' || /lookout|viewpoint|scenic/.test(n)) return 'viewpoint'
-  if (tags.natural === 'waterfall' || /waterfall|falls/.test(n))          return 'nature'
-  if (tags.natural === 'peak' || /peak|summit|mount\b/.test(n))           return 'viewpoint'
-  if (tags.natural === 'beach' || tags.leisure === 'beach_resort')        return 'beach'
-  if (tags.natural === 'hot_spring' || /hot spring|mineral spring|thermal|bathhouse/.test(n)) return 'wellness'
-  if (tags.tourism === 'museum' || /museum|heritage|historic/.test(n))    return 'history'
-  if (tags.tourism === 'gallery' || /gallery|art\b/.test(n))              return 'art'
-  if (tags.amenity === 'marketplace' || /market|farmers/.test(n))         return 'markets'
-  if (tags.leisure === 'nature_reserve' || tags.boundary === 'national_park' || /national park|reserve|forest/.test(n)) return 'nature'
-  if (/wildlife|sanctuary|zoo|koala|penguin/.test(n))                     return 'wildlife'
-  if (tags.leisure === 'sports_centre' || tags.leisure === 'stadium')     return 'entertainment'
-  if (tags.amenity === 'theatre' || tags.amenity === 'cinema')            return 'entertainment'
-  if (/adventure|zipline|treetop|ropes|climb/.test(n))                    return 'active'
-  if (/spa|wellness|retreat/.test(n))                                      return 'relaxation'
+  // Viewpoints & scenic
+  if (tags.tourism === 'viewpoint' || /lookout|viewpoint|scenic overlook|panorama/.test(n)) return 'viewpoint'
+  if (tags.natural === 'peak' || /\bpeak\b|summit|mount\b/.test(n))      return 'viewpoint'
+  // Water & nature
+  if (tags.natural === 'waterfall' || /waterfall|falls(?!.?creek)/.test(n)) return 'nature'
+  if (tags.natural === 'beach' || tags.leisure === 'beach_resort' || /\bbeach\b|\bcoast\b/.test(n)) return 'beach'
+  if (tags.natural === 'hot_spring' || /hot spring|mineral spring|thermal|bathhouse|day spa/.test(n)) return 'wellness'
+  // Culture & history
+  if (tags.tourism === 'museum' || tags.amenity === 'museum' || /museum|heritage|historic|history|colonial/.test(n)) return 'history'
+  if (tags.tourism === 'gallery' || tags.amenity === 'arts_centre' || /gallery|art centre|art space/.test(n)) return 'art'
+  // Markets & social
+  if (tags.amenity === 'marketplace' || /\bmarket\b|farmers market|night market/.test(n)) return 'markets'
+  // Wildlife
+  if (/wildlife|sanctuary|zoo|koala|penguin|seal|dolphin|animal park/.test(n)) return 'wildlife'
+  // Parks & nature reserves
+  if (tags.leisure === 'nature_reserve' || tags.boundary === 'national_park' || /national park|state park|nature reserve/.test(n)) return 'nature'
+  if (/\bgarden\b|botanic|arboretum/.test(n))                             return 'nature'
+  if (/forest|bush walk|rainforest/.test(n))                              return 'nature'
+  // Active & adventure
+  if (/adventure|zipline|treetop|ropes|rock climb|absei/.test(n))        return 'active'
+  if (tags.leisure === 'sports_centre' || /sports centre|leisure centre/.test(n)) return 'active'
+  if (tags.leisure === 'golf_course' || /golf/.test(n))                   return 'active'
+  // Relaxation & wellness
+  if (tags.amenity === 'spa' || tags.leisure === 'spa' || /\bspa\b|wellness|retreat|day spa/.test(n)) return 'relaxation'
+  // Entertainment
+  if (tags.leisure === 'stadium' || tags.amenity === 'theatre' || tags.amenity === 'cinema') return 'entertainment'
+  if (/winery|cellar door|vineyard|brewery|distillery/.test(n))           return 'relaxation'
   return 'nature'
 }
 
@@ -89,13 +107,12 @@ function activityEmoji(category: string): string {
 
 function foodCategory(tags: Record<string,string>, name: string): string {
   const n = name.toLowerCase()
-  if (tags.craft === 'brewery' || tags.craft === 'cider' || /brewery|brewing/.test(n)) return 'Brewery'
-  if (tags.craft === 'distillery' || tags.craft === 'gin' || /distillery|gin\b/.test(n)) return 'Distillery'
+  if (tags.craft === 'brewery' || tags.craft === 'cider' || /brewery|brewing|brewpub/.test(n)) return 'Brewery'
+  if (tags.craft === 'distillery' || /distillery|\bgin\b|whisky|whiskey/.test(n)) return 'Distillery'
   if (tags.amenity === 'winery' || tags.tourism === 'winery' || tags.craft === 'winery' || /winery|cellar door|vineyard/.test(n)) return 'Winery'
   if (tags.amenity === 'pub' || tags.amenity === 'bar' || tags.amenity === 'biergarten') return 'Pub'
-  if (tags.shop === 'bakery' || tags.amenity === 'bakery' || /bakery|bakehouse/.test(n)) return 'Bakery'
-  if (tags.amenity === 'cafe' || tags.shop === 'coffee') return 'Cafe'
-  if (tags.amenity === 'ice_cream') return 'Cafe'
+  if (tags.shop === 'bakery' || tags.amenity === 'bakery' || /bakery|bakehouse|patisserie/.test(n)) return 'Bakery'
+  if (tags.amenity === 'cafe' || tags.shop === 'coffee' || tags.amenity === 'ice_cream') return 'Cafe'
   if (tags.amenity === 'fast_food') return 'Cafe'
   return 'Restaurant'
 }
@@ -110,6 +127,9 @@ function natureType(tags: Record<string,string>): string {
 // Activities: all named OSM tourism/leisure features qualify (OSM is curated, not spam)
 // Nature: all named natural features qualify
 function foodQualifies(tags: Record<string,string>): boolean {
+  // Exclude chain fast food & fuel stations — not weekend getaway recommendations
+  if (CHAIN_BLACKLIST.test(tags.name || '')) return false
+  // Must have at least one contact/hours signal — shows it's an active local business
   return !!(tags.website || tags['contact:website'] || tags.phone || tags['contact:phone'] || tags.opening_hours)
 }
 
