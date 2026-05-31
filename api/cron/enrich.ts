@@ -262,6 +262,56 @@ async function fetchByKeyword(
     }))
 }
 
+// ── Fallback description when Google provides no editorial summary ─────────────
+
+function fallbackDescription(placeName: string, category: string, destName: string): string {
+  const n = placeName.toLowerCase()
+  const dest = destName.split(',')[0].trim()
+
+  // Name-specific patterns — ordered most specific to least
+  if (/seal colony|seal rock|fur seal/.test(n)) return `A renowned coastal spot near ${dest} where Australian fur seals can be observed in their natural habitat.`
+  if (/blowholes?/.test(n)) return `Dramatic natural blowholes near ${dest} where ocean swells force water through coastal rock formations.`
+  if (/petrified forest|petrified/.test(n)) return `An ancient petrified forest near ${dest}, a striking geological formation exposed along the coastline.`
+  if (/whale watch|whale viewing/.test(n)) return `A prime location near ${dest} for spotting Southern Right Whales during their seasonal migration.`
+  if (/penguin|little penguin/.test(n)) return `A wildlife experience near ${dest} where visitors can see Little Penguins in their natural coastal habitat.`
+  if (/koala|wildlife sanctuary|wildlife park/.test(n)) return `A wildlife sanctuary near ${dest} offering close encounters with native Australian animals.`
+  if (/waterfall|falls/.test(n)) return `A beautiful waterfall in the ${dest} area, a popular stop for nature lovers and bushwalkers.`
+  if (/lookout|scenic view|observation|panoram/.test(n)) return `A scenic lookout near ${dest} with sweeping views of the surrounding landscape.`
+  if (/gorge|canyon/.test(n)) return `A dramatic gorge near ${dest} carved through ancient rock formations over millions of years.`
+  if (/hot spring|mineral spring|thermal spring/.test(n)) return `Natural mineral springs near ${dest} renowned for their therapeutic properties and bathing experiences.`
+  if (/cave|cavern/.test(n)) return `A remarkable cave system near ${dest} showcasing impressive limestone formations and underground beauty.`
+  if (/lake/.test(n)) return `A scenic lake near ${dest} popular for its peaceful surroundings and natural beauty.`
+  if (/beach|surf beach|bay/.test(n)) return `A popular beach near ${dest} known for its natural beauty and coastal scenery.`
+  if (/national park|state park|nature reserve/.test(n)) return `A protected natural area near ${dest} offering wilderness experiences and diverse native flora and fauna.`
+  if (/botanic|botanical|garden/.test(n)) return `A beautiful garden in ${dest} showcasing native and exotic plant collections.`
+  if (/market/.test(n)) return `A popular local market in ${dest} featuring fresh produce, artisan goods and regional specialties.`
+  if (/railway|steam train|puffing billy/.test(n)) return `A heritage railway experience near ${dest} offering scenic rides through the regional landscape.`
+  if (/winery|cellar door|vineyard/.test(n)) return `A winery in the ${dest} region offering cellar door tastings of locally produced wines.`
+  if (/brewery|brewing/.test(n)) return `A craft brewery in ${dest} producing a range of locally made beers.`
+  if (/distillery/.test(n)) return `A distillery in ${dest} crafting quality spirits using local ingredients.`
+  if (/museum|heritage|historic/.test(n)) return `A museum in ${dest} exploring the region's fascinating history and cultural heritage.`
+  if (/gallery|art/.test(n)) return `An arts destination in ${dest} showcasing works from local and regional artists.`
+  if (/spa|bathhouse|wellness/.test(n)) return `A wellness destination in ${dest} offering spa treatments and rejuvenating experiences.`
+  if (/farm|farmhouse/.test(n)) return `A farm experience near ${dest} offering a taste of regional produce and rural life.`
+
+  // Category fallbacks
+  const categoryDescriptions: Record<string, string> = {
+    wildlife:      `A wildlife experience near ${dest} well-regarded for native animal encounters.`,
+    viewpoint:     `A scenic viewpoint near ${dest} with outstanding views of the regional landscape.`,
+    beach:         `A beach destination near ${dest} popular with locals and visitors alike.`,
+    nature:        `A natural attraction near ${dest} offering a chance to explore the local environment.`,
+    history:       `A historical site in ${dest} offering insight into the region's rich past.`,
+    art:           `An arts and culture destination in ${dest} worth visiting.`,
+    active:        `An outdoor activity destination near ${dest} for adventure seekers.`,
+    wellness:      `A wellness and relaxation destination in ${dest}.`,
+    relaxation:    `A peaceful retreat in the ${dest} area.`,
+    markets:       `A local market in ${dest} showcasing regional produce and handmade goods.`,
+    drink:         `A local cellar door or craft drink experience in the ${dest} region.`,
+    entertainment: `A popular entertainment venue in ${dest}.`,
+  }
+  return categoryDescriptions[category] ?? `A well-rated attraction near ${dest} recommended by visitors.`
+}
+
 // ── Classification ────────────────────────────────────────────────────────────
 
 // Cuisine types from Google Places API v1 — used for wizard filtering
@@ -535,7 +585,7 @@ async function enrichSubDest(
       foods.push({
         slug: placeSlug, sub_dest_id: subDestId, name: place.name,
         category: foodCategoryFromTypes(place.types),
-        description: place.editorial_summary ?? '', lat: pLat, lng: pLng, address,
+        description: place.editorial_summary || fallbackDescription(place.name, 'food', name), lat: pLat, lng: pLng, address,
         // Store cuisine tags from Google Places v1 types (e.g. chinese_restaurant) for wizard filtering
         attributes: {
           google_place_id: place.place_id,
@@ -559,7 +609,7 @@ async function enrichSubDest(
       nature.push({
         slug: placeSlug, sub_dest_id: subDestId, name: place.name,
         type: natureTypeFromGoogleTypes(place.types),
-        description: place.editorial_summary ?? '', lat: pLat, lng: pLng, address, source: 'google',
+        description: place.editorial_summary || fallbackDescription(place.name, 'nature', name), lat: pLat, lng: pLng, address, source: 'google',
       })
     } else if (classification === 'accommodation') {
       accommodation.push({
@@ -595,10 +645,11 @@ async function enrichSubDest(
       if (isService) continue
 
       const { category, emoji } = categoryFromPlace(place.name, place.types)
+      const description = place.editorial_summary || fallbackDescription(place.name, category, name)
       activities.push({
         slug: placeSlug, sub_dest_id: subDestId, name: place.name,
         lat: pLat, lng: pLng,
-        category, emoji, description: place.editorial_summary ?? '', duration: '1–2 hrs', cost: '$',
+        category, emoji, description, duration: '1–2 hrs', cost: '$',
         kids_ok: true, is_hidden_gem: false,
         maps_url: `https://www.google.com/maps/place/?q=place_id:${place.place_id}`,
         tags: place.types.slice(0, 5), source: 'google',
