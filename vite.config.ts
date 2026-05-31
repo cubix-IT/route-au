@@ -9,7 +9,7 @@ export default defineConfig({
     tailwindcss(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['icons/*.png', 'data/*.json'],
+      includeAssets: ['icons/*.png', 'favicon.ico', 'data/*.json'],
       workbox: {
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2,json}'],
         maximumFileSizeToCacheInBytes: 50 * 1024 * 1024,
