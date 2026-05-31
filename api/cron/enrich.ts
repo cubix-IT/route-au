@@ -11,6 +11,10 @@ const REFRESH_DAYS = 7
 const RADIUS = 20000  // 20km — wide enough to capture remote area attractions
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  // DISABLED — Google Places API bill exceeded budget (A$1,992 in May 2026).
+  // Re-enable only after resolving billing and adding a hard quota cap in GCP.
+  return res.status(503).json({ error: 'Enrichment disabled — Google Places API suspended due to billing.' })
+
   if (req.method !== 'POST' && req.method !== 'GET') {
     return res.status(405).json({ error: 'Method not allowed' })
   }

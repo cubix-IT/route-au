@@ -43,6 +43,9 @@ let instanceRequestCount = 0
 const MONTHLY_LIMIT = parseInt(process.env.PLACES_MONTHLY_LIMIT ?? '9000')
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  // Google Places API disabled — bill exceeded budget. All data now served from Supabase only.
+  return res.status(200).json({ places: [], disabled: true })
+
   const { lat, lng, category, radius = '5000' } = req.query as Record<string, string>
   if (!lat || !lng || !category) return res.status(400).json({ error: 'lat, lng, category required' })
 
