@@ -14,6 +14,60 @@ import type {
 const GREEN = '#3A6B4F'
 const season = getCurrentSeason()
 
+// Approximate Victorian sunset hours by month (conservative — when it gets dark)
+const VIC_SUNSET_HOUR: Record<number, number> = {
+  1:20, 2:20, 3:19, 4:18, 5:17, 6:17, 7:17, 8:18, 9:18, 10:19, 11:20, 12:20,
+}
+function getSunsetHour(): number { return VIC_SUNSET_HOUR[new Date().getMonth() + 1] ?? 18 }
+
+function DepartureTimePicker({ departureHour, setDepartureHour, tripDate }: {
+  departureHour: number; setDepartureHour: (h: number) => void; tripDate?: string
+}) {
+  const nowH = new Date().getHours()
+  const isToday = !tripDate || tripDate === new Date().toISOString().split('T')[0]
+  const allSlots: [number, string][] = [
+    [6,'6 AM'],[7,'7 AM'],[8,'8 AM'],[9,'9 AM'],[10,'10 AM'],
+    [11,'11 AM'],[12,'12 PM'],[13,'1 PM'],[14,'2 PM'],[15,'3 PM'],
+  ]
+  const slots = isToday ? allSlots.filter(([h]) => h >= nowH) : allSlots
+  // Evening/night — show full list for next-day planning
+  const show = slots.length > 0 ? slots : allSlots
+
+  // Auto-correct past hour in an effect, not during render
+  useEffect(() => {
+    if (isToday && departureHour < nowH && show.length > 0) {
+      setDepartureHour(show[0][0])
+    }
+  }, [isToday, nowH, departureHour]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const sunsetH = getSunsetHour()
+  const isWinter = [5,6,7].includes(new Date().getMonth() + 1)
+  const showSunsetWarning = departureHour >= sunsetH - 2 && (isWinter || departureHour >= 16)
+
+  return (
+    <div>
+      <Label>What time do you want to leave?</Label>
+      <div style={{ display: 'flex', gap: 6, marginTop: 10, flexWrap: 'wrap' }}>
+        {show.map(([h, label]) => (
+          <button key={h} onClick={() => setDepartureHour(h)} style={{
+            padding: '9px 13px', borderRadius: 9, cursor: 'pointer',
+            background: departureHour === h ? 'var(--green-light)' : 'var(--bg-muted)',
+            border: `1.5px solid ${departureHour === h ? 'var(--border-active)' : 'var(--border)'}`,
+            color: departureHour === h ? GREEN : 'var(--text-muted)',
+            fontSize: 12, fontWeight: departureHour === h ? 700 : 500,
+            transition: 'all 0.15s',
+          }}>{label}</button>
+        ))}
+      </div>
+      {showSunsetWarning && (
+        <div style={{ marginTop: 10, padding: '10px 12px', borderRadius: 10, background: '#FFF7ED', border: '1px solid rgba(251,146,60,0.4)', fontSize: 12, color: '#92400E', lineHeight: 1.5 }}>
+          🌅 Sunset around {sunsetH}:00 PM in Victoria{isWinter ? ' this time of year' : ''}. Leaving this late means driving back in the dark — we recommend an early morning departure for safety.
+        </div>
+      )}
+    </div>
+  )
+}
+
 function haversinKm(a: Coordinate, b: Coordinate): number {
   const R = 6371
   const dLat = ((b.lat - a.lat) * Math.PI) / 180
@@ -88,16 +142,21 @@ export function ProfileWizard() {
   const [startDate, setStartDate] = useState('')   // empty = user must pick
   const [endDate, setEndDate] = useState('')
   const [dailyDriveHours, setDailyDriveHours] = useState(3)
-  const [departureHour, setDepartureHour] = useState(8)
+  const [departureHour, setDepartureHour] = useState(() => {
+    const h = new Date().getHours()
+    if (h < 6) return 6   // before 6am — suggest 6am
+    if (h <= 15) return h  // during the day — default to now
+    return 8               // evening/night — planning for tomorrow, default 8am
+  })
   const [diningPrefs, setDiningPrefs] = useState<DiningPref[]>([])
   const [dietary] = useState<DietaryReq[]>([])
   const [vehicleType, setVehicleType] = useState<VehicleType>('AWD')
   const [fuelType, setFuelType] = useState<FuelType>('Unleaded95')
-  const [fuelBrand, setFuelBrand] = useState<string>('Any')
+  const fuelBrand = 'Any'
   const [skipFuel, setSkipFuel] = useState(false)
   const [accommodation, setAccommodation] = useState<AccommodationPreference>('Any')
 
-  const totalSteps = isPreselected ? 4 : 6 // 0..3 for preselect, 0..5 for discovery
+  const totalSteps = isPreselected ? 3 : 6 // 0..2 for preselect, 0..5 for discovery
 
   if (!isWizardOpen) return null
 
@@ -118,7 +177,7 @@ export function ProfileWizard() {
   }
 
   const handleNext = async () => {
-    const lastStep = isPreselected ? 3 : 5
+    const lastStep = isPreselected ? 2 : 5
 
     // Step 1 in discovery mode → compute suggestions, derive dining prefs, advance
     if (!isPreselected && step === 1) {
@@ -237,7 +296,7 @@ export function ProfileWizard() {
 
   // ── Step labels ──
   const discoveryStepLabels = ['How far & who', 'What you love', 'Pick a spot', 'Finishing touches', 'Trip summary']
-  const preselectedStepLabels = ['Your trip details', 'Preferences', 'Trip summary']
+  const preselectedStepLabels = ['Your trip details', 'Your vehicle', 'Trip summary']
   const stepLabels = isPreselected ? preselectedStepLabels : discoveryStepLabels
 
   const isPickStep = !isPreselected && step === 2
@@ -298,25 +357,13 @@ export function ProfileWizard() {
                 />
               )}
               {step === 1 && (
-                <StepPreferences
-                  hasKids={hasKids} kidsAge={kidsAge}
-                  tripType={tripType}
-
-                  accommodation={accommodation} setAccommodation={setAccommodation}
-                  dailyDriveHours={dailyDriveHours} setDailyDriveHours={setDailyDriveHours}
-                  departureHour={departureHour} setDepartureHour={setDepartureHour}
-                  destCoord={preselectedDest?.destCoord ?? undefined}
-                />
-              )}
-              {step === 2 && (
                 <StepVehicle
                   vehicleType={vehicleType} setVehicleType={setVehicleType}
                   fuelType={fuelType} setFuelType={setFuelType}
-                  fuelBrand={fuelBrand} setFuelBrand={setFuelBrand}
                   skipFuel={skipFuel} setSkipFuel={setSkipFuel}
                 />
               )}
-              {step === 3 && (
+              {step === 2 && (
                 <StepSummary
                   effectiveDest={effectiveDest}
                   startDate={startDate}
@@ -371,7 +418,6 @@ export function ProfileWizard() {
                 <StepVehicle
                   vehicleType={vehicleType} setVehicleType={setVehicleType}
                   fuelType={fuelType} setFuelType={setFuelType}
-                  fuelBrand={fuelBrand} setFuelBrand={setFuelBrand}
                   skipFuel={skipFuel} setSkipFuel={setSkipFuel}
                 />
               )}
@@ -411,7 +457,7 @@ export function ProfileWizard() {
               cursor: canContinue ? 'pointer' : 'not-allowed',
               transition: 'all 0.15s',
             }}>
-              {step === (isPreselected ? 2 : 4) ? 'Build my trip →' : step === 1 && !isPreselected ? 'Show me options →' : 'Continue →'}
+              {step === (isPreselected ? 1 : 4) ? 'Build my trip →' : step === 1 && !isPreselected ? 'Show me options →' : 'Continue →'}
             </button>
           </div>
         )}
@@ -934,10 +980,15 @@ function DateDayStrip({
       .catch(() => {})
   }, [destCoord?.lat, destCoord?.lng])
 
-  const today = new Date()
-  const allDays = Array.from({ length: 14 }, (_, i) => {
-    const d = new Date(today)
-    d.setDate(d.getDate() + i)
+  const LAST_SLOT_HOUR = 15 // last departure slot is 3pm
+  const nowH = new Date().getHours()
+  const todayIsTooLate = nowH >= LAST_SLOT_HOUR
+  // Start from tomorrow if it's too late to leave today
+  const startOffset = todayIsTooLate ? 1 : 0
+  const PAGE_SIZE = 5
+  const allDays = Array.from({ length: 10 }, (_, i) => {
+    const d = new Date()
+    d.setDate(d.getDate() + startOffset + i)
     return {
       iso: d.toISOString().split('T')[0],
       day: d.toLocaleDateString('en-AU', { weekday: 'short' }),
@@ -946,7 +997,7 @@ function DateDayStrip({
     }
   })
 
-  const visible = allDays.slice(page * 7, page * 7 + 7)
+  const visible = allDays.slice(page * PAGE_SIZE, page * PAGE_SIZE + PAGE_SIZE)
 
   return (
     <div>
@@ -955,9 +1006,9 @@ function DateDayStrip({
           onClick={() => setPage(0)} disabled={page === 0}
           style={{ width: 28, height: 28, borderRadius: 14, border: '1px solid var(--border)', background: '#fff', cursor: page === 0 ? 'default' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: page === 0 ? 'var(--border)' : GREEN, fontSize: 15, fontWeight: 700, flexShrink: 0 }}
         >‹</button>
-        <div style={{ flex: 1, display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 3 }}>
+        <div style={{ flex: 1, display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 3 }}>
           {visible.map((d, idx) => {
-            const wIdx = page * 7 + idx
+            const wIdx = page * PAGE_SIZE + idx
             const selected = d.iso === value
             return (
               <button key={d.iso} onClick={() => onChange(d.iso)} style={{
@@ -976,7 +1027,7 @@ function DateDayStrip({
           })}
         </div>
         <button
-          onClick={() => setPage(1)} disabled={page === 1}
+          onClick={() => setPage((p) => Math.min(p + 1, 1))} disabled={page === 1}
           style={{ width: 28, height: 28, borderRadius: 14, border: '1px solid var(--border)', background: '#fff', cursor: page === 1 ? 'default' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: page === 1 ? 'var(--border)' : GREEN, fontSize: 15, fontWeight: 700, flexShrink: 0 }}
         >›</button>
       </div>
@@ -1088,29 +1139,7 @@ function StepPreferences({
 
       {/* Departure time — hidden in preselected flow (already set in step 0) */}
       {!hideDepartureTime && (
-        <div>
-          <Label>What time do you want to leave?</Label>
-          <div style={{ display: 'flex', gap: 6, marginTop: 10, flexWrap: 'wrap' }}>
-            {[
-              [6, '6:00 AM'], [7, '7:00 AM'], [8, '8:00 AM'], [9, '9:00 AM'], [10, '10:00 AM'],
-            ].map(([h, label]) => (
-              <button
-                key={h}
-                onClick={() => setDepartureHour(h as number)}
-                style={{
-                  padding: '9px 13px', borderRadius: 9, cursor: 'pointer',
-                  background: departureHour === h ? 'var(--green-light)' : 'var(--bg-muted)',
-                  border: `1.5px solid ${departureHour === h ? 'var(--border-active)' : 'var(--border)'}`,
-                  color: departureHour === h ? GREEN : 'var(--text-muted)',
-                  fontSize: 12, fontWeight: departureHour === h ? 700 : 500,
-                  transition: 'all 0.15s',
-                }}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-        </div>
+        <DepartureTimePicker departureHour={departureHour} setDepartureHour={setDepartureHour} tripDate={startDate} />
       )}
 
       {/* Accommodation — multiday only */}
@@ -1134,31 +1163,13 @@ function StepPreferences({
 
 // ── Vehicle & fuel step ───────────────────────────────────────────
 
-const FUEL_BRANDS = [
-  { id: 'Any',      label: 'No preference', color: '#6B7280', bg: '#F3F4F6' },
-  { id: 'BP',       label: 'BP',            color: '#006B3F', bg: '#DCFCE7' },
-  { id: 'Ampol',    label: 'Ampol',         color: '#C41230', bg: '#FEE2E2' },
-  { id: 'Shell',    label: 'Shell',         color: '#DD1D21', bg: '#FEE2E2' },
-  { id: 'Caltex',   label: 'Caltex',        color: '#B8860B', bg: '#FEF9C3' },
-  { id: 'Liberty',  label: 'Liberty',       color: '#E65100', bg: '#FFF3E0' },
-  { id: 'Metro',    label: 'Metro',         color: '#7C3AED', bg: '#F5F3FF' },
-  { id: '7-Eleven', label: '7-Eleven',      color: '#007A33', bg: '#DCFCE7' },
-  { id: 'Mobil',    label: 'Mobil',         color: '#1D4ED8', bg: '#EFF6FF' },
-  { id: 'United',   label: 'United',        color: '#1565C0', bg: '#E3F2FD' },
-  { id: 'OTR',      label: 'OTR',           color: '#EA580C', bg: '#FFF7ED' },
-  { id: 'Astron',   label: 'Astron',        color: '#0F766E', bg: '#F0FDFA' },
-  { id: 'Pacific',  label: 'Pacific',       color: '#0369A1', bg: '#E0F2FE' },
-]
-
 function StepVehicle({
   vehicleType, setVehicleType,
   fuelType, setFuelType,
-  fuelBrand, setFuelBrand,
   skipFuel, setSkipFuel,
 }: {
   vehicleType: VehicleType; setVehicleType: (v: VehicleType) => void
   fuelType: FuelType; setFuelType: (f: FuelType) => void
-  fuelBrand: string; setFuelBrand: (b: string) => void
   skipFuel: boolean; setSkipFuel: (s: boolean) => void
 }) {
   const vehicles = [
@@ -1202,8 +1213,10 @@ function StepVehicle({
             <Label>Fuel type</Label>
             <div style={{ display: 'flex', gap: 6, marginTop: 10, flexWrap: 'wrap' }}>
               {([
-                { type: 'Unleaded95' as FuelType, emoji: '⛽', label: 'Unleaded 95' },
-                { type: 'Unleaded98' as FuelType, emoji: '🔵', label: 'Unleaded 98' },
+                { type: 'Unleaded91' as FuelType, emoji: '⛽', label: 'U91' },
+                { type: 'E10'        as FuelType, emoji: '🌿', label: 'E10' },
+                { type: 'Unleaded95' as FuelType, emoji: '⛽', label: 'U95' },
+                { type: 'Unleaded98' as FuelType, emoji: '🔵', label: 'U98' },
                 { type: 'Diesel'     as FuelType, emoji: '🛢️', label: 'Diesel' },
               ] as { type: FuelType; emoji: string; label: string }[]).map((f) => (
                 <div key={f.type} className={`option-card ${fuelType === f.type ? 'selected' : ''}`}
@@ -1216,34 +1229,6 @@ function StepVehicle({
             </div>
           </div>
 
-          {/* Fuel brand preference */}
-          <div>
-            <Label>Preferred fuel brand <span style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 400 }}>optional</span></Label>
-            <p style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 10, marginTop: 4 }}>
-              We'll prioritise this brand when showing cheapest stations on your route.
-            </p>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-              {FUEL_BRANDS.map((b) => {
-                const selected = fuelBrand === b.id
-                return (
-                  <button
-                    key={b.id}
-                    onClick={() => setFuelBrand(b.id)}
-                    style={{
-                      padding: '8px 16px', borderRadius: 20, cursor: 'pointer',
-                      background: selected ? b.bg : '#fff',
-                      border: `1.5px solid ${selected ? b.color : 'var(--border)'}`,
-                      color: selected ? b.color : 'var(--text-muted)',
-                      fontSize: 13, fontWeight: selected ? 700 : 500,
-                      transition: 'all 0.15s',
-                    }}
-                  >
-                    {b.label}
-                  </button>
-                )
-              })}
-            </div>
-          </div>
         </>
       )}
 
@@ -1520,27 +1505,7 @@ function StepPlanningDetails({
       </div>
 
       {/* Departure time */}
-      <div>
-        <Label>What time do you want to leave?</Label>
-        <div style={{ display: 'flex', gap: 6, marginTop: 10, flexWrap: 'wrap' }}>
-          {([6, 7, 8, 9, 10] as const).map((h) => (
-            <button
-              key={h}
-              onClick={() => setDepartureHour(h)}
-              style={{
-                padding: '9px 13px', borderRadius: 9, cursor: 'pointer',
-                background: departureHour === h ? 'var(--green-light)' : 'var(--bg-muted)',
-                border: `1.5px solid ${departureHour === h ? 'var(--border-active)' : 'var(--border)'}`,
-                color: departureHour === h ? GREEN : 'var(--text-muted)',
-                fontSize: 12, fontWeight: departureHour === h ? 700 : 500,
-                transition: 'all 0.15s',
-              }}
-            >
-              {h}:00 {h < 12 ? 'AM' : 'PM'}
-            </button>
-          ))}
-        </div>
-      </div>
+      <DepartureTimePicker departureHour={departureHour} setDepartureHour={setDepartureHour} tripDate={startDate} />
 
       {/* Who */}
       <div>

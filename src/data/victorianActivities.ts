@@ -20,6 +20,11 @@ export type ActivityCategory =
   | 'sports'
   | 'shopping'
 
+export interface OpenHoursPeriod {
+  open: { day: number; hour: number; minute: number }
+  close?: { day: number; hour: number; minute: number }
+}
+
 export interface Activity {
   id: string
   name: string
@@ -32,6 +37,12 @@ export interface Activity {
   isHiddenGem: boolean
   mapsUrl: string        // deep-link to Google Maps
   tags: string[]         // for interest matching
+  // optional Google Places enriched fields
+  websiteUri?: string
+  editorialSummary?: string
+  openingHoursPeriods?: OpenHoursPeriod[]
+  rating?: number
+  reviewCount?: number
 }
 
 export interface SubDestActivities {
@@ -1023,13 +1034,13 @@ const ACTIVITIES: SubDestActivities[] = [
         name: 'Daylesford Sunday Market',
         category: 'markets',
         emoji: '🛍',
-        description: 'One of Victoria\'s best regional markets. Runs Sunday mornings by the lake — produce, antiques, and some genuinely interesting craft stalls.',
+        description: 'One of Victoria\'s best regional markets. Runs Sunday mornings by the lake — local produce, antiques, handmade crafts, and great coffee. A Daylesford institution and the perfect way to start a Sunday.',
         duration: '1.5 hrs',
         cost: 'free',
         kidsOk: true,
         isHiddenGem: true,
         mapsUrl: mapsUrl('Daylesford Sunday Market', 'Daylesford'),
-        tags: ['Markets', 'Food'],
+        tags: ['Markets', 'Sunday'],
       },
       {
         id: 'sault-restaurant',

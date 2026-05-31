@@ -63,7 +63,17 @@ const ACCOM_POI_CFG: Record<AccommodationPOI['type'], { emoji: string; label: st
   guest_house:  { emoji: '🏡', label: 'Guest House', color: '#059669', bg: '#ECFDF5' },
 }
 
-type FilterMode = 'all' | 'food' | 'activities' | 'stay'
+type FilterMode = 'all' | 'food' | 'activities' | 'stay' | 'fuel'
+
+interface FuelStop {
+  coord: { lat: number; lng: number }
+  label: string
+  brandNotFound?: boolean
+  station: {
+    id: string; name: string; brand: string; address: string
+    lat: number; lng: number; pricePerLitre: number; distanceKm: number
+  } | null
+}
 
 type AccomPref = 'Hotel' | 'Glamping' | 'CaravanPark' | 'FreeCamping' | 'Any'
 
@@ -81,6 +91,57 @@ function sortAccomByPref(pois: AccommodationPOI[], pref?: string): Accommodation
     const ai = order.indexOf(a.type); const bi = order.indexOf(b.type)
     return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi)
   })
+}
+
+// ── Open/closed status from Google Places regularOpeningHours.periods ─────────
+
+interface OpenPeriod {
+  open: { day: number; hour: number; minute: number }
+  close?: { day: number; hour: number; minute: number }
+}
+
+function getOpenStatus(periods?: OpenPeriod[]): { isOpen: boolean; nextOpen?: string } | null {
+  if (!periods || periods.length === 0) return null
+  const now = new Date()
+  const day = now.getDay()
+  const nowMins = day * 24 * 60 + now.getHours() * 60 + now.getMinutes()
+
+  const toMins = (d: number, h: number, m: number) => d * 24 * 60 + h * 60 + m
+
+  for (const p of periods) {
+    const openM = toMins(p.open.day, p.open.hour, p.open.minute)
+    if (!p.close) {
+      if (nowMins >= openM) return { isOpen: true }
+      continue
+    }
+    const closeM = toMins(p.close.day, p.close.hour, p.close.minute)
+    // overnight: openM > closeM means spans midnight
+    if (closeM > openM) {
+      if (nowMins >= openM && nowMins < closeM) return { isOpen: true }
+    } else {
+      if (nowMins >= openM || nowMins < closeM) return { isOpen: true }
+    }
+  }
+
+  // Closed — find next open time
+  const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+  let minDiff = Infinity
+  let nextOpen: string | undefined
+  for (const p of periods) {
+    let openM = toMins(p.open.day, p.open.hour, p.open.minute)
+    let diff = openM - nowMins
+    if (diff <= 0) diff += 7 * 24 * 60
+    if (diff < minDiff) {
+      minDiff = diff
+      const h = p.open.hour; const m = p.open.minute
+      const ampm = h >= 12 ? 'pm' : 'am'
+      const hd = h > 12 ? h - 12 : h === 0 ? 12 : h
+      const md = m === 0 ? '' : `:${String(m).padStart(2, '0')}`
+      const sameDay = p.open.day === day && diff < 24 * 60
+      nextOpen = sameDay ? `${hd}${md} ${ampm}` : `${DAYS[p.open.day]} ${hd}${md} ${ampm}`
+    }
+  }
+  return { isOpen: false, nextOpen }
 }
 
 // ── Rating stars ──────────────────────────────────────────────────────────────
@@ -114,37 +175,114 @@ export function ExperiencePanel({ hideTimeline = false }: { hideTimeline?: boole
   const [addModal, setAddModal] = useState<RouteFoodStop | null>(null)
   const [filter, setFilter] = useState<FilterMode>('all')
   const [actCategoryFilter, setActCategoryFilter] = useState<string>('all')
+  const [foodCategoryFilter, setFoodCategoryFilter] = useState<string>('all')
   const [expandedActId, setExpandedActId] = useState<string | null>(null)
   const [_expandedPoiId, setExpandedPoiId] = useState<string | null>(null)
   const [showAllAccom, setShowAllAccom] = useState(false)
   const [showAllFood, setShowAllFood] = useState(false)
   const [showAllActivities, setShowAllActivities] = useState(false)
+  const [fuelStops, setFuelStops] = useState<FuelStop[]>([])
+  const [fuelLoading, setFuelLoading] = useState(false)
 
   const RESULT_LIMIT = 10
 
   const isOneDayTrip = (d.activeItinerary?.total_days ?? 0) === 1
 
-  const syncMapPins = useCallback((_f: FilterMode, pois: LivePOI[]) => {
+  const syncMapPins = useCallback((_f: FilterMode, pois: LivePOI[], stops?: FuelStop[], catFilter?: string) => {
+    if (_f === 'fuel') {
+      setDisplayedMapPins((stops ?? []).filter((s) => s.station).map((s) => ({
+        id: `fuel-${s.label}`, lat: s.station!.lat, lng: s.station!.lng,
+        type: 'attraction' as LivePOI['type'],
+        name: `${s.station!.brand} — $${s.station!.pricePerLitre.toFixed(3)}/L (${s.label})`,
+      })))
+      return
+    }
+    if (d.dbFood.length > 0 || d.dbActivities.length > 0) {
+      const SPA_CATS = new Set(['spa','wellness','beauty_salon','beauty','gym','fitness'])
+      // Only show pins matching current filter/category
+      let foodPins: typeof d.dbFood = []
+      let actPins: typeof d.dbNature = []
+
+      if (_f === 'all' || _f === 'food') {
+        foodPins = d.dbFood
+          .filter((f) => f.lat && f.lng && !SPA_CATS.has(f.category.toLowerCase()))
+          .filter((f) => !catFilter || catFilter === 'all' || f.category.toLowerCase() === catFilter)
+          .map((f) => {
+            const attr = (f.attributes as Record<string, unknown>) ?? {}
+            return { f, rating: (attr.rating as number | undefined) ?? 0 }
+          })
+          .sort((a, b) => b.rating - a.rating)
+          .slice(0, 8)
+          .map(({ f }) => f)
+      }
+      if (_f === 'all' || _f === 'activities') {
+        actPins = d.dbNature.filter((n) => n.lat && n.lng).slice(0, 8)
+      }
+      setDisplayedMapPins([
+        ...foodPins.map((f) => ({ id: String(f.food_place_id), lat: f.lat!, lng: f.lng!, type: f.category.toLowerCase() as LivePOI['type'], name: f.name })),
+        ...actPins.map((n) => ({ id: `nature-${n.nature_spot_id}`, lat: n.lat!, lng: n.lng!, type: (n.type === 'viewpoint' ? 'viewpoint' : 'attraction') as LivePOI['type'], name: n.name })),
+      ])
+      return
+    }
     const FOOD_TYPES: LivePOI['type'][] = ['cafe', 'restaurant', 'pub', 'winery', 'bakery', 'fast_food']
     const ACT_TYPES: LivePOI['type'][] = ['hiking', 'viewpoint', 'attraction']
-    const foodPins = pois.filter((p) => FOOD_TYPES.includes(p.type) && p.lat && p.lng).slice(0, 5)
-    const actPins  = pois.filter((p) => ACT_TYPES.includes(p.type)  && p.lat && p.lng).slice(0, 5)
-    setDisplayedMapPins(
-      [...foodPins, ...actPins].map((p) => ({ id: p.id, lat: p.lat!, lng: p.lng!, type: p.type, name: p.name }))
-    )
-  }, [setDisplayedMapPins])
+    const fp = (_f === 'all' || _f === 'food') ? pois.filter((p) => FOOD_TYPES.includes(p.type) && p.lat && p.lng).slice(0, 5) : []
+    const ap = (_f === 'all' || _f === 'activities') ? pois.filter((p) => ACT_TYPES.includes(p.type) && p.lat && p.lng).slice(0, 5) : []
+    setDisplayedMapPins([...fp, ...ap].map((p) => ({ id: p.id, lat: p.lat!, lng: p.lng!, type: p.type, name: p.name })))
+  }, [setDisplayedMapPins, d.dbFood, d.dbActivities, d.dbNature])
 
-  const handleFilterChange = (f: FilterMode) => {
+  const fetchFuelStops = useCallback(async () => {
+    if (!d.activeItinerary || !d.vehicleProfile) return
+    if (d.vehicleProfile.fuel_type === 'Electric') return
+    if ((d.vehicleProfile as unknown as { skip_fuel?: boolean }).skip_fuel) return
+    const waypoints = d.activeItinerary.route.waypoints
+    if (waypoints.length < 2) return
+
+    const origin = waypoints[0].coord
+    const dest = waypoints[waypoints.length - 1].coord
+    const mid = { lat: (origin.lat + dest.lat) / 2, lng: (origin.lng + dest.lng) / 2 }
+    const spots = [
+      { coord: origin, label: 'Near start' },
+      { coord: mid,    label: 'En route' },
+      { coord: dest,   label: 'Near destination' },
+    ]
+
+    setFuelLoading(true)
+    const brand = (d.vehicleProfile as unknown as { fuel_brand?: string | null }).fuel_brand
+    const brandQ = brand && brand !== 'Any' ? `&brand=${encodeURIComponent(brand)}` : ''
+
+    const results = await Promise.all(spots.map(async ({ coord, label }) => {
+      try {
+        const r = await fetch(`/api/fuel?lat=${coord.lat}&lng=${coord.lng}&fuelType=${d.vehicleProfile!.fuel_type}&limit=1&radius=50${brandQ}`)
+        const data = await r.json() as { stations?: FuelStop['station'][]; brandNotFound?: boolean }
+        return { coord, label, station: data.stations?.[0] ?? null, brandNotFound: data.brandNotFound } as FuelStop
+      } catch {
+        return { coord, label, station: null } as FuelStop
+      }
+    }))
+    setFuelStops(results)
+    setFuelLoading(false)
+    return results
+  }, [d.activeItinerary, d.vehicleProfile])
+
+  const handleFilterChange = async (f: FilterMode) => {
     setFilter(f)
     setActivePOIFilter(f)
-    syncMapPins(f, d.livePOIs ?? [])
+    setActCategoryFilter('all')
+    setFoodCategoryFilter('all')
+    if (f === 'fuel') {
+      const stops = fuelStops.length > 0 ? fuelStops : await fetchFuelStops()
+      syncMapPins(f, d.livePOIs ?? [], stops, 'all')
+    } else {
+      syncMapPins(f, d.livePOIs ?? [], undefined, 'all')
+    }
     setShowAllFood(false)
     setShowAllActivities(false)
   }
 
   useEffect(() => {
-    if (d.livePOIs) syncMapPins(filter, d.livePOIs)
-  }, [d.livePOIs]) // eslint-disable-line react-hooks/exhaustive-deps
+    syncMapPins(filter, d.livePOIs ?? [], undefined, foodCategoryFilter)
+  }, [d.livePOIs, d.dbFood, d.dbActivities, d.dbNature, foodCategoryFilter]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Scroll to and highlight a POI card when selected via map pin click
   useEffect(() => {
@@ -185,6 +323,7 @@ export function ExperiencePanel({ hideTimeline = false }: { hideTimeline?: boole
           ['activities', '🗺 Things to Do'],
           ['food',       '🍽 Eat & Drink'],
           ...(!isOneDayTrip ? [['stay', '🏨 Stay']] : []),
+          ...(d.vehicleProfile && d.vehicleProfile.fuel_type !== 'Electric' && !(d.vehicleProfile as unknown as { skip_fuel?: boolean }).skip_fuel ? [['fuel', '⛽ Fuel']] : []),
         ] as const).map(([f, label]) => (
           <button key={f} onClick={() => handleFilterChange(f as FilterMode)} style={{
             padding: '6px 14px', borderRadius: 20, flexShrink: 0,
@@ -238,19 +377,27 @@ export function ExperiencePanel({ hideTimeline = false }: { hideTimeline?: boole
           }
 
           // Map dbActivities to Activity shape
-          const dbActs: Activity[] = d.dbActivities.map((a) => ({
-            id: String(a.activity_id),
-            name: a.name,
-            category: a.category as Activity['category'],
-            emoji: a.emoji || '📍',
-            description: a.description || '',
-            duration: a.duration || '',
-            cost: (a.cost as Activity['cost']) || 'free',
-            kidsOk: a.kids_ok,
-            isHiddenGem: a.is_hidden_gem,
-            mapsUrl: a.maps_url || '',
-            tags: a.tags ?? [],
-          }))
+          const dbActs: Activity[] = d.dbActivities.map((a) => {
+            const aAttr = (a.attributes as Record<string, unknown>) ?? {}
+            return {
+              id: String(a.activity_id),
+              name: a.name,
+              category: a.category as Activity['category'],
+              emoji: a.emoji || '📍',
+              description: (aAttr.editorial_summary as string | undefined) || a.description || '',
+              duration: a.duration || '',
+              cost: (a.cost as Activity['cost']) || 'free',
+              kidsOk: a.kids_ok,
+              isHiddenGem: a.is_hidden_gem,
+              mapsUrl: a.maps_url || '',
+              tags: a.tags ?? [],
+              websiteUri: aAttr.website_uri as string | undefined,
+              editorialSummary: aAttr.editorial_summary as string | undefined,
+              openingHoursPeriods: aAttr.opening_hours_periods as import('@/lib/overpass').OpenHoursPeriod[] | undefined,
+              rating: aAttr.rating as number | undefined,
+              reviewCount: aAttr.review_count as number | undefined,
+            }
+          })
 
           // Map dbNature to Activity shape (merged into Things to Do)
           const dbNatureActs: Activity[] = d.dbNature.map((n) => ({
@@ -263,9 +410,7 @@ export function ExperiencePanel({ hideTimeline = false }: { hideTimeline?: boole
             cost: 'free' as Activity['cost'],
             kidsOk: true,
             isHiddenGem: false,
-            mapsUrl: n.lat && n.lng
-              ? `https://www.google.com/maps/search/?api=1&query=${n.lat},${n.lng}`
-              : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(n.name + ' Victoria')}`,
+            mapsUrl: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(n.name + ' Victoria')}`,
             tags: [n.type],
           }))
 
@@ -284,6 +429,7 @@ export function ExperiencePanel({ hideTimeline = false }: { hideTimeline?: boole
             catCounts.set(a.category, (catCounts.get(a.category) ?? 0) + 1)
           }
           const topCats = [...catCounts.entries()]
+            .filter(([cat]) => cat !== 'family')
             .sort((a, b) => b[1] - a[1])
             .slice(0, 6)
             .map(([cat]) => cat)
@@ -373,49 +519,92 @@ export function ExperiencePanel({ hideTimeline = false }: { hideTimeline?: boole
             loading={d.dbLoading && d.dbFood.length === 0 && d.curatedDining.length === 0}
             empty={!d.dbLoading && d.dbFood.length === 0 && d.curatedDining.length === 0}
           >
-              {/* Local favs first (curated + static drink activities) */}
             {(() => {
-              const activityFood = d.activities.filter((a) => a.category === 'food' || a.category === 'drink')
-              const hasCurated = d.curatedDining.length > 0 || activityFood.length > 0
-              if (!hasCurated) return null
-              return (
-                <div style={{ padding: '0 16px 12px' }}>
-                  <div style={{ fontSize: 10, fontWeight: 700, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 10 }}>
-                    Local Favourites
-                  </div>
-                  <div className="activity-grid">
-                    {d.curatedDining.map((f) => (
-                      <FoodCard key={f.id} poi={{
-                        id: f.id, type: (f.category?.toLowerCase() ?? 'restaurant') as LivePOI['type'],
-                        name: f.name, lat: f.coord?.lat, lng: f.coord?.lng,
-                        description: f.signature_dish ? `★ ${f.signature_dish}` : f.description,
-                      }} destName={d.shortDest} />
-                    ))}
-                    {activityFood.map((act) => (
-                      <FoodCard key={act.id} poi={{
-                        id: act.id, type: act.category === 'drink' ? 'winery' : 'restaurant',
-                        name: act.name, lat: undefined, lng: undefined,
-                        description: act.description,
-                        website: act.mapsUrl,
-                      }} destName={d.shortDest} />
-                    ))}
-                  </div>
-                </div>
-              )
-            })()}
+              const SPA_CATS = new Set(['spa','wellness','beauty_salon','beauty','gym','fitness','market','markets','farmers_market','flea_market','night_market','shopping_mall','department_store','supermarket'])
+              const foodOnly = d.dbFood.filter((f) => !SPA_CATS.has(f.category.toLowerCase()) && !/\bmarkets?\b/i.test(f.name))
 
-            {/* Google Places food — 10 by default, rated, "show all" */}
-            {d.dbFood.length > 0 && (() => {
-              const displayed = showAllFood ? d.dbFood : d.dbFood.slice(0, RESULT_LIMIT)
-              const hidden = d.dbFood.length - RESULT_LIMIT
+              // Curated local favs injected at top of the same list — marked with localFav flag
+              const activityFood = d.activities.filter((a) => a.category === 'food' || a.category === 'drink')
+              type CuratedItem = { id: string; type: LivePOI['type']; name: string; lat?: number; lng?: number; description?: string; website?: string; isLocalFav: true }
+              const curatedItems: CuratedItem[] = [
+                ...d.curatedDining.map((f) => ({
+                  id: f.id, type: (f.category?.toLowerCase() ?? 'restaurant') as LivePOI['type'],
+                  name: f.name, lat: f.coord?.lat, lng: f.coord?.lng,
+                  description: f.signature_dish ? `★ ${f.signature_dish}` : f.description,
+                  isLocalFav: true as const,
+                })),
+                ...activityFood.map((a) => ({
+                  id: a.id, type: (a.category === 'drink' ? 'winery' : 'restaurant') as LivePOI['type'],
+                  name: a.name, website: a.mapsUrl, description: a.description,
+                  isLocalFav: true as const,
+                })),
+              ]
+              const curatedNames = new Set(curatedItems.map((c) => c.name.toLowerCase()))
+
+              const ratedFood = foodOnly.filter((f) => {
+                const a = (f.attributes as Record<string, unknown>) ?? {}
+                return (a.rating as number | undefined) && (a.review_count as number | undefined)
+              })
+              const unratedFood = foodOnly.filter((f) => {
+                const a = (f.attributes as Record<string, unknown>) ?? {}
+                return !((a.rating as number | undefined) && (a.review_count as number | undefined))
+              })
+              const hasEnoughRated = ratedFood.length >= 2
+              const primaryFood = (hasEnoughRated ? ratedFood : foodOnly)
+                .filter((f) => !curatedNames.has(f.name.toLowerCase())) // don't duplicate curated items
+
+              const FOOD_CAT_LABEL: Record<string, string> = {
+                cafe: 'Cafe', restaurant: 'Restaurant', winery: 'Winery',
+                pub: 'Pub', bakery: 'Bakery', distillery: 'Distillery',
+                brewery: 'Brewery', fast_food: 'Takeaway', bar: 'Bar',
+                ice_cream: 'Ice Cream', food_truck: 'Food Truck',
+              }
+              const catCounts = new Map<string, number>()
+              for (const f of primaryFood) {
+                const c = f.category.toLowerCase()
+                catCounts.set(c, (catCounts.get(c) ?? 0) + 1)
+              }
+              const foodCats = [...catCounts.entries()]
+                .filter(([, n]) => n >= 1)
+                .sort((a, b) => b[1] - a[1])
+                .map(([c]) => c)
+
+              const filteredFood = foodCategoryFilter === 'all'
+                ? primaryFood
+                : primaryFood.filter((f) => f.category.toLowerCase() === foodCategoryFilter)
+              const displayed = showAllFood ? filteredFood : filteredFood.slice(0, RESULT_LIMIT)
+              const hidden = filteredFood.length - RESULT_LIMIT
               return (
                 <>
+                  {/* Category filter chips */}
+                  {foodCats.length > 1 && (
+                    <div style={{ padding: '0 16px 10px', display: 'flex', gap: 6, overflowX: 'auto' }}>
+                      <button onClick={() => setFoodCategoryFilter('all')} style={{
+                        padding: '5px 12px', borderRadius: 20, flexShrink: 0, cursor: 'pointer', fontSize: 11, fontWeight: foodCategoryFilter === 'all' ? 700 : 500,
+                        background: foodCategoryFilter === 'all' ? '#1C1B1F' : '#fff', color: foodCategoryFilter === 'all' ? '#fff' : '#6B7280',
+                        border: `1.5px solid ${foodCategoryFilter === 'all' ? '#1C1B1F' : 'var(--border)'}`,
+                      }}>All</button>
+                      {foodCats.map((c) => (
+                        <button key={c} onClick={() => { setFoodCategoryFilter(foodCategoryFilter === c ? 'all' : c); setShowAllFood(false) }} style={{
+                          padding: '5px 12px', borderRadius: 20, flexShrink: 0, cursor: 'pointer', fontSize: 11, fontWeight: foodCategoryFilter === c ? 700 : 500,
+                          background: foodCategoryFilter === c ? '#1C1B1F' : '#fff', color: foodCategoryFilter === c ? '#fff' : '#6B7280',
+                          border: `1.5px solid ${foodCategoryFilter === c ? '#1C1B1F' : 'var(--border)'}`,
+                          whiteSpace: 'nowrap',
+                        }}>{FOOD_CAT_LABEL[c] ?? c}</button>
+                      ))}
+                    </div>
+                  )}
                   <div className="activity-grid" style={{ padding: '0 16px' }}>
+                    {/* Curated local favs pinned at top with ◆ */}
+                    {foodCategoryFilter === 'all' && curatedItems.map((f) => (
+                      <FoodCard key={`curated-${f.id}`} poi={{ ...f, description: f.description }} destName={d.shortDest} isLocalFav />
+                    ))}
                     {displayed.map((f) => {
                       const attr = (f.attributes as Record<string, unknown>) ?? {}
-                      const mapsUrl = attr.google_place_id
-                        ? `https://www.google.com/maps/place/?q=place_id:${attr.google_place_id}`
-                        : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(f.name + ' ' + d.shortDest)}`
+                      const website = attr.website as string | undefined
+                      const placeId = attr.google_place_id as string | undefined
+                      const primaryUrl = website || (placeId ? `https://www.google.com/maps/place/?q=place_id:${placeId}` : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(f.name + ' ' + d.shortDest)}`)
+                      const cuisineTags = attr.cuisine_tags as string[] | undefined
                       const pinId = String(f.food_place_id)
                       return (
                         <FoodCard key={f.food_place_id} poi={{
@@ -425,8 +614,10 @@ export function ExperiencePanel({ hideTimeline = false }: { hideTimeline?: boole
                           lat: f.lat, lng: f.lng,
                           rating: attr.rating as number | undefined,
                           totalRatings: attr.review_count as number | undefined,
-                          cuisine: (attr.cuisine_tags as string[] | undefined)?.[0],
-                          website: mapsUrl,
+                          cuisine: cuisineTags?.join(' · '),
+                          website: (attr.website_uri as string | undefined) || (attr.google_place_id ? `https://www.google.com/maps/place/?q=place_id:${attr.google_place_id}` : primaryUrl),
+                          editorialSummary: attr.editorial_summary as string | undefined,
+                          openingHoursPeriods: attr.opening_hours_periods as import('@/lib/overpass').OpenHoursPeriod[] | undefined,
                         }} destName={d.shortDest}
                         highlighted={selectedPinId === pinId}
                         onMapPin={f.lat && f.lng ? () => setSelectedPinId(pinId) : undefined} />
@@ -440,8 +631,29 @@ export function ExperiencePanel({ hideTimeline = false }: { hideTimeline?: boole
                       border: '1px dashed var(--border)', background: 'none',
                       fontSize: 12, color: '#6B7280', fontWeight: 600, cursor: 'pointer',
                     }}>
-                      Show all {d.dbFood.length} places ↓
+                      Show more rated places ↓
                     </button>
+                  )}
+                  {hasEnoughRated && unratedFood.length > 0 && showAllFood && (
+                    <div style={{ margin: '12px 16px 0' }}>
+                      <div style={{ fontSize: 10, fontWeight: 700, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 8 }}>No reviews yet</div>
+                      <div className="activity-grid">
+                        {unratedFood.map((f) => {
+                          const attr = (f.attributes as Record<string, unknown>) ?? {}
+                          const mapsUrl = attr.google_place_id
+                            ? `https://www.google.com/maps/place/?q=place_id:${attr.google_place_id}`
+                            : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(f.name + ' ' + d.shortDest)}`
+                          return (
+                            <FoodCard key={f.food_place_id} poi={{
+                              id: String(f.food_place_id),
+                              type: f.category.toLowerCase() as LivePOI['type'],
+                              name: f.name, lat: f.lat, lng: f.lng,
+                              website: mapsUrl,
+                            }} destName={d.shortDest} />
+                          )
+                        })}
+                      </div>
+                    </div>
                   )}
                 </>
               )
@@ -559,6 +771,61 @@ export function ExperiencePanel({ hideTimeline = false }: { hideTimeline?: boole
 
         {/* Day stepper — hidden in 3-col wide layout */}
         {!hideTimeline && (filter === 'all' || filter === 'activities') && <VerticalStepper d={d} />}
+
+        {/* ── Fuel Stops ── */}
+        {filter === 'fuel' && (
+          <div style={{ padding: '16px 16px 0' }}>
+            <SectionHeader title="Best Fuel Along Your Route" icon="⛽" count={0} />
+            {fuelLoading ? (
+              <div style={{ padding: '20px 0', textAlign: 'center', fontSize: 13, color: '#9CA3AF' }}>Finding stations…</div>
+            ) : fuelStops.length === 0 ? (
+              <div style={{ padding: '20px 0', textAlign: 'center', fontSize: 13, color: '#9CA3AF' }}>No fuel data available.</div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 10 }}>
+                {fuelStops.map((stop) => (
+                  <div key={stop.label} style={{
+                    background: '#fff', borderRadius: 14, border: '1px solid var(--border)',
+                    padding: '14px 16px', boxShadow: '0 1px 4px rgba(0,0,0,0.05)',
+                  }}>
+                    <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#9CA3AF', marginBottom: 6 }}>{stop.label}</div>
+                    {stop.brandNotFound ? (
+                      <div style={{ fontSize: 12, color: '#9CA3AF' }}>
+                        No {(d.vehicleProfile as unknown as { fuel_brand?: string }).fuel_brand} stations found nearby — try selecting "Any" brand in trip settings.
+                      </div>
+                    ) : stop.station ? (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                        <div style={{
+                          width: 52, height: 52, borderRadius: 12, background: '#F0FDF4',
+                          border: '1.5px solid #BBF7D0', display: 'flex', flexDirection: 'column',
+                          alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                        }}>
+                          <span style={{ fontSize: 13, fontWeight: 900, color: '#16A34A', lineHeight: 1 }}>${stop.station.pricePerLitre.toFixed(3)}</span>
+                          <span style={{ fontSize: 8, color: '#6B7280', marginTop: 1 }}>/litre</span>
+                        </div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: 14, fontWeight: 700, color: '#1C1C1A', marginBottom: 2 }}>{stop.station.brand}</div>
+                          <div style={{ fontSize: 12, color: '#6B7280', marginBottom: 2 }}>{stop.station.name}</div>
+                          {stop.station.address && <div style={{ fontSize: 11, color: '#9CA3AF' }}>{stop.station.address}</div>}
+                          <div style={{ fontSize: 11, color: '#9CA3AF', marginTop: 2 }}>{stop.station.distanceKm} km from route point</div>
+                        </div>
+                        <a
+                          href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(stop.station.brand + ' ' + stop.station.address)}`}
+                          target="_blank" rel="noopener noreferrer"
+                          style={{ fontSize: 11, fontWeight: 700, color: '#fff', background: '#16A34A', padding: '7px 11px', borderRadius: 9, textDecoration: 'none', flexShrink: 0 }}
+                        >Maps ↗</a>
+                      </div>
+                    ) : (
+                      <div style={{ fontSize: 12, color: '#9CA3AF' }}>No stations found nearby.</div>
+                    )}
+                  </div>
+                ))}
+                <div style={{ fontSize: 11, color: '#9CA3AF', textAlign: 'center', paddingBottom: 4 }}>
+                  Prices from Service Victoria — updated daily
+                </div>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {addModal && (
@@ -611,47 +878,54 @@ function SectionBlock({ id, title, icon, count, loading, empty, children }: {
 
 // ── Food card (2-col grid, rich data) ────────────────────────────────────────
 
-function FoodCard({ poi, destName, highlighted, onMapPin }: {
-  poi: LivePOI; destName: string; highlighted?: boolean; onMapPin?: () => void
+function FoodCard({ poi, destName, highlighted, onMapPin, isLocalFav }: {
+  poi: LivePOI; destName: string; highlighted?: boolean; onMapPin?: () => void; isLocalFav?: boolean
 }) {
   const tag = POI_TAG[poi.type] ?? { emoji: '🍽', label: poi.type, color: '#B45309', bg: '#FEF3C7' }
   const mapsUrl = poi.lat && poi.lng
-    ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(poi.name)}&center=${poi.lat},${poi.lng}`
+    ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(poi.name)}`
     : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(poi.name + ' ' + destName)}`
 
+  const openStatus = getOpenStatus(poi.openingHoursPeriods)
+
   return (
-    <a data-poi-id={poi.id} href={mapsUrl} target="_blank" rel="noopener noreferrer" style={{
-      display: 'flex', flexDirection: 'column', gap: 8, textDecoration: 'none',
-      background: highlighted ? '#F0F9FF' : '#fff', borderRadius: 14,
-      border: `1.5px solid ${highlighted ? '#3B82F6' : 'var(--border)'}`,
+    <div data-poi-id={poi.id} onClick={onMapPin} style={{
+      display: 'flex', flexDirection: 'column', gap: 8,
+      background: highlighted ? '#F0F9FF' : isLocalFav ? '#F0FDF4' : '#fff', borderRadius: 14,
+      border: `1.5px solid ${highlighted ? '#3B82F6' : isLocalFav ? 'rgba(58,107,79,0.25)' : 'var(--border)'}`,
       padding: '14px',
-      boxShadow: highlighted ? '0 0 0 3px rgba(59,130,246,0.15)' : '0 1px 4px rgba(0,0,0,0.05)',
-      transition: 'all 0.15s', cursor: 'pointer',
-    }}
-      onMouseEnter={(e) => { if (!highlighted) { (e.currentTarget as HTMLAnchorElement).style.boxShadow = '0 4px 16px rgba(0,0,0,0.1)'; (e.currentTarget as HTMLAnchorElement).style.transform = 'translateY(-1px)' } }}
-      onMouseLeave={(e) => { if (!highlighted) { (e.currentTarget as HTMLAnchorElement).style.boxShadow = '0 1px 4px rgba(0,0,0,0.05)'; (e.currentTarget as HTMLAnchorElement).style.transform = 'none' } }}
-      onClick={onMapPin}
-    >
-      {/* Type chip + map pin */}
+      boxShadow: highlighted ? '0 0 0 3px rgba(59,130,246,0.15)' : isLocalFav ? '0 2px 8px rgba(58,107,79,0.1)' : '0 1px 4px rgba(0,0,0,0.05)',
+      transition: 'all 0.15s', cursor: onMapPin ? 'pointer' : 'default',
+    }}>
+      {/* Type chip + local fav or map pin */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
         <span style={{ fontSize: 18 }}>{tag.emoji}</span>
         <span style={{ fontSize: 9.5, fontWeight: 700, color: tag.color, background: tag.bg, padding: '2px 7px', borderRadius: 5, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
           {tag.label}
         </span>
-        {onMapPin && (
-          <span style={{ marginLeft: 'auto', fontSize: 12, color: highlighted ? '#3B82F6' : '#9CA3AF' }} title="Show on map">📍</span>
-        )}
+        {isLocalFav
+          ? <span style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 4, background: '#E8F5EE', border: '1px solid rgba(58,107,79,0.2)', borderRadius: 20, padding: '2px 8px' }}>
+              <span style={{ fontSize: 11, color: GREEN }}>◆</span>
+              <span style={{ fontSize: 10, fontWeight: 700, color: GREEN, letterSpacing: '0.02em' }}>Local gem</span>
+            </span>
+          : onMapPin && <span style={{ marginLeft: 'auto', fontSize: 12, color: highlighted ? '#3B82F6' : '#9CA3AF' }} title="Show on map">📍</span>
+        }
       </div>
 
       {/* Name */}
-      <div style={{ fontSize: 13.5, fontWeight: 800, color: '#1C1B1F', lineHeight: 1.3, flex: 1 }}>
+      <div style={{ fontSize: 13.5, fontWeight: 800, color: '#1C1B1F', lineHeight: 1.3 }}>
         {poi.name}
       </div>
 
-      {/* Rating — prominent */}
+      {/* Rating */}
       {poi.rating && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <StarRating rating={poi.rating} count={poi.totalRatings} />
+        <StarRating rating={poi.rating} count={poi.totalRatings} />
+      )}
+
+      {/* Editorial summary */}
+      {poi.editorialSummary && (
+        <div style={{ fontSize: 11.5, color: '#49454F', lineHeight: 1.55 }}>
+          {poi.editorialSummary}
         </div>
       )}
 
@@ -660,11 +934,27 @@ function FoodCard({ poi, destName, highlighted, onMapPin }: {
         <span style={{ fontSize: 11, color: '#6B7280' }}>{poi.cuisine}</span>
       )}
 
-      {/* Tap hint */}
-      <div style={{ fontSize: 10.5, color: '#9CA3AF', marginTop: 'auto', display: 'flex', alignItems: 'center', gap: 4 }}>
-        <span>📍</span><span>Tap to open in Google Maps</span>
+      {/* Open/closed */}
+      {openStatus && (
+        <div style={{ fontSize: 11, fontWeight: 600, color: openStatus.isOpen ? '#16A34A' : '#DC2626' }}>
+          {openStatus.isOpen ? 'Open now' : `Closed${openStatus.nextOpen ? ` — opens ${openStatus.nextOpen}` : ''}`}
+        </div>
+      )}
+
+      {/* Buttons */}
+      <div style={{ display: 'flex', gap: 6, marginTop: 2 }}>
+        {poi.website && !poi.website.includes('google.com') && (
+          <a href={poi.website} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()}
+            style={{ flex: 1, textAlign: 'center', padding: '7px 10px', borderRadius: 8, background: '#F8F7F4', border: '1px solid var(--border)', color: '#374151', fontSize: 11.5, fontWeight: 700, textDecoration: 'none', whiteSpace: 'nowrap' }}>
+            Website ↗
+          </a>
+        )}
+        <a href={mapsUrl} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()}
+          style={{ flex: 1, textAlign: 'center', padding: '7px 10px', borderRadius: 8, background: '#1C1B1F', color: '#fff', fontSize: 11.5, fontWeight: 700, textDecoration: 'none', whiteSpace: 'nowrap' }}>
+          Open in Maps ↗
+        </a>
       </div>
-    </a>
+    </div>
   )
 }
 
@@ -676,37 +966,59 @@ function ActivityCard({ act, expanded, highlighted, onToggle, isAdded, onAdd, on
 }) {
   const tag = CAT_TAG[act.category] ?? { label: act.category, color: '#374151', bg: '#F3F4F6' }
   const mapsUrl = act.mapsUrl || `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(act.name + ' Victoria AU')}`
+  const websiteUrl = act.websiteUri && !act.websiteUri.includes('google.com') ? act.websiteUri : null
+  const openStatus = getOpenStatus(act.openingHoursPeriods)
+
+  const handleToggle = () => {
+    onToggle()
+    if (!expanded && onMapPin) onMapPin()
+  }
 
   return (
-    <div data-poi-id={act.id} onClick={onToggle} style={{
-      background: isAdded ? '#F0FDF4' : highlighted ? '#F0F9FF' : '#fff', borderRadius: 14,
-      border: `1.5px solid ${highlighted ? '#3B82F6' : isAdded ? 'rgba(58,107,79,0.4)' : expanded ? (act.isHiddenGem ? 'rgba(184,115,51,0.45)' : `${GREEN}45`) : (act.isHiddenGem ? 'rgba(184,115,51,0.25)' : 'var(--border)')}`,
+    <div data-poi-id={act.id} onClick={handleToggle} style={{
+      background: highlighted ? '#F0F9FF' : isAdded ? '#F0FDF4' : act.isHiddenGem ? '#F0FDF4' : '#fff',
+      borderRadius: 14,
+      border: `1.5px solid ${highlighted ? '#3B82F6' : isAdded ? 'rgba(58,107,79,0.4)' : act.isHiddenGem ? 'rgba(58,107,79,0.25)' : 'var(--border)'}`,
       padding: '13px 15px', cursor: 'pointer',
       transition: 'all 0.15s',
-      boxShadow: highlighted ? '0 0 0 3px rgba(59,130,246,0.2)' : expanded ? '0 4px 20px rgba(0,0,0,0.09)' : '0 1px 3px rgba(0,0,0,0.04)',
+      boxShadow: highlighted ? '0 0 0 3px rgba(59,130,246,0.2)' : act.isHiddenGem ? '0 2px 8px rgba(58,107,79,0.1)' : expanded ? '0 4px 20px rgba(0,0,0,0.09)' : '0 1px 3px rgba(0,0,0,0.04)',
       transform: expanded ? 'translateY(-1px)' : 'none',
     }}>
       <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 6 }}>
             <Chip label={tag.label} color={tag.color} bg={tag.bg} />
-            {act.isHiddenGem && <Chip label="Local gem" color={WARM} bg="#FFF5EB" />}
             {act.cost === 'free' && <Chip label="Free" color={GREEN} bg="#E8F5EE" />}
-            {act.kidsOk && <Chip label="Kid Friendly" color="#D97706" bg="#FFFBEB" />}
             {isAdded && <Chip label="In your plan" color={GREEN} bg="#E8F5EE" />}
           </div>
           <div style={{ fontSize: 13.5, fontWeight: 700, color: '#1C1B1F', marginBottom: 3, lineHeight: 1.3 }}>{act.name}</div>
+          {act.rating && (
+            <div style={{ marginBottom: 3 }}>
+              <StarRating rating={act.rating} count={act.reviewCount} />
+            </div>
+          )}
           {!expanded && act.description && (
             <div style={{ fontSize: 11.5, color: '#49454F', lineHeight: 1.55 }}>
               {act.description.length > 90 ? act.description.slice(0, 90) + '…' : act.description}
             </div>
           )}
+          {openStatus && !expanded && (
+            <div style={{ fontSize: 10.5, fontWeight: 600, color: openStatus.isOpen ? '#16A34A' : '#DC2626', marginTop: 3 }}>
+              {openStatus.isOpen ? 'Open now' : `Closed${openStatus.nextOpen ? ` — opens ${openStatus.nextOpen}` : ''}`}
+            </div>
+          )}
           <div style={{ fontSize: 10.5, color: '#9CA3AF', marginTop: 4 }}>⏱ {act.duration}</div>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
-          {onMapPin && (
-            <button onClick={(e) => { e.stopPropagation(); onMapPin() }} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 13, color: highlighted ? '#3B82F6' : '#C8C4BD', padding: 0, lineHeight: 1 }} title="Show on map">📍</button>
-          )}
+          {act.isHiddenGem
+            ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, background: '#E8F5EE', border: '1px solid rgba(58,107,79,0.2)', borderRadius: 20, padding: '3px 8px', flexShrink: 0 }}>
+                <span style={{ fontSize: 10, color: GREEN }}>◆</span>
+                <span style={{ fontSize: 9.5, fontWeight: 700, color: GREEN, letterSpacing: '0.02em' }}>Local gem</span>
+              </span>
+            : onMapPin && (
+                <button onClick={(e) => { e.stopPropagation(); onMapPin() }} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 13, color: highlighted ? '#3B82F6' : '#C8C4BD', padding: 0, lineHeight: 1 }} title="Show on map">📍</button>
+              )
+          }
           <span style={{ fontSize: 12, color: '#9CA3AF', transition: 'transform 0.15s', transform: expanded ? 'rotate(180deg)' : 'none', marginTop: 2 }}>▾</span>
         </div>
       </div>
@@ -715,10 +1027,21 @@ function ActivityCard({ act, expanded, highlighted, onToggle, isAdded, onAdd, on
           {act.description && (
             <p style={{ fontSize: 12, color: '#374151', lineHeight: 1.65, margin: 0 }}>{act.description}</p>
           )}
-          <div style={{ display: 'flex', gap: 8 }}>
+          {openStatus && (
+            <div style={{ fontSize: 11.5, fontWeight: 600, color: openStatus.isOpen ? '#16A34A' : '#DC2626' }}>
+              {openStatus.isOpen ? 'Open now' : `Closed${openStatus.nextOpen ? ` — opens ${openStatus.nextOpen}` : ''}`}
+            </div>
+          )}
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            {websiteUrl && (
+              <a href={websiteUrl} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()}
+                style={{ padding: '9px 14px', borderRadius: 9, background: '#F8F7F4', border: '1px solid var(--border)', color: '#374151', fontSize: 12, fontWeight: 700, textDecoration: 'none', whiteSpace: 'nowrap' }}>
+                Website ↗
+              </a>
+            )}
             <a href={mapsUrl} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()}
-              style={{ flex: 1, display: 'block', textAlign: 'center', padding: '9px', borderRadius: 9, background: '#1C1B1F', color: '#fff', fontSize: 12, fontWeight: 700, textDecoration: 'none' }}>
-              📍 Google Maps ↗
+              style={{ flex: websiteUrl ? undefined : 1, display: 'block', textAlign: 'center', padding: '9px 14px', borderRadius: 9, background: '#1C1B1F', color: '#fff', fontSize: 12, fontWeight: 700, textDecoration: 'none', whiteSpace: 'nowrap' }}>
+              Open in Maps ↗
             </a>
             {onAdd && !isAdded && (
               <button onClick={(e) => { e.stopPropagation(); onAdd() }}
@@ -745,18 +1068,20 @@ function ActivityCard({ act, expanded, highlighted, onToggle, isAdded, onAdd, on
 function AccommodationGridCard({ poi, destName }: { poi: AccommodationPOI; destName: string }) {
   const cfg = ACCOM_POI_CFG[poi.type]
   const mapsUrl = poi.lat && poi.lng
-    ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(poi.name)}&center=${poi.lat},${poi.lng}`
+    ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(poi.name)}`
     : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(poi.name + ' ' + destName)}`
+  const attr = (poi as unknown as { attributes?: Record<string, unknown> }).attributes ?? {}
+  const editorialSummary = attr.editorial_summary as string | undefined
+  const websiteUri = attr.website_uri as string | undefined
+  const websiteUrl = websiteUri && !websiteUri.includes('google.com') ? websiteUri : null
+  const openStatus = getOpenStatus(attr.opening_hours_periods as import('@/lib/overpass').OpenHoursPeriod[] | undefined)
 
   return (
-    <a href={mapsUrl} target="_blank" rel="noopener noreferrer" style={{
-      display: 'flex', flexDirection: 'column', gap: 8, textDecoration: 'none',
+    <div style={{
+      display: 'flex', flexDirection: 'column', gap: 8,
       background: '#fff', borderRadius: 14, border: '1px solid var(--border)',
-      padding: '14px', boxShadow: '0 1px 4px rgba(0,0,0,0.05)', transition: 'all 0.15s',
-    }}
-      onMouseEnter={(e) => { (e.currentTarget as HTMLAnchorElement).style.boxShadow = '0 4px 16px rgba(0,0,0,0.1)'; (e.currentTarget as HTMLAnchorElement).style.transform = 'translateY(-1px)' }}
-      onMouseLeave={(e) => { (e.currentTarget as HTMLAnchorElement).style.boxShadow = '0 1px 4px rgba(0,0,0,0.05)'; (e.currentTarget as HTMLAnchorElement).style.transform = 'none' }}
-    >
+      padding: '14px', boxShadow: '0 1px 4px rgba(0,0,0,0.05)',
+    }}>
       {/* Type chip */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
         <span style={{ fontSize: 18 }}>{cfg.emoji}</span>
@@ -766,21 +1091,41 @@ function AccommodationGridCard({ poi, destName }: { poi: AccommodationPOI; destN
       </div>
 
       {/* Name */}
-      <div style={{ fontSize: 13.5, fontWeight: 800, color: '#1C1B1F', lineHeight: 1.3, flex: 1 }}>
+      <div style={{ fontSize: 13.5, fontWeight: 800, color: '#1C1B1F', lineHeight: 1.3 }}>
         {poi.name}
       </div>
 
-      {/* Hotel star class */}
+      {/* Hotel stars */}
       {poi.stars && (
         <div style={{ fontSize: 12, color: '#F59E0B' }}>{'★'.repeat(poi.stars)}{'☆'.repeat(Math.max(0, 5 - poi.stars))}</div>
       )}
 
+      {/* Editorial summary */}
+      {editorialSummary && (
+        <div style={{ fontSize: 11.5, color: '#49454F', lineHeight: 1.55 }}>{editorialSummary}</div>
+      )}
 
-      {/* Tap hint */}
-      <div style={{ fontSize: 10.5, color: '#9CA3AF', marginTop: 'auto', display: 'flex', alignItems: 'center', gap: 4 }}>
-        <span>📍</span><span>Tap to open in Google Maps</span>
+      {/* Open/closed */}
+      {openStatus && (
+        <div style={{ fontSize: 11, fontWeight: 600, color: openStatus.isOpen ? '#16A34A' : '#DC2626' }}>
+          {openStatus.isOpen ? 'Open now' : `Closed${openStatus.nextOpen ? ` — opens ${openStatus.nextOpen}` : ''}`}
+        </div>
+      )}
+
+      {/* Buttons */}
+      <div style={{ display: 'flex', gap: 6, marginTop: 2 }}>
+        {websiteUrl && (
+          <a href={websiteUrl} target="_blank" rel="noopener noreferrer"
+            style={{ flex: 1, textAlign: 'center', padding: '7px 10px', borderRadius: 8, background: '#F8F7F4', border: '1px solid var(--border)', color: '#374151', fontSize: 11.5, fontWeight: 700, textDecoration: 'none' }}>
+            Website ↗
+          </a>
+        )}
+        <a href={mapsUrl} target="_blank" rel="noopener noreferrer"
+          style={{ flex: 1, textAlign: 'center', padding: '7px 10px', borderRadius: 8, background: '#1C1B1F', color: '#fff', fontSize: 11.5, fontWeight: 700, textDecoration: 'none' }}>
+          Open in Maps ↗
+        </a>
       </div>
-    </a>
+    </div>
   )
 }
 

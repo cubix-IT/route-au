@@ -1,6 +1,11 @@
 import { getPlacesCache, setPlacesCache, isPlacesBudgetExhausted, incrementPlacesRequestCount } from '@/store/db'
 import { useAppStore } from '@/store/useAppStore'
 
+export interface OpenHoursPeriod {
+  open: { day: number; hour: number; minute: number }
+  close?: { day: number; hour: number; minute: number }
+}
+
 export interface LivePOI {
   id: string
   type: 'cafe' | 'restaurant' | 'pub' | 'fast_food' | 'bakery' | 'winery' | 'viewpoint' | 'attraction' | 'hiking'
@@ -15,6 +20,8 @@ export interface LivePOI {
   rating?: number        // Google Places rating (1–5)
   totalRatings?: number  // number of reviews
   source?: 'google' | 'osm'
+  editorialSummary?: string
+  openingHoursPeriods?: OpenHoursPeriod[]
 }
 
 const OVERPASS = 'https://overpass-api.de/api/interpreter'

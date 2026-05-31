@@ -144,6 +144,11 @@ async function getRemainingCount(staleDate: string, force: boolean): Promise<num
 
 // ── Google Places fetchers ────────────────────────────────────────────────────
 
+interface OpenHoursPeriod {
+  open: { day: number; hour: number; minute: number }
+  close?: { day: number; hour: number; minute: number }
+}
+
 interface GPlace {
   place_id: string
   name: string
@@ -154,6 +159,9 @@ interface GPlace {
   business_status?: string
   rating?: number
   user_ratings_total?: number
+  editorial_summary?: string
+  website_uri?: string
+  opening_hours_periods?: OpenHoursPeriod[]
 }
 
 // Google Places API v1 (New) — returns cuisine-level types like chinese_restaurant, italian_restaurant
@@ -174,7 +182,7 @@ async function fetchByType(
       'Content-Type': 'application/json',
       'X-Goog-Api-Key': apiKey,
       // Request specific fields — only pay for what we use
-      'X-Goog-FieldMask': 'places.id,places.displayName,places.location,places.types,places.formattedAddress,places.rating,places.userRatingCount,places.businessStatus,places.primaryType',
+      'X-Goog-FieldMask': 'places.id,places.displayName,places.location,places.types,places.formattedAddress,places.rating,places.userRatingCount,places.businessStatus,places.primaryType,places.editorialSummary,places.websiteUri,places.regularOpeningHours',
     },
     body: JSON.stringify(body),
     signal: AbortSignal.timeout(8_000),
@@ -193,6 +201,9 @@ async function fetchByType(
       rating: p.rating,
       user_ratings_total: p.userRatingCount,
       business_status: p.businessStatus,
+      editorial_summary: p.editorialSummary?.text,
+      website_uri: p.websiteUri,
+      opening_hours_periods: p.regularOpeningHours?.periods,
     }))
 }
 
@@ -206,6 +217,9 @@ interface PlacesV1Result {
   userRatingCount?: number
   businessStatus?: string
   primaryType?: string
+  editorialSummary?: { text: string }
+  websiteUri?: string
+  regularOpeningHours?: { periods?: OpenHoursPeriod[] }
 }
 
 // Text Search via Places API v1 — catches lookouts, waterfalls, wineries, trails etc.
@@ -224,7 +238,7 @@ async function fetchByKeyword(
     headers: {
       'Content-Type': 'application/json',
       'X-Goog-Api-Key': apiKey,
-      'X-Goog-FieldMask': 'places.id,places.displayName,places.location,places.types,places.formattedAddress,places.rating,places.userRatingCount,places.businessStatus,places.primaryType',
+      'X-Goog-FieldMask': 'places.id,places.displayName,places.location,places.types,places.formattedAddress,places.rating,places.userRatingCount,places.businessStatus,places.primaryType,places.editorialSummary,places.websiteUri,places.regularOpeningHours',
     },
     body: JSON.stringify(body),
     signal: AbortSignal.timeout(8_000),
@@ -242,6 +256,9 @@ async function fetchByKeyword(
       rating: p.rating,
       user_ratings_total: p.userRatingCount,
       business_status: p.businessStatus,
+      editorial_summary: p.editorialSummary?.text,
+      website_uri: p.websiteUri,
+      opening_hours_periods: p.regularOpeningHours?.periods,
     }))
 }
 
@@ -306,7 +323,16 @@ const SERVICE_TYPES = new Set([
   'post_office', 'local_government_office',
 ])
 
-function classifyGPlace(types: string[]): 'activity' | 'food' | 'nature' | 'accommodation' | 'service' | null {
+// Types that are experiences/destinations — override food classification even if cafe/restaurant also in types
+const EXPERIENCE_PRIMARY = new Set([
+  'market', 'tourist_attraction', 'farm', 'garden', 'historical_landmark',
+  'historical_place', 'cultural_landmark', 'national_park', 'zoo', 'aquarium',
+  'amusement_park', 'art_gallery', 'museum', 'vineyard', 'winery',
+])
+
+function classifyGPlace(types: string[], primaryType?: string): 'activity' | 'food' | 'nature' | 'accommodation' | 'service' | null {
+  // Primary type wins — a market with a cafe corner is still a market
+  if (primaryType && EXPERIENCE_PRIMARY.has(primaryType)) return 'activity'
   if (types.some((t) => EXPLICIT_FOOD.has(t))) return 'food'
   if (types.some((t) => ACCOMMODATION_TYPES.has(t))) return 'accommodation'
   if (types.some((t) => SERVICE_TYPES.has(t))) return 'service'
@@ -461,7 +487,7 @@ async function enrichSubDest(
   const accommodation: AccommodationRow[] = []
 
   for (const place of allPlaces.values()) {
-    const classification = classifyGPlace(place.types)
+    const classification = classifyGPlace(place.types, place.primary_type)
     if (!classification || classification === 'service') continue
 
     const placeSlug = `${slug}-gp-${place.place_id}`
@@ -488,10 +514,17 @@ async function enrichSubDest(
           rating,
           review_count: reviewCount,
           business_status: place.business_status ?? 'OPERATIONAL',
+          editorial_summary: place.editorial_summary,
+          website_uri: place.website_uri,
+          opening_hours_periods: place.opening_hours_periods,
         },
         source: 'google',
       })
     } else if (classification === 'nature') {
+      // Nature spots: require at least 4.0★ and 50 reviews to be worth showing
+      const rating = place.rating ?? 0
+      const reviewCount = place.user_ratings_total ?? 0
+      if (rating < 4.0 || reviewCount < 50) continue
       nature.push({
         slug: placeSlug, sub_dest_id: subDestId, name: place.name,
         type: natureTypeFromGoogleTypes(place.types),
@@ -502,7 +535,12 @@ async function enrichSubDest(
         slug: placeSlug, sub_dest_id: subDestId, name: place.name,
         type: accommodationTypeFromGoogleTypes(place.name, place.types),
         description: '', lat: pLat, lng: pLng, address,
-        attributes: { google_place_id: place.place_id },
+        attributes: {
+          google_place_id: place.place_id,
+          editorial_summary: place.editorial_summary,
+          website_uri: place.website_uri,
+          opening_hours_periods: place.opening_hours_periods,
+        },
         source: 'google',
       })
     } else {
@@ -521,10 +559,16 @@ async function enrichSubDest(
       const { category, emoji } = categoryFromPlace(place.name, place.types)
       activities.push({
         slug: placeSlug, sub_dest_id: subDestId, name: place.name,
-        category, emoji, description: '', duration: '1–2 hrs', cost: '$',
+        category, emoji, description: place.editorial_summary ?? '', duration: '1–2 hrs', cost: '$',
         kids_ok: true, is_hidden_gem: false,
         maps_url: `https://www.google.com/maps/place/?q=place_id:${place.place_id}`,
         tags: place.types.slice(0, 5), source: 'google',
+        attributes: {
+          google_place_id: place.place_id, rating, review_count: reviewCount,
+          editorial_summary: place.editorial_summary,
+          website_uri: place.website_uri,
+          opening_hours_periods: place.opening_hours_periods,
+        },
       })
     }
   }
@@ -557,6 +601,7 @@ interface ActivityRow {
   emoji: string; description: string; duration: string; cost: string
   kids_ok: boolean; is_hidden_gem: boolean; maps_url: string
   tags: string[]; source: string
+  attributes?: Record<string, unknown>
 }
 
 interface FoodRow {

@@ -29,13 +29,28 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   let pricesUpserted = 0
 
   try {
+    const headers = {
+      'x-consumer-id': apiKey,
+      'x-transactionid': randomUUID(),
+      'User-Agent': 'UnplannedEscapes/1.0',
+    }
+
+    // Fetch brands first so we can resolve brandId → readable name
+    const brandsResp = await fetch('https://api.fuel.service.vic.gov.au/open-data/v1/fuel/brands', {
+      headers: { ...headers, 'x-transactionid': randomUUID() },
+      signal: AbortSignal.timeout(15_000),
+    })
+    const brandMap = new Map<string, string>()
+    if (brandsResp.ok) {
+      const brandsData = await brandsResp.json() as { brands?: Array<{ brandId: string; name: string }> }
+      for (const b of brandsData.brands ?? []) {
+        if (b.brandId && b.name) brandMap.set(b.brandId, b.name)
+      }
+    }
+
     // Fetch all VIC fuel station prices in one call (~1,741 stations)
     const resp = await fetch('https://api.fuel.service.vic.gov.au/open-data/v1/fuel/prices', {
-      headers: {
-        'x-consumer-id': apiKey,
-        'x-transactionid': randomUUID(),
-        'User-Agent': 'UnplannedEscapes/1.0',
-      },
+      headers,
       signal: AbortSignal.timeout(30_000),
     })
 
@@ -55,10 +70,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const { latitude: lat, longitude: lng } = st.location
       if (lat == null || lng == null) continue
 
+      // Resolve brandId to human-readable name
+      const brandName = brandMap.get(st.brandId) ?? st.brandId ?? null
+
       stationMap.set(st.id, {
         external_id: st.id,
         name: st.name ?? 'Unknown',
-        brand: st.brandId ?? null,
+        brand: brandName,
         address: st.address ?? null,
         lat,
         lng,

@@ -382,18 +382,6 @@ export const FOOD_DRINK: FoodDrinkPOI[] = [
     signature_dish: 'Heritage lamb with lavender jus',
   },
   {
-    id: 'daylesford-sunday-market',
-    name: 'Daylesford Sunday Market',
-    category: 'Cafe',
-    coord: { lng: 144.143, lat: -37.352 },
-    description: 'The beating heart of Daylesford on a Sunday morning — artisan producers, local cheeses, flowers, and the best flat whites you\'ll find outside Melbourne. Stalls from 8am.',
-    corridor_id: 'daylesford',
-    meal_times: ['breakfast'],
-    price_range: '$',
-    matching_prefs: ['Cafes'],
-    signature_dish: 'Sourdough + local honey',
-  },
-  {
     id: 'cliffy-s-daylesford',
     name: "Cliffy's Emporium",
     category: 'Cafe',

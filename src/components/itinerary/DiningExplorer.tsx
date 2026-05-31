@@ -150,7 +150,7 @@ function FoodStopCard({ stop }: { stop: RouteFoodStop }) {
   const cfg = TYPE_CFG[stop.type]
   const isOnRoute = stop.distanceFromRouteKm < 1
 
-  const mapsUrl = `https://www.google.com/maps/search/${encodeURIComponent(stop.name)}/@${stop.lat},${stop.lng},15z`
+  const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(stop.name)}`
 
   return (
     <div style={{

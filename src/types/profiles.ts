@@ -39,7 +39,7 @@ export type VehicleType =
   | '4WD_WithCaravan'
   | 'Electric'
 
-export type FuelType = 'Unleaded95' | 'Unleaded98' | 'Diesel' | 'Electric'
+export type FuelType = 'Unleaded91' | 'E10' | 'Unleaded95' | 'Unleaded98' | 'Diesel' | 'Electric'
 
 export type TripType = 'day' | 'multiday'
 

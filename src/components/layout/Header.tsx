@@ -16,7 +16,7 @@ export function LogoMark({ size = 56 }: { size?: number }) {
 }
 
 export function Header() {
-  const { isOffline, setWizardOpen, activeItinerary, clearItinerary, userProfile } = useAppStore()
+  const { isOffline, setWizardOpen, clearItinerary, userProfile } = useAppStore()
 
   return (
     <header style={{
@@ -55,31 +55,6 @@ export function Header() {
             <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#DC2626' }} />
             <span style={{ fontSize: 11, fontWeight: 600, color: '#DC2626' }}>Offline</span>
           </div>
-        )}
-
-        {/* Start Over */}
-        {activeItinerary && (
-          <button
-            onClick={() => clearItinerary()}
-            style={{
-              padding: '6px 13px', borderRadius: 8,
-              background: 'transparent',
-              border: '1px solid var(--border)',
-              color: '#8C8A87',
-              fontSize: 12.5, fontWeight: 500, cursor: 'pointer',
-              transition: 'all 0.15s',
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.borderColor = '#C8C4BD'
-              e.currentTarget.style.color = '#4A4948'
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.borderColor = 'var(--border)'
-              e.currentTarget.style.color = '#8C8A87'
-            }}
-          >
-            Start over
-          </button>
         )}
 
         {/* Primary CTA */}

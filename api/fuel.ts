@@ -16,10 +16,20 @@ function haversinKm(lat1: number, lng1: number, lat2: number, lng2: number): num
 
 // Fuel type: app label → DB fuel_type code
 const APP_TO_DB_FUEL: Record<string, string> = {
+  Unleaded91: 'U91',
+  E10: 'E10',
   Unleaded95: 'P95',
   Unleaded98: 'P98',
   Diesel: 'DSL',
   Electric: '',
+}
+
+// Salesforce ID pattern — 15 or 18 alphanumeric chars starting with 0
+const SF_ID = /^[a-zA-Z0-9]{15,18}$/
+function decodeBrand(raw: string | null): string {
+  if (!raw) return 'Independent'
+  if (SF_ID.test(raw)) return 'Service Station' // ID not yet resolved — cron will fix overnight
+  return raw
 }
 
 export interface FuelStation {
@@ -81,38 +91,41 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     if (error) throw error
 
-    const stations: FuelStation[] = []
-
-    for (const row of data ?? []) {
-      if (!row.lat || !row.lng) continue
-      const distKm = haversinKm(originLat, originLng, row.lat, row.lng)
-      if (distKm > radiusKm) continue
-      if (brand && !row.brand?.toLowerCase().includes(brand.toLowerCase())) continue
-
-      const prices = Array.isArray(row.fuel_prices) ? row.fuel_prices : [row.fuel_prices]
-      const priceEntry = prices.find((p: { fuel_type: string; price_cents: number }) => p.fuel_type === dbFuelType)
-      if (!priceEntry) continue
-
-      stations.push({
-        id: row.external_id,
-        name: row.name,
-        brand: row.brand ?? 'Independent',
-        brandId: '',
-        address: row.address ?? '',
-        lat: row.lat,
-        lng: row.lng,
-        priceCents: priceEntry.price_cents,
-        pricePerLitre: priceEntry.price_cents / 100,
-        distanceKm: Math.round(distKm * 10) / 10,
-        fuelType: dbFuelType,
-      })
+    function rowsToStations(rows: typeof data, brandFilter: string | undefined): FuelStation[] {
+      const out: FuelStation[] = []
+      for (const row of rows ?? []) {
+        if (!row.lat || !row.lng) continue
+        const distKm = haversinKm(originLat, originLng, row.lat, row.lng)
+        if (distKm > radiusKm) continue
+        if (brandFilter && !row.brand?.toLowerCase().includes(brandFilter.toLowerCase())) continue
+        const prices = Array.isArray(row.fuel_prices) ? row.fuel_prices : [row.fuel_prices]
+        const priceEntry = prices.find((p: { fuel_type: string; price_cents: number }) => p.fuel_type === dbFuelType)
+        if (!priceEntry) continue
+        out.push({
+          id: row.external_id,
+          name: row.name,
+          brand: decodeBrand(row.brand),
+          brandId: '',
+          address: row.address ?? '',
+          lat: row.lat,
+          lng: row.lng,
+          priceCents: priceEntry.price_cents,
+          pricePerLitre: priceEntry.price_cents / 100,
+          distanceKm: Math.round(distKm * 10) / 10,
+          fuelType: dbFuelType,
+        })
+      }
+      return out
     }
+
+    const stations = rowsToStations(data, brand)
+    const brandNotFound = brand && stations.length === 0
 
     stations.sort((a, b) => a.priceCents - b.priceCents)
     const top = stations.slice(0, maxResults)
 
     res.setHeader('Cache-Control', 's-maxage=3600, stale-while-revalidate=7200')
-    return res.status(200).json({ stations: top, totalFound: stations.length, fuelType: dbFuelType, radiusKm })
+    return res.status(200).json({ stations: top, totalFound: stations.length, fuelType: dbFuelType, radiusKm, brandNotFound: brandNotFound || undefined })
   } catch (err) {
     console.error('[fuel] error:', err)
     return res.status(200).json({ stations: [], error: 'fuel data unavailable' })

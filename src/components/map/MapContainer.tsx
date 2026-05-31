@@ -116,9 +116,7 @@ export function MapContainer() {
 
       el.addEventListener('click', (e) => {
         e.stopPropagation()
-        // Toggle popup on click
-        if (popup.isOpen()) { popup.remove() } else { popup.addTo(map) }
-        // Highlight card in left panel
+        popup.addTo(map)
         setSelectedPinId(pin.id)
         el.style.transform = 'scale(1.25)'
         setTimeout(() => { el.style.transform = 'scale(1)' }, 200)

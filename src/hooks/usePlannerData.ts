@@ -14,6 +14,8 @@ import { FOOD_DRINK, type FoodDrinkPOI } from '@/data/foodDrink'
 import { distanceBetween } from '@/utils/geo'
 
 const FUEL_PRICE_PER_L: Record<FuelType, number> = {
+  Unleaded91: 1.82,
+  E10: 1.85,
   Unleaded95: 1.98,
   Unleaded98: 2.12,
   Diesel: 1.88,
@@ -54,6 +56,7 @@ export interface DbActivity {
   maps_url: string
   tags: string[]
   source: string
+  attributes: Record<string, unknown>
 }
 
 export interface DbFoodPlace {
@@ -114,7 +117,7 @@ async function fetchDestinationFromDB(destSlug: string): Promise<{
   const [activitiesRes, foodRes, natureRes, accomRes, summaryRes] = await Promise.all([
     supabase
       .from('activities')
-      .select('activity_id,slug,name,category,emoji,description,duration,cost,kids_ok,is_hidden_gem,maps_url,tags,source')
+      .select('activity_id,slug,name,category,emoji,description,duration,cost,kids_ok,is_hidden_gem,maps_url,tags,source,attributes')
       .eq('sub_dest_id', id)
       .limit(200),
     supabase
@@ -297,20 +300,102 @@ export function usePlannerData() {
     ? `${activeItinerary!.total_days}-Day Escape`
     : 'Day Escape'
 
-  // Derived counts from DB (used by UI for "X places to eat" etc.)
-  // Filter out closed places (business_status stored in attributes.business_status)
-  const openFood = dbFood.filter((f) => {
-    const status = (f as unknown as { attributes?: { business_status?: string } }).attributes?.business_status
-    return !status || status === 'OPERATIONAL'
-  })
-  const openActivities = dbActivities.filter((a) => {
-    const attr = (a as unknown as { attributes?: { business_status?: string } }).attributes
-    const status = attr?.business_status
-    return !status || status === 'OPERATIONAL'
-  })
+  // Categories that are experiences, not food venues — excluded from Eat & Drink
+  const NON_FOOD_CATS = new Set([
+    'spa', 'wellness', 'beauty_salon', 'beauty', 'gym', 'fitness',
+    'market', 'markets', 'farmers_market', 'flea_market', 'night_market',
+    'shopping_mall', 'department_store', 'supermarket',
+  ])
+
+  // Filter closed places, deduplicate by name (keep highest-rated), sort rated first
+  const openFood = (() => {
+    const byStatus = dbFood.filter((f) => {
+      const status = (f as unknown as { attributes?: { business_status?: string } }).attributes?.business_status
+      if (status && status !== 'OPERATIONAL') return false
+      if (NON_FOOD_CATS.has(f.category.toLowerCase())) return false
+      // Catch markets by name regardless of category (e.g. "Daylesford Sunday Market")
+      if (/\bmarkets?\b/i.test(f.name)) return false
+      if (/\b(spa|wellness|bathhouse|hot\s*spring|retreat|ryokan|onsen)\b/i.test(f.name)) return false
+      return true
+    })
+    // Deduplicate: keep highest-rated entry per name
+    const seen = new Map<string, typeof byStatus[0]>()
+    for (const f of byStatus) {
+      const key = f.name.toLowerCase().trim()
+      const prev = seen.get(key)
+      if (!prev) { seen.set(key, f); continue }
+      const prevRating = ((prev.attributes as Record<string, unknown>)?.rating as number | undefined) ?? 0
+      const fRating = ((f.attributes as Record<string, unknown>)?.rating as number | undefined) ?? 0
+      if (fRating > prevRating) seen.set(key, f)
+    }
+    const deduped = [...seen.values()]
+    // Sort: rated (with reviews) first, descending by rating; unrated sink to bottom
+    deduped.sort((a, b) => {
+      const aAttr = (a.attributes as Record<string, unknown>) ?? {}
+      const bAttr = (b.attributes as Record<string, unknown>) ?? {}
+      const aR = (aAttr.rating as number | undefined) ?? 0
+      const bR = (bAttr.rating as number | undefined) ?? 0
+      const aCount = (aAttr.review_count as number | undefined) ?? 0
+      const bCount = (bAttr.review_count as number | undefined) ?? 0
+      // Treat as rated only if has reviews
+      const aRated = aR > 0 && aCount > 0 ? 1 : 0
+      const bRated = bR > 0 && bCount > 0 ? 1 : 0
+      if (aRated !== bRated) return bRated - aRated
+      return bR - aR
+    })
+    return deduped
+  })()
+  // Coordinate-only maps URL pattern — these are OSM nodes with no real place page
+  const COORD_ONLY_URL = /query=-?\d+\.\d+,-?\d+\.\d+/
+
+  // Generic low-value names from OSM / unrated Google Places
+  const JUNK_ACT_PATTERN = /^(corni|unnamed|track\b|path\b|trail\b|road\b|street\b|lane\b|reserve\b|locality\b|area\b|\d+\s)/i
+
+  const openActivities = (() => {
+    const byStatus = dbActivities.filter((a) => {
+      const attr = (a as unknown as { attributes?: Record<string, unknown> }).attributes ?? {}
+      if ((attr.business_status as string | undefined) && attr.business_status !== 'OPERATIONAL') return false
+      // Drop coordinate-only maps links
+      if (a.maps_url && COORD_ONLY_URL.test(a.maps_url) && !a.maps_url.includes('place_id')) return false
+      // Drop junk names
+      if (!a.name || a.name.trim().length < 3) return false
+      if (JUNK_ACT_PATTERN.test(a.name.trim())) return false
+      // If activity has rating stored in attributes, enforce minimum quality
+      const rating = attr.rating as number | undefined
+      const reviewCount = attr.review_count as number | undefined
+      if (rating !== undefined && reviewCount !== undefined) {
+        if (rating < 4.0 || reviewCount < 50) return false
+      }
+      return true
+    })
+    const seen = new Set<string>()
+    return byStatus.filter((a) => {
+      const key = a.name.toLowerCase().trim()
+      if (seen.has(key)) return false
+      seen.add(key)
+      return true
+    })
+  })()
+
+  // Nature spots: remove OSM junk and low-credibility entries
+  const NATURE_JUNK = /^(road verge|road side|roadside|verge|track|path|footpath|cycleway|footway|bridleway|unnamed|way|lane|street|road|avenue|drive|court|close|place|highway|route|service road|access road|fire track|fire road|fire trail|dirt road|gravel road|unsealed road|walking track|walking path|shared path|nature strip|median strip|drain|channel|creek crossing|culvert|bridge|roundabout|intersection|junction|node|area|region|zone|locality|suburb|township|settlement|precinct|\d+)$/i
+  const uniqueNature = (() => {
+    const seen = new Set<string>()
+    return dbNature.filter((n) => {
+      const name = n.name.trim()
+      // Must have a real name (not just a number, single word generic, or < 3 chars)
+      if (name.length < 3) return false
+      if (NATURE_JUNK.test(name)) return false
+      // Must have a meaningful description or at least a proper noun-ish name
+      const key = name.toLowerCase()
+      if (seen.has(key)) return false
+      seen.add(key)
+      return true
+    })
+  })()
 
   const dbFoodCount = openFood.length
-  const dbActivityCount = openActivities.length + dbNature.length
+  const dbActivityCount = openActivities.length + uniqueNature.length
   const dbAccomCount = dbAccommodation.length
 
   // Map DbAccommodation → AccommodationPOI for components that expect the legacy type
@@ -335,7 +420,7 @@ export function usePlannerData() {
     totalKm, driveHours, fuelCost, dayLabel,
     season, seasonMeta,
     // DB data (primary — fast, comprehensive, closed places filtered)
-    dbActivities: openActivities, dbFood: openFood, dbNature, dbAccommodation, accommodationPOIs,
+    dbActivities: openActivities, dbFood: openFood, dbNature: uniqueNature, dbAccommodation, accommodationPOIs,
     dbLoading, dbFoodCount, dbActivityCount, dbAccomCount,
     // legacy Overpass (fallback + route food)
     activities, livePOIs, wikiSummary, routeFood,
