@@ -248,11 +248,14 @@ export function ExperiencePanel({ hideTimeline = false }: { hideTimeline?: boole
 
     const origin = waypoints[0].coord
     const dest = waypoints[waypoints.length - 1].coord
-    const mid = { lat: (origin.lat + dest.lat) / 2, lng: (origin.lng + dest.lng) / 2 }
+    // Use route waypoints for accurate along-route points, not straight-line midpoint
+    const allWaypoints = waypoints.map(w => w.coord)
+    const quarter = allWaypoints[Math.floor(allWaypoints.length * 0.25)] ?? { lat: (origin.lat * 3 + dest.lat) / 4, lng: (origin.lng * 3 + dest.lng) / 4 }
+    const threeQuarter = allWaypoints[Math.floor(allWaypoints.length * 0.75)] ?? { lat: (origin.lat + dest.lat * 3) / 4, lng: (origin.lng + dest.lng * 3) / 4 }
     const spots = [
-      { coord: origin, label: 'Near start' },
-      { coord: mid,    label: 'En route' },
-      { coord: dest,   label: 'Near destination' },
+      { coord: quarter,      label: 'Early on route' },
+      { coord: threeQuarter, label: 'Later on route' },
+      { coord: dest,         label: 'Near destination' },
     ]
 
     setFuelLoading(true)
@@ -261,7 +264,8 @@ export function ExperiencePanel({ hideTimeline = false }: { hideTimeline?: boole
 
     const results = await Promise.all(spots.map(async ({ coord, label }) => {
       try {
-        const r = await fetch(`/api/fuel?lat=${coord.lat}&lng=${coord.lng}&fuelType=${d.vehicleProfile!.fuel_type}&limit=1&radius=50${brandQ}`)
+        // radius=15km — tight enough to stay on-route, wide enough to find stations
+        const r = await fetch(`/api/fuel?lat=${coord.lat}&lng=${coord.lng}&fuelType=${d.vehicleProfile!.fuel_type}&limit=1&radius=15${brandQ}`)
         const data = await r.json() as { stations?: FuelStop['station'][]; brandNotFound?: boolean }
         return { coord, label, station: data.stations?.[0] ?? null, brandNotFound: data.brandNotFound } as FuelStop
       } catch {
@@ -818,10 +822,10 @@ export function ExperiencePanel({ hideTimeline = false }: { hideTimeline?: boole
                           <span style={{ fontSize: 8, color: '#6B7280', marginTop: 1 }}>/litre</span>
                         </div>
                         <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ fontSize: 14, fontWeight: 700, color: '#1C1C1A', marginBottom: 2 }}>{stop.station.brand}</div>
-                          <div style={{ fontSize: 12, color: '#6B7280', marginBottom: 2 }}>{stop.station.name}</div>
+                          <div style={{ fontSize: 14, fontWeight: 700, color: '#1C1C1A', marginBottom: 1 }}>{stop.station.name}</div>
+                          <div style={{ fontSize: 12, color: '#6B7280', marginBottom: 2 }}>{stop.station.brand} · Service Station</div>
                           {stop.station.address && <div style={{ fontSize: 11, color: '#9CA3AF' }}>{stop.station.address}</div>}
-                          <div style={{ fontSize: 11, color: '#9CA3AF', marginTop: 2 }}>{stop.station.distanceKm} km from route point</div>
+                          <div style={{ fontSize: 11, color: '#9CA3AF', marginTop: 2 }}>{stop.station.distanceKm} km from your route</div>
                         </div>
                         <a
                           href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(stop.station.brand + ' ' + stop.station.address)}`}

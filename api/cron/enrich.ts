@@ -378,12 +378,14 @@ const PRIMARY_TYPE_SKIP = new Set([
   'natural_feature',              // too vague (legacy v1 type, returns 0 results anyway)
   'forest',                       // generic forest entry (also legacy)
   'campground', 'rv_park',        // accommodation handled separately
-  // Sport/community facilities tourists don't visit
-  'sports_club', 'sports_complex', 'stadium', 'golf_course', 'tennis_court',
+  // Local sport facilities (not tourist destinations — MCG/Rod Laver are tourist_attraction not stadium)
+  'sports_club', 'sports_complex', 'golf_course', 'tennis_court',
   'fitness_center', 'gym',
   // Civic/government
   'city_hall', 'courthouse', 'embassy', 'local_government_office',
   'community_center', 'convention_center',
+  // Retail/shopping (not experiences)
+  'shopping_mall', 'department_store',
 ])
 // Note: 'park' is NOT in PRIMARY_TYPE_SKIP — instead we filter by review count below.
 // Parks with ≥300 reviews are real destinations (Mt Franklin, Hanging Rock etc.);
@@ -423,7 +425,7 @@ function classifyGPlace(types: string[], primaryType?: string, reviewCount?: num
 }
 
 // Use place name + types to pick the best activity category
-function categoryFromPlace(name: string, types: string[]): { category: string; emoji: string } {
+function categoryFromPlace(name: string, types: string[], primaryType?: string): { category: string; emoji: string } {
   const n = name.toLowerCase()
 
   // Name-based detection — catches lookouts, waterfalls, trails etc. that Google types as generic
@@ -467,7 +469,8 @@ function categoryFromPlace(name: string, types: string[]): { category: string; e
   if (types.includes('zoo')) return { category: 'wildlife', emoji: '🦘' }
   if (types.includes('spa')) return { category: 'relaxation', emoji: '♨️' }
   if (types.includes('bowling_alley')) return { category: 'active', emoji: '🎳' }
-  if (types.includes('stadium')) return { category: 'active', emoji: '🏟️' }
+  if (types.includes('stadium') || primaryType === 'stadium') return { category: 'entertainment', emoji: '🏟️' }
+  if (types.includes('ski_resort') || primaryType === 'ski_resort') return { category: 'active', emoji: '⛷️' }
   if (types.includes('night_club') || types.includes('movie_theater'))
     return { category: 'entertainment', emoji: '🎵' }
   if (types.includes('campground')) return { category: 'relaxation', emoji: '⛺' }
@@ -543,6 +546,8 @@ async function enrichSubDest(
     fetchByType(gKey, lat, lng, 'night_club'),
     fetchByType(gKey, lat, lng, 'movie_theater'),
     fetchByType(gKey, lat, lng, 'lodging'),
+    fetchByType(gKey, lat, lng, 'stadium'),        // MCG, Rod Laver, AAMI Park etc.
+    fetchByType(gKey, lat, lng, 'ski_resort'),     // Mount Buller, Hotham etc.
   ])
 
   // Keyword text searches — catches lookouts, waterfalls, wineries, trails
@@ -553,6 +558,8 @@ async function enrichSubDest(
     fetchByKeyword(gKey, lat, lng, `walking trail near ${name} Victoria`),
     fetchByKeyword(gKey, lat, lng, `winery cellar door near ${name} Victoria`),
     fetchByKeyword(gKey, lat, lng, `viewpoint near ${name} Victoria`),
+    fetchByKeyword(gKey, lat, lng, `lake near ${name} Victoria`),
+    fetchByKeyword(gKey, lat, lng, `things to do near ${name} Victoria`),
   ])
 
   // Deduplicate across all searches by place_id
@@ -625,10 +632,13 @@ async function enrichSubDest(
         source: 'google',
       })
     } else {
-      // Quality filter: 4.5★ + 200+ reviews (regional attractions rarely have 1000+)
+      // Quality filter:
+      // Standard: 4.5★ + 200+ reviews
+      // Iconic exception: 4.0★ + 5000+ reviews (MCG 4.7/30k, Luna Park 4.1/9k, Crown etc.)
       const rating = place.rating ?? 0
       const reviewCount = place.user_ratings_total ?? 0
-      if (rating < 4.5 || reviewCount < 200) continue
+      const isIconic = rating >= 4.0 && reviewCount >= 5000
+      if (!isIconic && (rating < 4.5 || reviewCount < 200)) continue
 
       // Exclude pure accommodation venues leaking as tourist_attraction (e.g. RACV Resort)
       // Only skip if both: has lodging in types AND name suggests it's primarily a hotel
@@ -644,14 +654,46 @@ async function enrichSubDest(
       )
       if (isService) continue
 
-      const { category, emoji } = categoryFromPlace(place.name, place.types)
+      // Exclude event/program entries that are not real places
+      // e.g. "Wombats at Dusk", "Sunset Tour", "Ranger Talk" etc.
+      const isEventProgram = /\bat dusk\b|\bat dawn\b|\bsunset tour\b|\bguided tour\b|\bnight tour\b|\bpenguin parade\b|\branger\b/i.test(place.name)
+      if (isEventProgram) continue
+
+      // If name suggests winery/cellar door, send to food not activity
+      // (catches places Google classifies as tourist_attraction but are primarily food/drink)
+      const nameIsWinery = /\b(winery|cellar door|vineyard|brewing|distillery|brewery)\b/i.test(place.name)
+      if (nameIsWinery) {
+        // Reclassify as food if it meets food quality threshold
+        if (rating >= 4.5 && reviewCount >= 100) {
+          foods.push({
+            slug: placeSlug, sub_dest_id: subDestId, name: place.name,
+            category: foodCategoryFromTypes([...place.types, 'winery']),
+            description: place.editorial_summary || fallbackDescription(place.name, 'food', name),
+            lat: pLat, lng: pLng, address,
+            attributes: {
+              google_place_id: place.place_id,
+              types: place.types,
+              cuisine_tags: extractCuisineTags(place.types),
+              rating, review_count: reviewCount,
+              editorial_summary: place.editorial_summary,
+              website_uri: place.website_uri,
+              opening_hours_periods: place.opening_hours_periods,
+            },
+            source: 'google',
+          })
+        }
+        continue  // Skip adding to activities regardless
+      }
+
+      const { category, emoji } = categoryFromPlace(place.name, place.types, place.primary_type)
       const description = place.editorial_summary || fallbackDescription(place.name, category, name)
       activities.push({
         slug: placeSlug, sub_dest_id: subDestId, name: place.name,
         lat: pLat, lng: pLng,
         category, emoji, description, duration: '1–2 hrs', cost: '$',
         kids_ok: true, is_hidden_gem: false,
-        maps_url: `https://www.google.com/maps/place/?q=place_id:${place.place_id}`,
+        // Use lat/lng URL — more reliable than place_id which can expire
+        maps_url: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(place.name)}&query_place_id=${place.place_id}`,
         tags: place.types.slice(0, 5), source: 'google',
         attributes: {
           google_place_id: place.place_id, rating, review_count: reviewCount,

@@ -522,9 +522,11 @@ function StepHowFarAndWho({
           onChange={(e) => setMaxDriveHours(Math.round(Number(e.target.value) * 4) / 4)}
           style={{ width: '100%', accentColor: GREEN }}
         />
+        {/* Tick marks aligned to slider range 0.75–4 (step 0.25) */}
         <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'var(--text-muted)', marginTop: 6 }}>
           <span>45 min</span>
-          <span>2 hrs</span>
+          <span>1.5 hrs</span>
+          <span>2.5 hrs</span>
           <span>4 hrs</span>
         </div>
         <div style={{ marginTop: 12, fontSize: 12, color: GREEN, fontWeight: 600 }}>

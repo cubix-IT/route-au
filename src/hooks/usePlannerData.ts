@@ -124,8 +124,12 @@ async function fetchDestinationFromDB(
   const cLat = destCoord?.lat ?? (subDest as any).lat
   const cLng = destCoord?.lng ?? (subDest as any).lng
 
-  // ~25km bounding box in degrees (covers remote areas with sparse neighbours)
-  const DELTA = 0.23
+  // Bounding box size:
+  // - Urban Melbourne (within 0.5° of CBD): 0.08° ≈ 8km — prevents St Kilda showing MCG etc.
+  // - Regional Victoria: 0.23° ≈ 25km — wide enough to catch nearby attractions
+  const MELB_CBD_LAT = -37.814, MELB_CBD_LNG = 144.963
+  const distFromCBD = Math.abs(cLat - MELB_CBD_LAT) + Math.abs(cLng - MELB_CBD_LNG)
+  const DELTA = distFromCBD < 0.5 ? 0.08 : 0.23
   const latMin = cLat - DELTA, latMax = cLat + DELTA
   const lngMin = cLng - DELTA, lngMax = cLng + DELTA
 
