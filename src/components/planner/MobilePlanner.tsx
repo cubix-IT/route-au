@@ -408,13 +408,29 @@ export function MobilePlanner() {
               : filteredActivities.length === 0
                 ? <div style={{ fontSize: 13, color: '#9CA3AF', padding: '8px 0' }}>No activities found for this filter.</div>
                 : <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                    {filteredActivities.map((act) => (
-                      <MActivityCard key={act.id} act={act}
-                        isAdded={d.addedActivities.some((a) => a.actId === act.id)}
-                        onAdd={() => d.addActivity({ actId: act.id, actName: act.name, emoji: act.emoji, dayNumber: 1 })}
-                        onRemove={() => d.removeActivity(act.id)}
-                      />
-                    ))}
+                    {(() => {
+                      const rated = filteredActivities.filter(a => a.rating)
+                      const unrated = filteredActivities.filter(a => !a.rating)
+                      const primary = rated.length > 0 ? rated : filteredActivities
+                      const renderCard = (act: typeof filteredActivities[0]) => (
+                        <MActivityCard key={act.id} act={act}
+                          isAdded={d.addedActivities.some((a) => a.actId === act.id)}
+                          onAdd={() => d.addActivity({ actId: act.id, actName: act.name, emoji: act.emoji, dayNumber: 1 })}
+                          onRemove={() => d.removeActivity(act.id)}
+                        />
+                      )
+                      return (
+                        <>
+                          {primary.map(renderCard)}
+                          {unrated.length > 0 && rated.length > 0 && (
+                            <div style={{ paddingTop: 4 }}>
+                              <div style={{ fontSize: 10, fontWeight: 700, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.09em', marginBottom: 8 }}>No reviews yet</div>
+                              {unrated.map(renderCard)}
+                            </div>
+                          )}
+                        </>
+                      )
+                    })()}
                     {d.activityPOIs.length > 0 && (
                       <>
                         <div style={{ fontSize: 10, fontWeight: 700, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.09em', padding: '4px 0 2px' }}>Nearby on OpenStreetMap</div>

@@ -491,23 +491,28 @@ export function ExperiencePanel({ hideTimeline = false }: { hideTimeline?: boole
                 </div>
               )}
               {(() => {
-                const displayed = showAllActivities ? filtered : filtered.slice(0, RESULT_LIMIT)
-                const hidden = filtered.length - RESULT_LIMIT
+                // Rated activities first, unrated behind "Show more"
+                const ratedActs = filtered.filter(a => a.rating)
+                const unratedActs = filtered.filter(a => !a.rating)
+                const primary = ratedActs.length > 0 ? ratedActs : filtered
+                const displayed = showAllActivities ? primary : primary.slice(0, RESULT_LIMIT)
+                const hidden = primary.length - RESULT_LIMIT
+                const renderCard = (act: typeof filtered[0]) => (
+                  <ActivityCard
+                    key={act.id} act={act}
+                    expanded={expandedActId === act.id}
+                    highlighted={selectedPinId === act.id}
+                    onToggle={() => setExpandedActId(expandedActId === act.id ? null : act.id)}
+                    isAdded={addedActIds.has(act.id)}
+                    onAdd={() => d.addActivity({ actId: act.id, actName: act.name, emoji: act.emoji, dayNumber: 1 })}
+                    onRemove={() => d.removeActivity(act.id)}
+                    onMapPin={() => setSelectedPinId(act.id)}
+                  />
+                )
                 return (
                   <>
                     <div className="activity-grid" style={{ padding: '0 16px' }}>
-                      {displayed.map((act) => (
-                        <ActivityCard
-                          key={act.id} act={act}
-                          expanded={expandedActId === act.id}
-                          highlighted={selectedPinId === act.id}
-                          onToggle={() => setExpandedActId(expandedActId === act.id ? null : act.id)}
-                          isAdded={addedActIds.has(act.id)}
-                          onAdd={() => d.addActivity({ actId: act.id, actName: act.name, emoji: act.emoji, dayNumber: 1 })}
-                          onRemove={() => d.removeActivity(act.id)}
-                          onMapPin={() => setSelectedPinId(act.id)}
-                        />
-                      ))}
+                      {displayed.map(renderCard)}
                     </div>
                     {!showAllActivities && hidden > 0 && (
                       <button onClick={() => setShowAllActivities(true)} style={{
@@ -516,8 +521,14 @@ export function ExperiencePanel({ hideTimeline = false }: { hideTimeline?: boole
                         border: '1px dashed var(--border)', background: 'none',
                         fontSize: 12, color: '#6B7280', fontWeight: 600, cursor: 'pointer',
                       }}>
-                        Show all {filtered.length} things to do ↓
+                        Show all {primary.length} things to do ↓
                       </button>
+                    )}
+                    {showAllActivities && unratedActs.length > 0 && ratedActs.length > 0 && (
+                      <div style={{ margin: '12px 16px 0' }}>
+                        <div style={{ fontSize: 10, fontWeight: 700, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 8 }}>No reviews yet</div>
+                        <div className="activity-grid">{unratedActs.map(renderCard)}</div>
+                      </div>
                     )}
                   </>
                 )
