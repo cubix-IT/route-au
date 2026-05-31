@@ -22,7 +22,7 @@ import { adminSupabase } from '../_lib/supabase.js'
 // At 5/day all 139 destinations cycle every ~28 days, well within free limits.
 // ─────────────────────────────────────────────────────────────────────────────
 
-const BATCH_SIZE  = 10
+const BATCH_SIZE  = 8   // 8 × (4s Overpass + 3s sleep) ≈ 56s — within 60s Vercel limit
 const REFRESH_DAYS = 28    // re-enrich each destination once a month
 
 // ── Usage hard limits ────────────────────────────────────────────────────────
@@ -505,6 +505,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       totalUpserted += upserted
       processed++
       results.push({ slug: sub.slug, upserted, overpassCallsUsed: usage.overpassCallsToday })
+
+      // 3s pause between destinations — prevents Overpass burst rate limiting (429)
+      if (!usage.stopped && processed < subDests.length) await sleep(3000)
     }
 
     // Count how many destinations are still pending
