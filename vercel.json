@@ -5,6 +5,7 @@
   ],
   "crons": [
     { "path": "/api/cron/enrich",    "schedule": "0 19 * * *" },
+    { "path": "/api/cron/enrich",    "schedule": "0 7 * * *" },
     { "path": "/api/cron/fuel",      "schedule": "0 17 * * *" },
     { "path": "/api/cron/summaries", "schedule": "0 16 * * 0" }
   ],

@@ -1144,21 +1144,7 @@ function StepPreferences({
         <DepartureTimePicker departureHour={departureHour} setDepartureHour={setDepartureHour} tripDate={startDate} />
       )}
 
-      {/* Accommodation — multiday only */}
-      {tripType === 'multiday' && (
-        <div>
-          <Label>Where do you sleep?</Label>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginTop: 10 }}>
-            {stays.map((s) => (
-              <div key={s.type} className={`option-card ${accommodation === s.type ? 'selected' : ''}`}
-                onClick={() => setAccommodation(s.type)} style={{ padding: '11px 8px', gap: 5 }}>
-                <span style={{ fontSize: 18 }}>{s.emoji}</span>
-                <span style={{ fontSize: 10, fontWeight: 600, textAlign: 'center', lineHeight: 1.3 }}>{s.label}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
+      {/* Accommodation question hidden — data coming soon */}
     </div>
   )
 }

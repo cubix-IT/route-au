@@ -22,7 +22,7 @@ import { adminSupabase } from '../_lib/supabase.js'
 // At 5/day all 139 destinations cycle every ~28 days, well within free limits.
 // ─────────────────────────────────────────────────────────────────────────────
 
-const BATCH_SIZE  = 5
+const BATCH_SIZE  = 10
 const REFRESH_DAYS = 28    // re-enrich each destination once a month
 
 // ── Usage hard limits ────────────────────────────────────────────────────────
