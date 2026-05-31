@@ -377,13 +377,17 @@ out center tags 200;`
         source: 'osm',
       })
     } else if (cat === 'nature') {
-      // Filter out unnamed survey parcels (e.g. "Shicer Hill", "I85 Bushland Reserve")
-      // Keep: has website OR description OR is a named park/reserve people actually visit
-      const isRealNatureSpot = website || tags.description ||
-        /national park|state park|regional park|scenic reserve|falls|waterfall|lake |spring|beach|botanic|gardens?$|lookout|gorge|creek streamside(?! reserve)|conservation reserve/i.test(name_) ||
-        (tags.boundary === 'national_park') ||
-        (tags.natural === 'waterfall' || tags.natural === 'hot_spring' || tags.natural === 'beach' || tags.natural === 'peak')
-      if (!isRealNatureSpot) continue
+      // Only keep nature spots that are real visitor destinations.
+      // Government survey parcels (e.g. "Beavers Hill", "I85 Bushland Reserve", "Coliban I7")
+      // have no website/phone/hours and names that are uninformative to visitors.
+      const hasContactInfo = !!(website || tags.phone || tags['contact:phone'] || tags.opening_hours)
+      const hasDescription = !!(tags.description || tags.note)
+      // Name patterns that indicate a real visitor destination
+      const isVisitorName = /national park|state park|regional park|state forest|conservation park|wilderness park|marine park|scenic reserve|natural features reserve|historic reserve|falls\b|waterfall|gorge|\blake\b|\blagoon\b|\breservoir\b|mineral spring|hot spring|\bbeach\b|\bocean\b|\bbay\b|botanic garden|lookout|summit track|heritage|^wombat|^mount\b|^mt\b/i.test(name_)
+      // Exclude code-named survey parcels: "I85 Bushland Reserve", "H79 Bushland Reserve", "K47 Streamside"
+      const isSurveyParcel = /\b[A-Z]\d+\b/.test(name_) || /\bI\d+\b/.test(name_)
+      if (isSurveyParcel) continue
+      if (!hasContactInfo && !hasDescription && !isVisitorName) continue
       nature.push({
         slug: elSlug, sub_dest_id: subDestId,
         name: name_,
