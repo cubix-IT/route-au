@@ -30,6 +30,9 @@ const CAT_TAG: Record<string, { label: string; color: string; bg: string }> = {
   relaxation:    { label: 'Leisure',       color: '#0891B2', bg: '#ECFEFF' },
   food:          { label: 'Food',          color: '#B45309', bg: '#FEF3C7' },
   drink:         { label: 'Drink',         color: '#B87333', bg: '#FFF5EB' },
+  winery:        { label: 'Winery',        color: '#7E22CE', bg: '#FAF5FF' },
+  brewery:       { label: 'Brewery',       color: '#92400E', bg: '#FEF3C7' },
+  distillery:    { label: 'Distillery',    color: '#374151', bg: '#F3F4F6' },
   markets:       { label: 'Markets',       color: '#059669', bg: '#ECFDF5' },
   viewpoint:     { label: 'Scenic View',   color: '#4338CA', bg: '#EEF2FF' },
   beach:         { label: 'Beach',         color: '#0369A1', bg: '#E0F2FE' },
@@ -457,6 +460,7 @@ export function ExperiencePanel({ hideTimeline = false }: { hideTimeline?: boole
             art: '🎨 Art', active: '🏄 Active', wildlife: '🦘 Wildlife',
             relaxation: '🧖 Relax', wellness: '♨️ Wellness', beach: '🏖️ Beach',
             entertainment: '🎵 Entertainment', markets: '🛒 Markets', family: '👨‍👩‍👧 Family',
+            winery: '🍷 Wineries', brewery: '🍺 Breweries', distillery: '🥃 Distilleries',
           }
 
           return (

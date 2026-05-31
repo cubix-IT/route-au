@@ -92,7 +92,10 @@ function activityCategory(tags: Record<string,string>, name: string): string {
   if (tags.amenity === 'spa' || tags.leisure === 'spa' || /\bspa\b|wellness|retreat|day spa/.test(n)) return 'relaxation'
   // Entertainment
   if (tags.leisure === 'stadium' || tags.amenity === 'theatre' || tags.amenity === 'cinema') return 'entertainment'
-  if (/winery|cellar door|vineyard|brewery|distillery/.test(n))           return 'relaxation'
+  // Drink experiences — their own categories
+  if (/winery|cellar door|vineyard|wine tasting/.test(n))                 return 'winery'
+  if (/brewery|brewpub|brew house|craft beer/.test(n))                    return 'brewery'
+  if (/distillery|\bgin\b|whisky|whiskey|spirits/.test(n))                return 'distillery'
   return 'nature'
 }
 
@@ -101,6 +104,7 @@ function activityEmoji(category: string): string {
     viewpoint:'🌄', nature:'🌿', beach:'🏖️', wellness:'♨️', history:'🏛️',
     art:'🎨', markets:'🛒', wildlife:'🦘', entertainment:'🎵', active:'🧗',
     relaxation:'🧖', nature_reserve:'🌿',
+    winery:'🍷', brewery:'🍺', distillery:'🥃',
   }
   return map[category] ?? '📍'
 }
