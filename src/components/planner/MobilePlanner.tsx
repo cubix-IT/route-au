@@ -638,6 +638,14 @@ export function MobilePlanner() {
           </div>
         )}
 
+        {/* Footer */}
+        <div style={{ padding: '20px 16px', borderTop: '1px solid rgba(0,0,0,0.07)', marginTop: 8, textAlign: 'center' }}>
+          <div style={{ fontSize: 11, color: '#9CA3AF', marginBottom: 6 }}>Place data © Google · Map © OpenStreetMap contributors</div>
+          <div style={{ display: 'flex', justifyContent: 'center', gap: 16 }}>
+            <a href="/privacy" style={{ fontSize: 11, color: '#9CA3AF', textDecoration: 'none', fontWeight: 500 }}>Privacy & Attribution</a>
+            <a href="mailto:support@cubixit.com.au" style={{ fontSize: 11, color: '#9CA3AF', textDecoration: 'none', fontWeight: 500 }}>Feedback</a>
+          </div>
+        </div>
       </div>{/* end scroll */}
 
       {/* ── Map FAB ── */}

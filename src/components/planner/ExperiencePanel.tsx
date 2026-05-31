@@ -838,6 +838,17 @@ export function ExperiencePanel({ hideTimeline = false }: { hideTimeline?: boole
             )}
           </div>
         )}
+
+        {/* ── Footer ── */}
+        <div style={{ padding: '24px 16px 20px', borderTop: '1px solid var(--border)', marginTop: 8, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
+          <span style={{ fontSize: 11, color: '#9CA3AF' }}>
+            Place data © Google · Map © OpenStreetMap contributors
+          </span>
+          <div style={{ display: 'flex', gap: 12 }}>
+            <a href="/privacy" style={{ fontSize: 11, color: '#9CA3AF', textDecoration: 'none', fontWeight: 500 }}>Privacy & Attribution</a>
+            <a href="mailto:support@cubixit.com.au" style={{ fontSize: 11, color: '#9CA3AF', textDecoration: 'none', fontWeight: 500 }}>Feedback</a>
+          </div>
+        </div>
       </div>
 
       {addModal && (
