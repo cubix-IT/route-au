@@ -570,8 +570,13 @@ async function enrichSubDest(
       const reviewCount = place.user_ratings_total ?? 0
       if (rating < 4.5 || reviewCount < 200) continue
 
-      // Exclude generic beauty/spa places — only keep genuine experience venues
-      // (hot springs, wellness retreats are fine; nail salons and hair salons are not)
+      // Exclude accommodation showing as tourist_attraction (e.g. RACV Resort)
+      const isAccommodation = place.types.some((t) =>
+        ['lodging', 'hotel', 'motel', 'resort', 'bed_and_breakfast', 'hostel'].includes(t)
+      )
+      if (isAccommodation) continue
+
+      // Exclude generic beauty/spa — only keep genuine experience venues
       const isGenericBeauty = place.types.some((t) =>
         ['beauty_salon', 'hair_care', 'nail_salon', 'hair_salon', 'barber', 'tattoo_parlor'].includes(t)
       )
