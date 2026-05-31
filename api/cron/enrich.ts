@@ -490,7 +490,8 @@ async function enrichSubDest(
     const classification = classifyGPlace(place.types, place.primary_type)
     if (!classification || classification === 'service') continue
 
-    const placeSlug = `${slug}-gp-${place.place_id}`
+    // Use place_id alone as slug so the same Google place can't appear twice across different sub-destinations
+    const placeSlug = `gp-${place.place_id}`
     const pLat = place.geometry.location.lat
     const pLng = place.geometry.location.lng
     const address = place.vicinity ?? null
@@ -586,7 +587,7 @@ async function enrichSubDest(
     if (!rows.length) continue
     const { error } = await adminSupabase
       .from(table)
-      .upsert(rows, { onConflict: 'slug', ignoreDuplicates: true })
+      .upsert(rows, { onConflict: 'slug', ignoreDuplicates: false })
     if (!error) total += rows.length
     else console.warn(`[enrich] ${table} error for ${name}:`, error.message)
   }
