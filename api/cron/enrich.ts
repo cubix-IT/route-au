@@ -32,6 +32,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   let destinationsProcessed = 0
   let skipped = 0
 
+  // Log this cron run to deployment_log for observability
+  const { data: logRow } = await adminSupabase
+    .from('deployment_log')
+    .insert({
+      plan_name: `enrich-cron${force ? '-force' : ''}`,
+      status: 'in_progress',
+      git_sha: process.env.VERCEL_GIT_COMMIT_SHA ?? null,
+      notes: `Batch size: ${batchSize}, force: ${force}`,
+    })
+    .select('deployment_id')
+    .single()
+  const deployLogId = logRow?.deployment_id ?? null
+
   try {
     const staleDate = new Date(Date.now() - REFRESH_DAYS * 24 * 60 * 60 * 1000).toISOString()
 
@@ -107,10 +120,28 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       total_records_upserted: recordsUpserted,
     }, { onConflict: 'job_name' })
 
+    // Mark cron run as completed in deployment_log
+    if (deployLogId) {
+      await adminSupabase.from('deployment_log').update({
+        status: 'completed',
+        completed_at: new Date().toISOString(),
+        notes: `Enriched ${destinationsProcessed} destinations, ${recordsUpserted} records upserted. ${remaining} remaining.`,
+      }).eq('deployment_id', deployLogId).then(() => {}, () => {})
+    }
+
     return res.status(200).json({ ok: true, recordsUpserted, destinationsProcessed, skipped, remaining })
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err)
     console.error('[cron/enrich]', msg)
+
+    // Mark cron run as failed
+    if (deployLogId) {
+      await adminSupabase.from('deployment_log').update({
+        status: 'failed',
+        completed_at: new Date().toISOString(),
+        notes: `Error: ${msg}`,
+      }).eq('deployment_id', deployLogId).then(() => {}, () => {})
+    }
 
     await adminSupabase.from('cron_log').insert({
       job_name: 'enrich-places',
