@@ -375,8 +375,9 @@ const PRIMARY_TYPE_NATURE = new Set([
 
 // Skip entirely — generic local infrastructure, not trip-worthy attractions
 const PRIMARY_TYPE_SKIP = new Set([
-  'natural_feature',              // too vague (legacy v1 type, returns 0 results anyway)
-  'forest',                       // generic forest entry (also legacy)
+  // 'natural_feature' removed — Lake Tyrrell and other prominent natural features
+  // should be included; keyword search + review threshold provides quality gate
+  'forest',                       // generic forest entry (legacy, returns 0 results)
   'campground', 'rv_park',        // accommodation handled separately
   // Local sport facilities (not tourist destinations — MCG/Rod Laver are tourist_attraction not stadium)
   'sports_club', 'sports_complex', 'golf_course', 'tennis_court',
@@ -562,6 +563,7 @@ async function enrichSubDest(
     fetchByKeyword(gKey, lat, lng, `viewpoint near ${name} Victoria`),
     fetchByKeyword(gKey, lat, lng, `lake near ${name} Victoria`),
     fetchByKeyword(gKey, lat, lng, `things to do near ${name} Victoria`),
+    fetchByKeyword(gKey, lat, lng, `arena concert hall events venue near ${name} Victoria`),
   ])
 
   // Deduplicate across all searches by place_id
@@ -586,10 +588,13 @@ async function enrichSubDest(
     const address = place.vicinity ?? null
 
     if (classification === 'food') {
-      // Only surface genuinely excellent food — send users to Google for generic search.
+      // Surface genuinely good food. High-review places (1000+) get a lower rating floor
+      // to catch famous destinations like Beechworth Bakery that draw big crowds but have
+      // mixed reviews; still requires 4.3 minimum to filter out genuinely poor places.
       const rating = place.rating ?? 0
       const reviewCount = place.user_ratings_total ?? 0
-      if (rating < 4.5 || reviewCount < 100) continue
+      const isWellKnown = reviewCount >= 1000 && rating >= 4.3
+      if (!isWellKnown && (rating < 4.5 || reviewCount < 100)) continue
 
       foods.push({
         slug: placeSlug, sub_dest_id: subDestId, name: place.name,
