@@ -228,14 +228,12 @@ export function ExperiencePanel({ hideTimeline = false }: { hideTimeline?: boole
       }
       setDisplayedMapPins([
         ...foodPins.map((f) => {
-          const a = (f.attributes as Record<string, unknown>) ?? {}
-          return { id: String(f.food_place_id), lat: f.lat!, lng: f.lng!, type: f.category.toLowerCase() as LivePOI['type'], name: f.name, placeId: a.google_place_id as string | undefined }
+          return { id: String(f.food_place_id), lat: f.lat!, lng: f.lng!, type: f.category.toLowerCase() as LivePOI['type'], name: f.name }
         }),
         ...actPins.map((n) => ({
           id: `nature-${n.nature_spot_id}`, lat: n.lat!, lng: n.lng!,
           type: (n.type === 'viewpoint' ? 'viewpoint' : 'attraction') as LivePOI['type'],
           name: n.name,
-          placeId: n.slug?.startsWith('gp-') ? n.slug.slice(3) : undefined,
         })),
       ])
       return
@@ -412,10 +410,6 @@ export function ExperiencePanel({ hideTimeline = false }: { hideTimeline?: boole
               mapsUrl: safeMapsUrl(a.maps_url, a.name),
               tags: a.tags ?? [],
               websiteUri: aAttr.website_uri as string | undefined,
-              editorialSummary: aAttr.editorial_summary as string | undefined,
-              openingHoursPeriods: aAttr.opening_hours_periods as import('@/lib/overpass').OpenHoursPeriod[] | undefined,
-              rating: aAttr.rating as number | undefined,
-              reviewCount: aAttr.review_count as number | undefined,
             }
           })
 
@@ -430,9 +424,7 @@ export function ExperiencePanel({ hideTimeline = false }: { hideTimeline?: boole
             cost: 'free' as Activity['cost'],
             kidsOk: true,
             isHiddenGem: false,
-            mapsUrl: n.slug?.startsWith('gp-')
-              ? `https://www.google.com/maps/place/?q=place_id:${n.slug.slice(3)}`
-              : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(n.name + ' Victoria')}`,
+            mapsUrl: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(n.name + ' Victoria')}`,
             tags: [n.type],
           }))
 
@@ -626,10 +618,8 @@ export function ExperiencePanel({ hideTimeline = false }: { hideTimeline?: boole
                     ))}
                     {displayed.map((f) => {
                       const attr = (f.attributes as Record<string, unknown>) ?? {}
-                      const placeId = attr.google_place_id as string | undefined
                       const cuisineTags = attr.cuisine_tags as string[] | undefined
                       const pinId = String(f.food_place_id)
-                      // website: only the actual business URL, not a google maps link
                       const websiteUri = attr.website_uri as string | undefined
                       return (
                         <FoodCard key={f.food_place_id} poi={{
@@ -637,14 +627,10 @@ export function ExperiencePanel({ hideTimeline = false }: { hideTimeline?: boole
                           type: f.category.toLowerCase() as LivePOI['type'],
                           name: f.name,
                           lat: f.lat, lng: f.lng,
-                          rating: attr.rating as number | undefined,
-                          totalRatings: attr.review_count as number | undefined,
                           cuisine: cuisineTags?.join(' · '),
                           website: websiteUri && !websiteUri.includes('google.com') ? websiteUri : undefined,
-                          placeId,
-                          editorialSummary: attr.editorial_summary as string | undefined,
                           description: f.description || undefined,
-                          openingHoursPeriods: attr.opening_hours_periods as import('@/lib/overpass').OpenHoursPeriod[] | undefined,
+                          openingHours: attr.opening_hours_text as string | undefined,
                         }} destName={d.shortDest}
                         highlighted={selectedPinId === pinId}
                         onMapPin={f.lat && f.lng ? () => setSelectedPinId(pinId) : undefined} />
@@ -667,14 +653,12 @@ export function ExperiencePanel({ hideTimeline = false }: { hideTimeline?: boole
                       <div className="activity-grid">
                         {unratedFood.map((f) => {
                           const attr = (f.attributes as Record<string, unknown>) ?? {}
-                          const placeId = attr.google_place_id as string | undefined
-                          const websiteUri = attr.website_uri as string | undefined
+                          const websiteUri = (attr.website_uri as string | undefined)
                           return (
                             <FoodCard key={f.food_place_id} poi={{
                               id: String(f.food_place_id),
                               type: f.category.toLowerCase() as LivePOI['type'],
                               name: f.name, lat: f.lat, lng: f.lng,
-                              placeId,
                               website: websiteUri && !websiteUri.includes('google.com') ? websiteUri : undefined,
                             }} destName={d.shortDest} />
                           )
@@ -921,11 +905,8 @@ function FoodCard({ poi, destName, highlighted, onMapPin, isLocalFav }: {
   poi: LivePOI; destName: string; highlighted?: boolean; onMapPin?: () => void; isLocalFav?: boolean
 }) {
   const tag = POI_TAG[poi.type] ?? { emoji: '🍽', label: poi.type, color: '#B45309', bg: '#FEF3C7' }
-  const mapsUrl = poi.placeId
-    ? `https://www.google.com/maps/place/?q=place_id:${poi.placeId}`
-    : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(poi.name + ' ' + destName)}`
-
-  const openStatus = getOpenStatus(poi.openingHoursPeriods)
+  const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(poi.name + ' ' + destName)}`
+  const openStatus = poi.openingHours ? { isOpen: null, text: poi.openingHours } : null
 
   return (
     <div data-poi-id={poi.id} onClick={onMapPin} style={{
@@ -956,15 +937,10 @@ function FoodCard({ poi, destName, highlighted, onMapPin, isLocalFav }: {
         {poi.name}
       </div>
 
-      {/* Rating */}
-      {poi.rating && (
-        <StarRating rating={poi.rating} count={poi.totalRatings} />
-      )}
-
-      {/* Description — editorial summary from Google, or hand-written for curated items */}
-      {(poi.editorialSummary || poi.description) && (
+      {/* Description */}
+      {poi.description && (
         <div style={{ fontSize: 11.5, color: '#49454F', lineHeight: 1.55 }}>
-          {poi.editorialSummary || poi.description}
+          {poi.description}
         </div>
       )}
 
@@ -973,11 +949,9 @@ function FoodCard({ poi, destName, highlighted, onMapPin, isLocalFav }: {
         <span style={{ fontSize: 11, color: '#6B7280' }}>{poi.cuisine}</span>
       )}
 
-      {/* Open/closed */}
+      {/* Opening hours */}
       {openStatus && (
-        <div style={{ fontSize: 11, fontWeight: 600, color: openStatus.isOpen ? '#16A34A' : '#DC2626' }}>
-          {openStatus.isOpen ? 'Open now' : `Closed${openStatus.nextOpen ? ` — opens ${openStatus.nextOpen}` : ''}`}
-        </div>
+        <div style={{ fontSize: 11, color: '#6B7280' }}>{openStatus.text}</div>
       )}
 
       {/* Buttons */}
