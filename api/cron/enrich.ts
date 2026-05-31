@@ -325,17 +325,19 @@ const PRIMARY_TYPE_NATURE = new Set([
 
 // Skip entirely — generic local infrastructure, not trip-worthy attractions
 const PRIMARY_TYPE_SKIP = new Set([
-  'park',                         // small suburban/local parks (Cornish Hill Reserve etc.)
-  'natural_feature',              // too vague
-  'forest',                       // generic forest entry
+  'natural_feature',              // too vague (legacy v1 type, returns 0 results anyway)
+  'forest',                       // generic forest entry (also legacy)
   'campground', 'rv_park',        // accommodation handled separately
   // Sport/community facilities tourists don't visit
   'sports_club', 'sports_complex', 'stadium', 'golf_course', 'tennis_court',
-  'fitness_center', 'gym', 'bowling_alley',
+  'fitness_center', 'gym',
   // Civic/government
   'city_hall', 'courthouse', 'embassy', 'local_government_office',
   'community_center', 'convention_center',
 ])
+// Note: 'park' is NOT in PRIMARY_TYPE_SKIP — instead we filter by review count below.
+// Parks with ≥300 reviews are real destinations (Mt Franklin, Hanging Rock etc.);
+// parks with fewer are small local reserves we skip.
 
 const PRIMARY_TYPE_SERVICE = new Set([
   'bank', 'atm', 'hospital', 'pharmacy', 'police', 'fire_station',
@@ -349,21 +351,21 @@ const PRIMARY_TYPE_SERVICE = new Set([
 
 // Everything else (tourist_attraction, zoo, aquarium, museum, art_gallery,
 // amusement_park, spa, market, etc.) → activity
-function classifyGPlace(types: string[], primaryType?: string): 'activity' | 'food' | 'nature' | 'accommodation' | 'service' | null {
+function classifyGPlace(types: string[], primaryType?: string, reviewCount?: number): 'activity' | 'food' | 'nature' | 'accommodation' | 'service' | null {
   const pt = primaryType ?? ''
   if (PRIMARY_TYPE_SKIP.has(pt)) return null
+  // park: only skip if low review count (local reserves); high-review parks are real destinations
+  if (pt === 'park') return (reviewCount ?? 0) >= 300 ? 'activity' : null
   if (PRIMARY_TYPE_SERVICE.has(pt)) return 'service'
   if (PRIMARY_TYPE_FOOD.has(pt)) return 'food'
   if (PRIMARY_TYPE_ACCOMMODATION.has(pt)) return 'accommodation'
   if (PRIMARY_TYPE_NATURE.has(pt)) return 'nature'
   if (pt) {
-    // Even if primaryType is tourist_attraction, check secondary types —
-    // highly-rated local cafes/kebabs/burger joints often get tagged tourist_attraction
+    // tourist_attraction with food secondary types → food (kebabs/cafes tagged as attractions)
     if (types.some(t => PRIMARY_TYPE_FOOD.has(t))) return 'food'
-    if (types.some(t => PRIMARY_TYPE_ACCOMMODATION.has(t))) return 'accommodation'
     return 'activity'
   }
-  // No primaryType — conservative fallback
+  // No primaryType fallback
   if (types.some(t => PRIMARY_TYPE_FOOD.has(t))) return 'food'
   if (types.includes('lodging')) return 'accommodation'
   if (types.includes('tourist_attraction')) return 'activity'
@@ -515,7 +517,7 @@ async function enrichSubDest(
   const accommodation: AccommodationRow[] = []
 
   for (const place of allPlaces.values()) {
-    const classification = classifyGPlace(place.types, place.primary_type)
+    const classification = classifyGPlace(place.types, place.primary_type, place.user_ratings_total)
     if (!classification || classification === 'service') continue
 
     // Use place_id alone as slug so the same Google place can't appear twice across different sub-destinations
@@ -578,11 +580,12 @@ async function enrichSubDest(
       const reviewCount = place.user_ratings_total ?? 0
       if (rating < 4.5 || reviewCount < 200) continue
 
-      // Exclude accommodation leaking as tourist_attraction (e.g. RACV Resort)
-      const isAccommodation = place.types.some((t) =>
-        ['lodging', 'hotel', 'motel', 'resort', 'bed_and_breakfast', 'hostel'].includes(t)
-      )
-      if (isAccommodation) continue
+      // Exclude pure accommodation venues leaking as tourist_attraction (e.g. RACV Resort)
+      // Only skip if both: has lodging in types AND name suggests it's primarily a hotel
+      // (The Convent Gallery has lodging in types but is primarily a cultural venue — keep it)
+      const hasLodgingType = place.types.some((t) => ['lodging', 'hotel', 'motel', 'resort'].includes(t))
+      const nameIsAccommodation = /\b(resort|hotel|motel|lodge|inn|motor inn|apartments)\b/i.test(place.name)
+      if (hasLodgingType && nameIsAccommodation) continue
 
       // Exclude beauty/personal services — not tourist destinations
       const isService = place.types.some((t) =>
