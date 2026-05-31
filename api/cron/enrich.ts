@@ -265,7 +265,16 @@ async function enrichSubDest(
 ): Promise<number> {
   if (usage.stopped) return 0
 
-  const r = 20_000  // 20km radius
+  // Always stamp enriched_at first — even if Overpass fails, destination moves
+  // to end of queue so we don't loop on the same slug forever
+  await adminSupabase
+    .from('sub_destinations')
+    .update({ enriched_at: new Date().toISOString() })
+    .eq('sub_dest_id', subDestId)
+
+  // Urban/suburban destinations have dense OSM data — use tighter radius
+  // to avoid timeout. Rural destinations use wider 20km radius.
+  const r = 15_000  // 15km radius works for both urban and rural
 
   // Single combined Overpass query — one call per destination (not 25 like Google)
   const query = `[out:json][timeout:25];
@@ -400,12 +409,6 @@ out center tags 200;`
     if (!error) upserted += nature.length
     else console.error('[enrich] nature upsert error:', error.message)
   }
-
-  // Mark destination as enriched
-  await adminSupabase
-    .from('sub_destinations')
-    .update({ enriched_at: new Date().toISOString() })
-    .eq('sub_dest_id', subDestId)
 
   console.log(`[enrich] ${slug}: ${activities.length} activities, ${foods.length} food, ${nature.length} nature — overpass calls so far: ${usage.overpassCallsToday}`)
   return upserted
