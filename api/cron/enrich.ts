@@ -505,7 +505,7 @@ async function enrichSubDest(
       foods.push({
         slug: placeSlug, sub_dest_id: subDestId, name: place.name,
         category: foodCategoryFromTypes(place.types),
-        description: '', lat: pLat, lng: pLng, address,
+        description: place.editorial_summary ?? '', lat: pLat, lng: pLng, address,
         // Store cuisine tags from Google Places v1 types (e.g. chinese_restaurant) for wizard filtering
         attributes: {
           google_place_id: place.place_id,
@@ -529,7 +529,7 @@ async function enrichSubDest(
       nature.push({
         slug: placeSlug, sub_dest_id: subDestId, name: place.name,
         type: natureTypeFromGoogleTypes(place.types),
-        description: '', lat: pLat, lng: pLng, address, source: 'google',
+        description: place.editorial_summary ?? '', lat: pLat, lng: pLng, address, source: 'google',
       })
     } else if (classification === 'accommodation') {
       accommodation.push({

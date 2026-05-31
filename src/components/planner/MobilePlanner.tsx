@@ -466,7 +466,7 @@ export function MobilePlanner() {
                           const rating = attr.rating as number | undefined
                           const reviewCount = attr.review_count as number | undefined
                           const cuisineTags = attr.cuisine_tags as string[] | undefined
-                          const editorialSummary = attr.editorial_summary as string | undefined
+                          const editorialSummary = (attr.editorial_summary as string | undefined) || f.description || undefined
                           const openStatus = getOpenStatus(attr.opening_hours_periods as OpenPeriod[] | undefined)
                           const FOOD_EMOJI: Record<string,string> = { cafe:'☕', winery:'🍷', brewery:'🍺', bakery:'🥐', distillery:'🥃', pub:'🍺', bar:'🍸', fast_food:'🥡' }
                           const emoji = FOOD_EMOJI[f.category.toLowerCase()] ?? '🍽'

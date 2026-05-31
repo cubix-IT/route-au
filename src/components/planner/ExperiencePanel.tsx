@@ -628,6 +628,7 @@ export function ExperiencePanel({ hideTimeline = false }: { hideTimeline?: boole
                           website: websiteUri && !websiteUri.includes('google.com') ? websiteUri : undefined,
                           placeId,
                           editorialSummary: attr.editorial_summary as string | undefined,
+                          description: f.description || undefined,
                           openingHoursPeriods: attr.opening_hours_periods as import('@/lib/overpass').OpenHoursPeriod[] | undefined,
                         }} destName={d.shortDest}
                         highlighted={selectedPinId === pinId}
@@ -933,10 +934,10 @@ function FoodCard({ poi, destName, highlighted, onMapPin, isLocalFav }: {
         <StarRating rating={poi.rating} count={poi.totalRatings} />
       )}
 
-      {/* Editorial summary */}
-      {poi.editorialSummary && (
+      {/* Description — editorial summary from Google, or hand-written for curated items */}
+      {(poi.editorialSummary || poi.description) && (
         <div style={{ fontSize: 11.5, color: '#49454F', lineHeight: 1.55 }}>
-          {poi.editorialSummary}
+          {poi.editorialSummary || poi.description}
         </div>
       )}
 
