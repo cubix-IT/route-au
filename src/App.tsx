@@ -127,7 +127,7 @@ function App() {
 
       {/* SYS-01: version badge */}
       <div style={{ position: 'fixed', bottom: 6, right: 10, fontSize: 10, color: 'rgba(0,0,0,0.22)', fontWeight: 500, letterSpacing: '0.02em', pointerEvents: 'none', zIndex: 500 }}>
-        v1.0.2-beta
+        v1.3.6
       </div>
 
       <Toaster
