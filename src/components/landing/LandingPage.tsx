@@ -406,24 +406,6 @@ function SeasonalWatercolour({ season }: { season: string }) {
       })
     )
 
-  // Winter uses a real watercolour illustration instead of CSS gradients
-  if (season === 'winter') {
-    return (
-      <div aria-hidden style={{ position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 0, overflow: 'hidden' }}>
-        <img
-          src="/seasonal/winter.webp"
-          alt=""
-          style={{
-            position: 'absolute', bottom: 0, right: 0,
-            width: '60%', maxWidth: 700,
-            opacity: 0.85,
-            objectFit: 'contain', objectPosition: 'bottom right',
-          }}
-        />
-      </div>
-    )
-  }
-
   return (
     <div aria-hidden style={{ position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 0, overflow: 'hidden' }}>
       {renderWash(topLeft)}
