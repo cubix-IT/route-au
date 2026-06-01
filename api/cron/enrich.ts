@@ -325,7 +325,7 @@ async function enrichSubDest(
   node["craft"~"^(brewery|winery|distillery)$"]["name"](around:${r},${lat},${lng});
   node["leisure"~"^(nature_reserve|garden|park)$"]["name"](around:${r},${lat},${lng});
 );
-out tags 150;`
+out body 150;`
 
   const elements = await fetchOverpass(query, usage)
   if (!elements) return 0
