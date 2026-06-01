@@ -191,5 +191,86 @@ export default async function handler(_req: VercelRequest, res: VercelResponse) 
     : statuses.includes('warn') ? 'warn'
     : 'ok'
 
-  return res.status(200).json(report)
+  // Return HTML dashboard if requested from browser, JSON otherwise
+  const wantsHtml = req.headers.accept?.includes('text/html')
+  if (!wantsHtml) return res.status(200).json(report)
+
+  const s = report.services as any
+  const overall = report.overall
+  const statusColor = (st: string) => st === 'ok' ? '#16A34A' : st === 'warn' ? '#D97706' : '#DC2626'
+  const statusDot = (st: string) => `<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${statusColor(st)};margin-right:6px"></span>`
+  const bar = (pct: number) => `<div style="height:6px;border-radius:3px;background:#E5E7EB;margin-top:4px"><div style="height:100%;border-radius:3px;background:${pct>90?'#DC2626':pct>70?'#D97706':'#16A34A'};width:${Math.min(pct,100)}%"></div></div>`
+
+  const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Unplanned Escapes — Status</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>body{font-family:-apple-system,sans-serif;background:#F8F7F4;color:#1C1C1A;margin:0;padding:24px}
+h1{font-size:22px;font-weight:700;margin:0 0 4px}
+.sub{color:#6B7280;font-size:13px;margin:0 0 24px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px;margin-bottom:24px}
+.card{background:#fff;border:1px solid #E5E7EB;border-radius:12px;padding:16px}
+.card-title{font-weight:700;font-size:14px;margin:0 0 4px;display:flex;align-items:center}
+.card-cost{font-size:11px;color:#16A34A;font-weight:600;margin-bottom:8px}
+.stat{display:flex;justify-content:space-between;font-size:12px;color:#6B7280;margin-top:6px}
+.stat b{color:#1C1C1A}
+.overall{display:inline-flex;align-items:center;padding:6px 14px;border-radius:20px;font-weight:700;font-size:14px;margin-bottom:20px}
+.row-table{width:100%;border-collapse:collapse;font-size:12px}
+.row-table th{text-align:left;color:#6B7280;font-weight:600;padding:6px 8px;border-bottom:1px solid #E5E7EB}
+.row-table td{padding:6px 8px;border-bottom:1px solid #F3F4F6}
+h2{font-size:15px;font-weight:700;margin:0 0 10px}
+</style></head><body>
+<h1>Unplanned Escapes — Status</h1>
+<p class="sub">Generated ${new Date(report.generated_at).toLocaleString('en-AU',{timeZone:'Australia/Melbourne'})} AEST</p>
+
+<div class="overall" style="background:${overall==='ok'?'#F0FDF4':overall==='warn'?'#FFF7ED':'#FEF2F2'};color:${statusColor(overall)}">
+  ${statusDot(overall)} Overall: ${overall.toUpperCase()}
+</div>
+
+<div class="grid">
+  <div class="card">
+    <div class="card-title">${statusDot(s.overpass.status)} Overpass API (OpenStreetMap)</div>
+    <div class="card-cost">${s.overpass.cost}</div>
+    <div class="stat">Calls today <b>${s.overpass.calls_today} / ${s.overpass.daily_limit}</b></div>
+    ${bar(s.overpass.used_pct)}
+    <div class="stat" style="margin-top:8px">Remaining <b>${s.overpass.daily_remaining}</b></div>
+  </div>
+  <div class="card">
+    <div class="card-title">${statusDot(s.wikipedia.status)} Wikipedia API</div>
+    <div class="card-cost">${s.wikipedia.cost}</div>
+    <div class="stat">Calls today <b>${s.wikipedia.calls_today}</b></div>
+    <div class="stat">Rate limit <b>${s.wikipedia.rate_limit}</b></div>
+  </div>
+  <div class="card">
+    <div class="card-title">${statusDot(s.supabase.status)} Supabase Database</div>
+    <div class="card-cost">${s.supabase.cost}</div>
+    <div class="stat">DB size <b>${s.supabase.estimated_db_mb} MB / ${s.supabase.db_limit_mb} MB</b></div>
+    ${bar(s.supabase.db_used_pct)}
+    <div style="margin-top:10px;font-size:11px;color:#6B7280">
+      ${Object.entries(s.supabase.row_counts).map(([k,v])=>`${k}: <b>${v}</b>`).join(' · ')}
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-title">${statusDot(s.vercel.status)} Vercel Hobby</div>
+    <div class="card-cost">${s.vercel.cost}</div>
+    <div class="stat">Invocations/mo <b>${s.vercel.estimated_invocations_this_month.toLocaleString()} / ${s.vercel.monthly_limit.toLocaleString()}</b></div>
+    ${bar(s.vercel.used_pct)}
+    <div class="stat" style="margin-top:8px">Projected <b>${s.vercel.projected_monthly.toLocaleString()}</b></div>
+  </div>
+</div>
+
+<h2>Recent Cron Runs</h2>
+${report.recent_cron_runs?.length ? `
+<table class="row-table">
+  <tr><th>Job</th><th>Time (AEST)</th><th>Status</th><th>Records</th><th>Message</th></tr>
+  ${(report.recent_cron_runs as any[]).map(r=>`<tr>
+    <td>${r.job}</td>
+    <td>${new Date(r.ran_at).toLocaleString('en-AU',{timeZone:'Australia/Melbourne'})}</td>
+    <td style="color:${r.status==='ok'?'#16A34A':'#DC2626'};font-weight:600">${r.status}</td>
+    <td>${r.records??0}</td>
+    <td style="color:#6B7280">${(r.message||'').slice(0,80)}</td>
+  </tr>`).join('')}
+</table>` : '<p style="color:#6B7280;font-size:13px">No cron runs logged yet — first run at 11am AEST.</p>'}
+</body></html>`
+
+  res.setHeader('Content-Type', 'text/html')
+  return res.status(200).send(html)
 }
