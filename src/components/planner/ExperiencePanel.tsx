@@ -849,7 +849,7 @@ export function ExperiencePanel({ hideTimeline = false }: { hideTimeline?: boole
             <span style={{ fontSize: 11, color: '#9CA3AF' }}>Data © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer" style={{ color: '#9CA3AF' }}>OpenStreetMap</a> (ODbL) · Tiles © <a href="https://carto.com/attributions" target="_blank" rel="noopener noreferrer" style={{ color: '#9CA3AF' }}>CARTO</a> · Content © <a href="https://en.wikipedia.org" target="_blank" rel="noopener noreferrer" style={{ color: '#9CA3AF' }}>Wikipedia</a> (CC BY-SA)</span>
           </div>
           <div style={{ display: 'flex', gap: 12 }}>
-            <button onClick={() => window.dispatchEvent(new CustomEvent('show-privacy'))} style={{ fontSize: 11, color: '#9CA3AF', background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontWeight: 500 }}>Privacy & Attribution</button>
+            <a href="/privacy" target="_blank" rel="noopener noreferrer" style={{ fontSize: 11, color: '#9CA3AF', textDecoration: 'none', fontWeight: 500 }}>Privacy & Attribution</a>
             <a href="mailto:support@cubixit.com.au" style={{ fontSize: 11, color: '#9CA3AF', textDecoration: 'none', fontWeight: 500 }}>Feedback</a>
           </div>
         </div>

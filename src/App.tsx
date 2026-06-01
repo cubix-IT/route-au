@@ -5,7 +5,6 @@ import { MapContainer } from '@/components/map/MapContainer'
 import { FloatingTimeline } from '@/components/planner/FloatingTimeline'
 import { ProfileWizard } from '@/components/wizard/ProfileWizard'
 import { LandingPage } from '@/components/landing/LandingPage'
-import { PrivacyPage } from '@/components/PrivacyPage'
 import { ExperiencePanel } from '@/components/planner/ExperiencePanel'
 import { MobilePlanner } from '@/components/planner/MobilePlanner'
 import { PlannerMetrics } from '@/components/planner/PlannerMetrics'
@@ -13,7 +12,7 @@ import { TripSummaryPanel } from '@/components/planner/TripSummaryPanel'
 import { useOfflineSync } from '@/hooks/useOfflineSync'
 import { useAppStore } from '@/store/useAppStore'
 
-type View = 'landing' | 'planner' | 'privacy'
+type View = 'landing' | 'planner'
 
 function useIsMobile() {
   const [mobile, setMobile] = useState(() => window.innerWidth < 768)
@@ -51,17 +50,9 @@ function App() {
     else setView('landing')
   }, [activeItinerary])
 
-  // Allow result page footer to show privacy page via custom event
-  useEffect(() => {
-    const handler = () => { prevView.current = view; setView('privacy') }
-    window.addEventListener('show-privacy', handler)
-    return () => window.removeEventListener('show-privacy', handler)
-  }, [view])
-
   return (
     <>
-      {view === 'landing' && <LandingPage onPrivacy={() => setView('privacy')} />}
-      {view === 'privacy' && <PrivacyPage onBack={() => setView(prevView.current === 'planner' ? 'planner' : 'landing')} />}
+      {view === 'landing' && <LandingPage />}
 
       {view === 'planner' && (
         isMobile ? (

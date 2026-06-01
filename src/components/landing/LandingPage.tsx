@@ -604,9 +604,9 @@ export function LandingPage({ onPrivacy }: { onPrivacy?: () => void } = {}) {
               Unplanned Escapes
               <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.55)', letterSpacing: '0.09em', textTransform: 'uppercase', fontWeight: 500, marginTop: 1 }}>Victoria</div>
             </div>
-            <button onClick={onPrivacy} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.7)', fontSize: 12.5, cursor: 'pointer', padding: 0, letterSpacing: '-0.01em' }}>
+            <a href="/privacy" target="_blank" rel="noopener noreferrer" style={{ color: 'rgba(255,255,255,0.7)', fontSize: 12.5, textDecoration: 'none', letterSpacing: '-0.01em' }}>
               Privacy &amp; About
-            </button>
+            </a>
           </div>
           {/* Attribution row */}
           <div style={{ marginBottom: 16, fontSize: 11.5, color: 'rgba(255,255,255,0.5)', lineHeight: 1.7 }}>
