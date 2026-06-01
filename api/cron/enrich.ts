@@ -369,12 +369,12 @@ out center tags 200;`
         description: tags.description || null,
         lat: elLat, lng: elLng, address,
         attributes: {
-          source: 'osm',
+          source: 'static',
           opening_hours_text: tags.opening_hours || null,
           website_uri: website,
           cuisine: tags.cuisine?.split(';')[0] || null,
         },
-        source: 'osm',
+        source: 'static',
       })
     } else if (cat === 'nature') {
       // Only keep nature spots that are real visitor destinations.
@@ -394,9 +394,9 @@ out center tags 200;`
         type: natureType(tags),
         description: tags.description || null,
         lat: elLat, lng: elLng, address,
-        source: 'osm',
+        source: 'static',
         attributes: {
-          source: 'osm',
+          source: 'static',
           website_uri: website,
           opening_hours_text: tags.opening_hours || null,
         },
@@ -414,9 +414,9 @@ out center tags 200;`
         is_hidden_gem: false,
         maps_url: elLat && elLng ? `https://www.openstreetmap.org/?mlat=${elLat}&mlon=${elLng}#map=16/${elLat}/${elLng}` : null,
         website, phone, tags: Object.keys(tags),
-        source: 'osm',
+        source: 'static',
         attributes: {
-          source: 'osm',
+          source: 'static',
           website_uri: website,
           opening_hours_text: tags.opening_hours || null,
         },
