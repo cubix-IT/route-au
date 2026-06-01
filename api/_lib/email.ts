@@ -4,7 +4,8 @@
 const RESEND_API = 'https://api.resend.com/emails'
 // Use onboarding@resend.dev until unplannedescapes.com.au is verified in Resend dashboard
 const FROM = 'Unplanned Escapes <onboarding@resend.dev>'
-const TO = 'subscriptions@cubixit.com.au'
+// Resend free tier: can only send to account owner email until domain verified
+const TO = 'raj@cubixit.com.au'
 
 export async function sendCronEmail(subject: string, html: string): Promise<void> {
   const key = process.env.RESEND_API_KEY
