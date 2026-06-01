@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import { Toaster } from 'react-hot-toast'
 import { Header } from '@/components/layout/Header'
 import { MapContainer } from '@/components/map/MapContainer'
@@ -43,8 +43,6 @@ function App() {
   const isWide   = useIsWide()
 
   const [view, setView] = useState<View>(() => activeItinerary ? 'planner' : 'landing')
-  const prevView = useRef<View>(view)
-
   useEffect(() => {
     if (activeItinerary) setView('planner')
     else setView('landing')

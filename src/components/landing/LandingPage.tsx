@@ -405,7 +405,7 @@ function SeasonalWatercolour({ season }: { season: string }) {
   )
 }
 
-export function LandingPage({ onPrivacy }: { onPrivacy?: () => void } = {}) {
+export function LandingPage() {
   const { clusters: rawClusters } = useClusters()
   const clusters = [...rawClusters].sort(
     (a, b) => (b.seasonalScores[season] ?? 0) - (a.seasonalScores[season] ?? 0)
