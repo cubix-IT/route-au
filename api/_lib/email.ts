@@ -2,7 +2,8 @@
 // https://resend.com
 
 const RESEND_API = 'https://api.resend.com/emails'
-const FROM = 'Unplanned Escapes <noreply@unplannedescapes.com.au>'
+// Use onboarding@resend.dev until unplannedescapes.com.au is verified in Resend dashboard
+const FROM = 'Unplanned Escapes <onboarding@resend.dev>'
 const TO = 'subscriptions@cubixit.com.au'
 
 export async function sendCronEmail(subject: string, html: string): Promise<void> {
