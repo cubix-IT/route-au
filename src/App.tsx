@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Toaster, toast } from 'react-hot-toast'
+import { Toaster } from 'react-hot-toast'
 import { useRegisterSW } from 'virtual:pwa-register/react'
 import { Header } from '@/components/layout/Header'
 import { MapContainer } from '@/components/map/MapContainer'
@@ -37,14 +37,10 @@ function useIsWide() {
 function App() {
   useOfflineSync()
 
-  useRegisterSW({
+  const { updateServiceWorker } = useRegisterSW({
     onNeedRefresh() {
-      toast('App updated — refresh to get the latest.', {
-        duration: 6000,
-        icon: '🔄',
-        style: { cursor: 'pointer' },
-        id: 'sw-update',
-      })
+      // Auto-reload — new version available, take it immediately
+      updateServiceWorker(true)
     },
   })
 
