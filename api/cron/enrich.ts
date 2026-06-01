@@ -311,9 +311,13 @@ async function enrichSubDest(
     .update({ enriched_at: new Date().toISOString() })
     .eq('sub_dest_id', subDestId)
 
-  // Urban/suburban destinations have dense OSM data — use tighter radius
-  // to avoid timeout. Rural destinations use wider 20km radius.
-  const r = 15_000  // 15km radius works for both urban and rural
+  // Tiered radius by distance from Melbourne CBD:
+  // inner suburbs (< 15km): 2km — avoid swamping with city-wide results
+  // regional towns (15–80km): 10km — standard town coverage
+  // rural/remote (80km+): 20km — sparse OSM needs wider net
+  const MELB_LAT = -37.814, MELB_LNG = 144.963
+  const distFromCBD = Math.sqrt((lat - MELB_LAT) ** 2 + (lng - MELB_LNG) ** 2) * 111
+  const r = distFromCBD < 15 ? 2_000 : distFromCBD < 80 ? 10_000 : 20_000
 
   // node-only queries — fast, typically under 3s even for large rural areas
   const query = `[out:json][timeout:15];
@@ -325,7 +329,7 @@ async function enrichSubDest(
   node["craft"~"^(brewery|winery|distillery)$"]["name"](around:${r},${lat},${lng});
   node["leisure"~"^(nature_reserve|garden|park)$"]["name"](around:${r},${lat},${lng});
 );
-out body 150;`
+out body ${distFromCBD < 15 ? 100 : distFromCBD < 80 ? 150 : 200};`
 
   const elements = await fetchOverpass(query, usage)
   if (!elements) return 0
