@@ -3,7 +3,6 @@ import { Toaster, toast } from 'react-hot-toast'
 import { useRegisterSW } from 'virtual:pwa-register/react'
 import { Header } from '@/components/layout/Header'
 import { MapContainer } from '@/components/map/MapContainer'
-import { FloatingTimeline } from '@/components/planner/FloatingTimeline'
 import { ProfileWizard } from '@/components/wizard/ProfileWizard'
 import { LandingPage } from '@/components/landing/LandingPage'
 import { ExperiencePanel } from '@/components/planner/ExperiencePanel'
@@ -92,7 +91,6 @@ function App() {
               <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
                 <div style={{ flex: 1, position: 'relative', minHeight: 0 }}>
                   <MapContainer />
-                  <FloatingTimeline />
                 </div>
                 <TripSummaryPanel />
                 <PlannerMetrics />
@@ -122,7 +120,6 @@ function App() {
               <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
                 <div style={{ flex: 1, position: 'relative', minHeight: 0 }}>
                   <MapContainer />
-                  <FloatingTimeline />
                 </div>
                 <TripSummaryPanel />
                 <PlannerMetrics />
