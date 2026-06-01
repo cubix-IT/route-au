@@ -1,274 +1,216 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { adminSupabase } from './_lib/supabase.js'
 
-// ─────────────────────────────────────────────────────────────────────────────
-// GET /api/status
-// Returns usage stats + health for every free-tier service.
-// Hard limits enforced — if any service is near limit, cron stops itself.
-//
-// Services monitored:
-//   Overpass API  : 9,000 calls/day safe limit (hard limit ~10,000)
-//   Wikipedia API : 200 req/min — tracked per-run only, no daily cap
-//   Supabase free : 500MB database, 5GB bandwidth, 2 projects
-//   Vercel Hobby  : 1M function invocations/month, 100 GB-hrs compute
-// ─────────────────────────────────────────────────────────────────────────────
-
-// Vercel Hobby hard limits
-const VERCEL_INVOCATIONS_LIMIT = 1_000_000   // per month
-const VERCEL_COMPUTE_LIMIT_GB_HRS = 100      // per month
-
-// Overpass safe limit
 const OVERPASS_DAILY_LIMIT = 9_000
+const SUPABASE_DB_LIMIT_MB = 500
+const RESEND_MONTHLY_LIMIT = 3_000
 
-// Supabase free limits
-const SUPABASE_DB_LIMIT_MB    = 500
-const SUPABASE_BW_LIMIT_GB    = 5
+function levelColor(pct: number) {
+  if (pct >= 90) return '#DC2626'
+  if (pct >= 70) return '#D97706'
+  return '#16A34A'
+}
 
-type Level = 'ok' | 'warn' | 'critical'
+function bar(pct: number) {
+  const color = levelColor(pct)
+  return `<div style="height:5px;border-radius:3px;background:#E5E7EB;margin-top:5px">
+    <div style="height:100%;border-radius:3px;background:${color};width:${Math.min(pct,100)}%"></div>
+  </div>`
+}
 
-function level(used: number, limit: number): Level {
-  const pct = used / limit
-  if (pct >= 0.9) return 'critical'
-  if (pct >= 0.7) return 'warn'
-  return 'ok'
+function dot(ok: boolean, warn = false) {
+  const color = !ok ? '#DC2626' : warn ? '#D97706' : '#16A34A'
+  return `<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${color};margin-right:6px;flex-shrink:0"></span>`
+}
+
+function timeAgo(iso: string | null) {
+  if (!iso) return 'never'
+  const diff = Date.now() - new Date(iso).getTime()
+  const h = Math.floor(diff / 3600000)
+  const d = Math.floor(h / 24)
+  if (d > 0) return `${d}d ago`
+  if (h > 0) return `${h}h ago`
+  return `${Math.floor(diff / 60000)}m ago`
+}
+
+function aest(iso: string | null) {
+  if (!iso) return '—'
+  return new Date(iso).toLocaleString('en-AU', { timeZone: 'Australia/Melbourne', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  const today = new Date().toISOString().slice(0, 10)
-  const thisMonth = new Date().toISOString().slice(0, 7)
+  if (!adminSupabase) return res.status(500).json({ error: 'Supabase not configured' })
 
-  const report: Record<string, any> = {
-    generated_at: new Date().toISOString(),
-    services: {},
+  const now = new Date()
+  const todayStr = now.toISOString().slice(0, 10)
+  const monthStr = now.toISOString().slice(0, 7)
+
+  // Fetch everything in parallel
+  const [
+    cronStatusRes,
+    clustersRes,
+    subDestsRes,
+    actRes, foodRes, natureRes,
+    overpassRes,
+    emailCountRes,
+  ] = await Promise.all([
+    adminSupabase.from('cron_status').select('*'),
+    adminSupabase.from('clusters').select('cluster_id, name').order('name'),
+    adminSupabase.from('sub_destinations').select('sub_dest_id, name, cluster_id, enriched_at').order('name'),
+    adminSupabase.from('activities').select('*', { count: 'exact', head: true }),
+    adminSupabase.from('food_places').select('*', { count: 'exact', head: true }),
+    adminSupabase.from('nature_spots').select('*', { count: 'exact', head: true }),
+    adminSupabase.from('cron_log').select('message').eq('job_name', 'enrich-places').gte('run_at', todayStr).order('run_at', { ascending: false }).limit(10),
+    adminSupabase.from('cron_log').select('*', { count: 'exact', head: true }).eq('status', 'ok').gte('run_at', `${monthStr}-01`),
+  ])
+
+  const cronJobs = cronStatusRes.data ?? []
+  const clusters = clustersRes.data ?? []
+  const subDests = subDestsRes.data ?? []
+
+  // Overpass calls today
+  let overpassToday = 0
+  for (const row of overpassRes.data ?? []) {
+    const m = (row.message ?? '').match(/overpass[:\s]+(\d+)/i)
+    if (m) overpassToday = Math.max(overpassToday, parseInt(m[1]))
   }
 
-  if (!adminSupabase) {
-    return res.status(500).json({ error: 'Supabase admin client not available' })
-  }
+  const totalRows = (actRes.count ?? 0) + (foodRes.count ?? 0) + (natureRes.count ?? 0)
+  const estimatedMB = Math.round(totalRows * 2 / 1024)
+  const emailsMonth = emailCountRes.count ?? 0
 
-  // ── 1. Overpass usage (from cron_log today) ───────────────────────────────
-  try {
-    const { data: overpassRows } = await adminSupabase
-      .from('cron_log')
-      .select('notes')
-      .gte('run_at', today)
-      .eq('job_name', 'enrich-overpass')
-
-    let overpassCallsToday = 0
-    for (const row of overpassRows ?? []) {
-      try {
-        const notes = typeof row.notes === 'string' ? JSON.parse(row.notes) : row.notes
-        overpassCallsToday = Math.max(overpassCallsToday, notes?.overpassCallsToday ?? 0)
-      } catch { /* */ }
-    }
-
-    report.services.overpass = {
-      label: 'Overpass API (OpenStreetMap)',
-      cost: 'Free forever',
-      calls_today: overpassCallsToday,
-      daily_limit: OVERPASS_DAILY_LIMIT,
-      daily_remaining: OVERPASS_DAILY_LIMIT - overpassCallsToday,
-      used_pct: Math.round((overpassCallsToday / OVERPASS_DAILY_LIMIT) * 100),
-      status: level(overpassCallsToday, OVERPASS_DAILY_LIMIT),
-      stop_condition: 'Cron stops if calls_today >= 9,000 or any query times out twice in a row',
-    }
-  } catch (e: any) {
-    report.services.overpass = { status: 'unknown', error: e.message }
-  }
-
-  // ── 2. Wikipedia (per-run only — no daily cap, just rate limit) ───────────
-  try {
-    const { data: wikiRows } = await adminSupabase
-      .from('cron_log')
-      .select('notes')
-      .gte('run_at', today)
-      .eq('job_name', 'enrich-overpass')
-
-    let wikiCallsToday = 0
-    for (const row of wikiRows ?? []) {
-      try {
-        const notes = typeof row.notes === 'string' ? JSON.parse(row.notes) : row.notes
-        wikiCallsToday += notes?.wikipediaCallsThisRun ?? 0
-      } catch { /* */ }
-    }
-
-    report.services.wikipedia = {
-      label: 'Wikipedia REST API',
-      cost: 'Free forever',
-      calls_today: wikiCallsToday,
-      rate_limit: '200 req/min (with User-Agent)',
-      sleep_between_calls_ms: 350,
-      status: 'ok',
-      stop_condition: 'Skip destination on HTTP 429, continue with next',
-    }
-  } catch (e: any) {
-    report.services.wikipedia = { status: 'unknown', error: e.message }
-  }
-
-  // ── 3. Supabase — DB size + row counts ────────────────────────────────────
-  try {
-    const tables = ['activities', 'food_places', 'nature_spots', 'accommodation', 'sub_destinations', 'clusters', 'cron_log']
-    const counts: Record<string, number> = {}
-    for (const table of tables) {
-      const { count } = await adminSupabase
-        .from(table)
-        .select('*', { count: 'exact', head: true })
-      counts[table] = count ?? 0
-    }
-
-    // Estimate DB size: ~2KB average per row across all tables
-    const totalRows = Object.values(counts).reduce((a, b) => a + b, 0)
-    const estimatedMB = Math.round(totalRows * 2 / 1024)
-
-    report.services.supabase = {
-      label: 'Supabase (database)',
-      cost: 'Free — 500MB limit',
-      row_counts: counts,
-      estimated_db_mb: estimatedMB,
-      db_limit_mb: SUPABASE_DB_LIMIT_MB,
-      db_used_pct: Math.round((estimatedMB / SUPABASE_DB_LIMIT_MB) * 100),
-      bandwidth_limit_gb: SUPABASE_BW_LIMIT_GB,
-      status: level(estimatedMB, SUPABASE_DB_LIMIT_MB),
-      stop_condition: 'Cron stops if estimated DB size > 450MB. Project auto-pauses after 7 days inactivity.',
-      warning: estimatedMB > 450 ? '⚠️ DB approaching 500MB limit — pause enrichment' : null,
-    }
-  } catch (e: any) {
-    report.services.supabase = { status: 'unknown', error: e.message }
-  }
-
-  // ── 4. Vercel — function invocations this month (from cron_log count) ─────
-  try {
-    const { count: cronRunsMonth } = await adminSupabase
-      .from('cron_log')
-      .select('*', { count: 'exact', head: true })
-      .gte('run_at', `${thisMonth}-01`)
-
-    // Each cron run = 1 invocation. Frontend hits Supabase directly (not Vercel functions).
-    // Other Vercel functions: /api/fuel (1/day), /api/summaries (1/week), /api/status (manual)
-    const estimatedMonthlyInvocations = ((cronRunsMonth ?? 0) + 60)  // +60 for fuel/misc
-    const daysInMonth = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate()
-    const dayOfMonth = new Date().getDate()
-    const projectedMonthly = Math.round((estimatedMonthlyInvocations / dayOfMonth) * daysInMonth)
-
-    report.services.vercel = {
-      label: 'Vercel Hobby (serverless functions)',
-      cost: 'Free — 1M invocations/month',
-      cron_runs_this_month: cronRunsMonth ?? 0,
-      estimated_invocations_this_month: estimatedMonthlyInvocations,
-      projected_monthly: projectedMonthly,
-      monthly_limit: VERCEL_INVOCATIONS_LIMIT,
-      used_pct: Math.round((projectedMonthly / VERCEL_INVOCATIONS_LIMIT) * 100),
-      compute_limit_gb_hrs: VERCEL_COMPUTE_LIMIT_GB_HRS,
-      status: level(projectedMonthly, VERCEL_INVOCATIONS_LIMIT),
-      note: 'Frontend queries Supabase directly — zero Vercel function calls from UI',
-    }
-  } catch (e: any) {
-    report.services.vercel = { status: 'unknown', error: e.message }
-  }
-
-  // ── 5. Recent cron runs ───────────────────────────────────────────────────
-  try {
-    const { data: recentRuns } = await adminSupabase
-      .from('cron_log')
-      .select('job_name,run_at,status,message,records_upserted,destinations_processed,notes')
-      .order('run_at', { ascending: false })
-      .limit(10)
-
-    report.recent_cron_runs = (recentRuns ?? []).map((r) => ({
-      job: r.job_name,
-      ran_at: r.run_at,
-      status: r.status,
-      message: r.message,
-      records: r.records_upserted,
-      destinations: r.destinations_processed,
-      usage: (() => { try { return typeof r.notes === 'string' ? JSON.parse(r.notes) : r.notes } catch { return null } })(),
-    }))
-  } catch { /* */ }
-
-  // ── Overall health ────────────────────────────────────────────────────────
-  const statuses = Object.values(report.services).map((s: any) => s.status)
-  report.overall = statuses.includes('critical') ? 'critical'
-    : statuses.includes('warn') ? 'warn'
-    : 'ok'
-
-  // Return HTML dashboard if requested from browser, JSON otherwise
   const wantsHtml = req.headers.accept?.includes('text/html')
-  if (!wantsHtml) return res.status(200).json(report)
+  if (!wantsHtml) {
+    return res.status(200).json({
+      generated_at: now.toISOString(),
+      cron_jobs: cronJobs,
+      data: { activities: actRes.count, food_places: foodRes.count, nature_spots: natureRes.count },
+      overpass_today: overpassToday,
+      estimated_db_mb: estimatedMB,
+    })
+  }
 
-  const s = report.services as any
-  const overall = report.overall
-  const statusColor = (st: string) => st === 'ok' ? '#16A34A' : st === 'warn' ? '#D97706' : '#DC2626'
-  const statusDot = (st: string) => `<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${statusColor(st)};margin-right:6px"></span>`
-  const bar = (pct: number) => `<div style="height:6px;border-radius:3px;background:#E5E7EB;margin-top:4px"><div style="height:100%;border-radius:3px;background:${pct>90?'#DC2626':pct>70?'#D97706':'#16A34A'};width:${Math.min(pct,100)}%"></div></div>`
+  // Group sub-destinations by cluster
+  const clusterMap = new Map(clusters.map(c => [c.cluster_id, c.name]))
+  const byCluster: Record<string, typeof subDests> = {}
+  for (const sd of subDests) {
+    const cname = clusterMap.get(sd.cluster_id) ?? 'Other'
+    if (!byCluster[cname]) byCluster[cname] = []
+    byCluster[cname].push(sd)
+  }
 
-  const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Unplanned Escapes — Status</title>
+  const enrichJob = cronJobs.find(j => j.job_name === 'enrich-places')
+  const fuelJob   = cronJobs.find(j => j.job_name === 'fuel-prices')
+  const summJob   = cronJobs.find(j => j.job_name === 'enrich-summaries')
+
+  const staleThreshold = Date.now() - 29 * 24 * 3600000
+  const totalDests = subDests.length
+  const enrichedDests = subDests.filter(sd => sd.enriched_at && new Date(sd.enriched_at).getTime() > staleThreshold).length
+
+  const html = `<!DOCTYPE html><html><head>
+<meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<style>body{font-family:-apple-system,sans-serif;background:#F8F7F4;color:#1C1C1A;margin:0;padding:24px}
-h1{font-size:22px;font-weight:700;margin:0 0 4px}
-.sub{color:#6B7280;font-size:13px;margin:0 0 24px}
-.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px;margin-bottom:24px}
-.card{background:#fff;border:1px solid #E5E7EB;border-radius:12px;padding:16px}
-.card-title{font-weight:700;font-size:14px;margin:0 0 4px;display:flex;align-items:center}
-.card-cost{font-size:11px;color:#16A34A;font-weight:600;margin-bottom:8px}
-.stat{display:flex;justify-content:space-between;font-size:12px;color:#6B7280;margin-top:6px}
-.stat b{color:#1C1C1A}
-.overall{display:inline-flex;align-items:center;padding:6px 14px;border-radius:20px;font-weight:700;font-size:14px;margin-bottom:20px}
-.row-table{width:100%;border-collapse:collapse;font-size:12px}
-.row-table th{text-align:left;color:#6B7280;font-weight:600;padding:6px 8px;border-bottom:1px solid #E5E7EB}
-.row-table td{padding:6px 8px;border-bottom:1px solid #F3F4F6}
-h2{font-size:15px;font-weight:700;margin:0 0 10px}
-</style></head><body>
-<h1>Unplanned Escapes — Status</h1>
-<p class="sub">Generated ${new Date(report.generated_at).toLocaleString('en-AU',{timeZone:'Australia/Melbourne'})} AEST</p>
+<title>Unplanned Escapes — Status</title>
+<style>
+  * { box-sizing: border-box }
+  body { font-family: -apple-system, sans-serif; background: #F8F7F4; color: #1C1C1A; margin: 0; padding: 20px }
+  h1 { font-size: 20px; font-weight: 700; margin: 0 0 2px }
+  .sub { color: #6B7280; font-size: 12px; margin: 0 0 20px }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px; margin-bottom: 20px }
+  .card { background: #fff; border: 1px solid #E5E7EB; border-radius: 10px; padding: 14px }
+  .card-title { font-size: 11px; font-weight: 700; color: #6B7280; text-transform: uppercase; letter-spacing: .06em; margin-bottom: 8px }
+  .big { font-size: 24px; font-weight: 700 }
+  .stat { font-size: 12px; color: #6B7280; margin-top: 4px }
+  h2 { font-size: 14px; font-weight: 700; margin: 20px 0 10px }
+  .job-row { display: flex; align-items: center; background: #fff; border: 1px solid #E5E7EB; border-radius: 8px; padding: 10px 14px; margin-bottom: 6px; gap: 10px }
+  .job-name { font-size: 13px; font-weight: 600; flex: 1 }
+  .job-meta { font-size: 11px; color: #6B7280 }
+  .cluster-title { font-size: 12px; font-weight: 700; color: #6B7280; text-transform: uppercase; letter-spacing: .06em; margin: 14px 0 6px }
+  .dest-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 4px; margin-bottom: 4px }
+  .dest-chip { display: flex; align-items: center; background: #fff; border: 1px solid #E5E7EB; border-radius: 6px; padding: 5px 8px; font-size: 11px }
+  .dest-name { flex: 1; font-weight: 500 }
+  .dest-age { color: #9CA3AF; font-size: 10px }
+</style>
+</head><body>
 
-<div class="overall" style="background:${overall==='ok'?'#F0FDF4':overall==='warn'?'#FFF7ED':'#FEF2F2'};color:${statusColor(overall)}">
-  ${statusDot(overall)} Overall: ${overall.toUpperCase()}
-</div>
+<h1>Unplanned Escapes</h1>
+<p class="sub">Status · ${aest(now.toISOString())} AEST</p>
 
 <div class="grid">
   <div class="card">
-    <div class="card-title">${statusDot(s.overpass.status)} Overpass API (OpenStreetMap)</div>
-    <div class="card-cost">${s.overpass.cost}</div>
-    <div class="stat">Calls today <b>${s.overpass.calls_today} / ${s.overpass.daily_limit}</b></div>
-    ${bar(s.overpass.used_pct)}
-    <div class="stat" style="margin-top:8px">Remaining <b>${s.overpass.daily_remaining}</b></div>
+    <div class="card-title">Activities</div>
+    <div class="big">${(actRes.count ?? 0).toLocaleString()}</div>
+    <div class="stat">things to do</div>
   </div>
   <div class="card">
-    <div class="card-title">${statusDot(s.wikipedia.status)} Wikipedia API</div>
-    <div class="card-cost">${s.wikipedia.cost}</div>
-    <div class="stat">Calls today <b>${s.wikipedia.calls_today}</b></div>
-    <div class="stat">Rate limit <b>${s.wikipedia.rate_limit}</b></div>
+    <div class="card-title">Food & Drink</div>
+    <div class="big">${(foodRes.count ?? 0).toLocaleString()}</div>
+    <div class="stat">places</div>
   </div>
   <div class="card">
-    <div class="card-title">${statusDot(s.supabase.status)} Supabase Database</div>
-    <div class="card-cost">${s.supabase.cost}</div>
-    <div class="stat">DB size <b>${s.supabase.estimated_db_mb} MB / ${s.supabase.db_limit_mb} MB</b></div>
-    ${bar(s.supabase.db_used_pct)}
-    <div style="margin-top:10px;font-size:11px;color:#6B7280">
-      ${Object.entries(s.supabase.row_counts).map(([k,v])=>`${k}: <b>${v}</b>`).join(' · ')}
-    </div>
+    <div class="card-title">Nature Spots</div>
+    <div class="big">${(natureRes.count ?? 0).toLocaleString()}</div>
+    <div class="stat">parks & reserves</div>
   </div>
   <div class="card">
-    <div class="card-title">${statusDot(s.vercel.status)} Vercel Hobby</div>
-    <div class="card-cost">${s.vercel.cost}</div>
-    <div class="stat">Invocations/mo <b>${s.vercel.estimated_invocations_this_month.toLocaleString()} / ${s.vercel.monthly_limit.toLocaleString()}</b></div>
-    ${bar(s.vercel.used_pct)}
-    <div class="stat" style="margin-top:8px">Projected <b>${s.vercel.projected_monthly.toLocaleString()}</b></div>
+    <div class="card-title">Destinations Enriched</div>
+    <div class="big">${enrichedDests} <span style="font-size:14px;color:#6B7280">/ ${totalDests}</span></div>
+    ${bar(Math.round(enrichedDests / totalDests * 100))}
+    <div class="stat">${Math.round(enrichedDests / totalDests * 100)}% current</div>
+  </div>
+  <div class="card">
+    <div class="card-title">Overpass API</div>
+    <div class="big">${overpassToday} <span style="font-size:14px;color:#6B7280">/ ${OVERPASS_DAILY_LIMIT}</span></div>
+    ${bar(Math.round(overpassToday / OVERPASS_DAILY_LIMIT * 100))}
+    <div class="stat">calls today</div>
+  </div>
+  <div class="card">
+    <div class="card-title">Database</div>
+    <div class="big">~${estimatedMB} <span style="font-size:14px;color:#6B7280">MB</span></div>
+    ${bar(Math.round(estimatedMB / SUPABASE_DB_LIMIT_MB * 100))}
+    <div class="stat">of ${SUPABASE_DB_LIMIT_MB}MB free limit</div>
+  </div>
+  <div class="card">
+    <div class="card-title">Resend Emails</div>
+    <div class="big">${emailsMonth} <span style="font-size:14px;color:#6B7280">/ ${RESEND_MONTHLY_LIMIT}</span></div>
+    ${bar(Math.round(emailsMonth / RESEND_MONTHLY_LIMIT * 100))}
+    <div class="stat">this month</div>
   </div>
 </div>
 
-<h2>Recent Cron Runs</h2>
-${report.recent_cron_runs?.length ? `
-<table class="row-table">
-  <tr><th>Job</th><th>Time (AEST)</th><th>Status</th><th>Records</th><th>Message</th></tr>
-  ${(report.recent_cron_runs as any[]).map(r=>`<tr>
-    <td>${r.job}</td>
-    <td>${new Date(r.ran_at).toLocaleString('en-AU',{timeZone:'Australia/Melbourne'})}</td>
-    <td style="color:${r.status==='ok'?'#16A34A':'#DC2626'};font-weight:600">${r.status}</td>
-    <td>${r.records??0}</td>
-    <td style="color:#6B7280">${(r.message||'').slice(0,80)}</td>
-  </tr>`).join('')}
-</table>` : '<p style="color:#6B7280;font-size:13px">No cron runs logged yet — first run at 11am AEST.</p>'}
+<h2>Cron Jobs</h2>
+${[
+  { job: enrichJob, label: 'Enrich Places (OSM)', schedule: 'Daily 11am AEST' },
+  { job: fuelJob,   label: 'Fuel Prices',          schedule: 'Daily 3am AEST' },
+  { job: summJob,   label: 'AI Summaries',          schedule: 'Weekly Sunday' },
+].map(({ job, label, schedule }) => {
+  const ok = !job?.last_error_at || (job?.last_success_at && job.last_success_at > job.last_error_at)
+  return `<div class="job-row">
+    ${dot(!!ok)}
+    <div>
+      <div class="job-name">${label}</div>
+      <div class="job-meta">${schedule} · last run: ${aest(job?.last_run_at ?? null)} (${timeAgo(job?.last_run_at ?? null)}) · last success: ${aest(job?.last_success_at ?? null)}</div>
+      ${job?.last_error_message ? `<div style="font-size:11px;color:#DC2626;margin-top:2px">Error: ${job.last_error_message}</div>` : ''}
+    </div>
+  </div>`
+}).join('')}
+
+<h2>Destinations by Region</h2>
+${Object.entries(byCluster).sort(([a],[b]) => a.localeCompare(b)).map(([cluster, dests]) => {
+  const enriched = dests.filter(d => d.enriched_at && new Date(d.enriched_at).getTime() > staleThreshold).length
+  return `<div class="cluster-title">${cluster} — ${enriched}/${dests.length} enriched</div>
+  <div class="dest-grid">
+    ${dests.map(d => {
+      const fresh = d.enriched_at && new Date(d.enriched_at).getTime() > staleThreshold
+      return `<div class="dest-chip">
+        ${dot(!!fresh, !d.enriched_at)}
+        <span class="dest-name">${d.name}</span>
+        <span class="dest-age">${timeAgo(d.enriched_at)}</span>
+      </div>`
+    }).join('')}
+  </div>`
+}).join('')}
+
 </body></html>`
 
   res.setHeader('Content-Type', 'text/html')

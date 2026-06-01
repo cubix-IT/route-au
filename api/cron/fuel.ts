@@ -1,7 +1,6 @@
 import { randomUUID } from 'crypto'
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { adminSupabase } from '../_lib/supabase.js'
-import { sendCronEmail, emailWrapper, statusRow } from '../_lib/email.js'
 
 // Called daily at 3am AEST by Vercel Cron (vercel.json: "0 17 * * *")
 // Pulls all VIC fuel stations + prices from Service Victoria Fair Fuel API.
@@ -153,52 +152,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       total_records_upserted: totalRecords,
     }, { onConflict: 'job_name' })
 
-    // Get average Melbourne prices by fuel type for email summary
-    let fuelSummary = ''
-    try {
-      const fuelTypes = ['U91', 'U95', 'U98', 'E10', 'DL']
-      const fuelLabels: Record<string, string> = { U91: 'ULP 91', U95: 'ULP 95', U98: 'ULP 98', E10: 'E10', DL: 'Diesel' }
-      // Pascoe Vale area stations (~5km radius)
-      const PV_LAT = -37.727, PV_LNG = 144.934, DELTA = 0.045
-      const { data: melbStations } = await adminSupabase
-        .from('fuel_stations')
-        .select('fuel_station_id,name')
-        .gte('lat', PV_LAT - DELTA).lte('lat', PV_LAT + DELTA)
-        .gte('lng', PV_LNG - DELTA).lte('lng', PV_LNG + DELTA)
-        .limit(50)
-      const stationIds = (melbStations ?? []).map((s: any) => s.fuel_station_id)
-      if (stationIds.length > 0) {
-        const rows: string[] = []
-        for (const ft of fuelTypes) {
-          const { data: prices } = await adminSupabase
-            .from('fuel_prices')
-            .select('price_cents')
-            .eq('fuel_type', ft)
-            .in('fuel_station_id', stationIds.slice(0, 100))
-          if (prices && prices.length > 0) {
-            const avg = prices.reduce((s: number, p: any) => s + p.price_cents, 0) / prices.length
-            const min = Math.min(...prices.map((p: any) => p.price_cents))
-            rows.push(statusRow(fuelLabels[ft] ?? ft, `avg ${avg.toFixed(1)}¢ · cheapest ${min.toFixed(1)}¢`))
-          }
-        }
-        if (rows.length > 0) {
-          fuelSummary = `<div style="font-size:11px;font-weight:700;color:#6B7280;text-transform:uppercase;letter-spacing:0.06em;margin:16px 0 6px">Prices Near Pascoe Vale</div>
-          <table style="width:100%;border-collapse:collapse">${rows.join('')}</table>`
-        }
-      }
-    } catch { /* non-fatal */ }
-
-    await sendCronEmail(
-      `✅ Fuel prices updated — ${pricesUpserted} prices refreshed`,
-      emailWrapper(`Fuel prices · ${new Date().toLocaleDateString('en-AU', { timeZone: 'Australia/Melbourne', weekday: 'short', day: 'numeric', month: 'short' })} AEST`, `
-        <table style="width:100%;border-collapse:collapse">
-          ${statusRow('Status', 'Completed')}
-          ${statusRow('Stations updated', String(stationsUpserted))}
-          ${statusRow('Prices updated', String(pricesUpserted))}
-        </table>
-        ${fuelSummary}
-      `)
-    )
     return res.status(200).json({ ok: true, stationsUpserted, pricesUpserted })
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err)
