@@ -1,5 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { adminSupabase } from '../_lib/supabase.js'
+import { sendCronEmail, emailWrapper, statusRow } from '../_lib/email.js'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Enrichment cron — 100% free, no API keys required
@@ -568,6 +569,26 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       : `Enriched ${processed} destinations, ${totalUpserted} records upserted`
 
     await logCronRun(runAt, status, message, totalUpserted, processed, usage)
+
+    // Send email report
+    const icon = usage.stopped ? '⚠️' : '✅'
+    const rows = results.map((r: any) =>
+      statusRow(r.slug.replace(/-/g, ' '), `${r.upserted} records`, r.upserted > 0)
+    ).join('')
+    await sendCronEmail(
+      `${icon} Daily top-up — ${processed} destinations, ${totalUpserted} records`,
+      emailWrapper(`Daily top-up · ${new Date().toLocaleDateString('en-AU', { timeZone: 'Australia/Melbourne', weekday: 'short', day: 'numeric', month: 'short' })} AEST`, `
+        <table style="width:100%;border-collapse:collapse;margin-bottom:16px">
+          ${statusRow('Status', usage.stopped ? `Stopped — ${usage.stopReason}` : 'Completed', !usage.stopped)}
+          ${statusRow('Destinations processed', String(processed))}
+          ${statusRow('Records added', String(totalUpserted))}
+          ${statusRow('Remaining', String(remaining ?? 0))}
+          ${statusRow('Overpass calls', `${usage.overpassCallsToday} / ${OVERPASS_DAILY_LIMIT}`)}
+        </table>
+        ${results.length > 0 ? `<div style="font-size:11px;font-weight:700;color:#6B7280;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:6px">Destinations</div>
+        <table style="width:100%;border-collapse:collapse">${rows}</table>` : ''}
+      `)
+    )
 
     return res.status(200).json({
       ok: true,

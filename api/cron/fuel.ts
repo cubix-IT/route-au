@@ -1,6 +1,7 @@
 import { randomUUID } from 'crypto'
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { adminSupabase } from '../_lib/supabase.js'
+import { sendCronEmail, emailWrapper, statusRow } from '../_lib/email.js'
 
 // Called daily at 3am AEST by Vercel Cron (vercel.json: "0 17 * * *")
 // Pulls all VIC fuel stations + prices from Service Victoria Fair Fuel API.
@@ -152,6 +153,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       total_records_upserted: totalRecords,
     }, { onConflict: 'job_name' })
 
+    await sendCronEmail(
+      `✅ Fuel prices updated — ${pricesUpserted} prices refreshed`,
+      emailWrapper(`Fuel prices · ${new Date().toLocaleDateString('en-AU', { timeZone: 'Australia/Melbourne', weekday: 'short', day: 'numeric', month: 'short' })} 3am AEST`, `
+        <table style="width:100%;border-collapse:collapse">
+          ${statusRow('Status', 'Completed')}
+          ${statusRow('Stations updated', String(stationsUpserted))}
+          ${statusRow('Prices updated', String(pricesUpserted))}
+        </table>
+      `)
+    )
     return res.status(200).json({ ok: true, stationsUpserted, pricesUpserted })
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err)
