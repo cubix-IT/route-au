@@ -34,7 +34,7 @@ export const SEASON_META: Record<Season, {
     headline: 'The best weekends are the cosy ones.',
     sub: 'Hot springs, mineral baths, crackling fires — Victoria\'s regional towns come alive in the cold.',
     emoji: '☕',
-    palette: { from: '#3D2B6B', to: '#B85C0A' },
+    palette: { from: '#1A5C5C', to: '#A04020' },
   },
   spring: {
     label: 'Spring',

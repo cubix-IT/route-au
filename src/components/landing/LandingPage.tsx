@@ -357,10 +357,10 @@ const CORNER_PALETTES: Record<string, { c1: string[]; c2: string[] }> = {
     c1: ['#8B2500', '#B84010', '#D4600A', '#C03008'],
     c2: ['#7A1E00', '#A03808', '#C85010', '#B02808'],
   },
-  // Winter: deep indigo-purple (cold mountain twilight) + warm amber (firelight)
+  // Winter: dusty teal (harmonises with site green) + warm rust (fire/warmth)
   winter: {
-    c1: ['#3D2B6B', '#2E1F5A', '#4A3478', '#352460'],
-    c2: ['#B85C0A', '#D4720C', '#9A4A08', '#C8680A'],
+    c1: ['#1A5C5C', '#0F4A4A', '#226868', '#174F4F'],
+    c2: ['#A04020', '#B85030', '#8A3018', '#C05828'],
   },
   // Spring: wattle gold, wildflower pink, sage — Grampians bloom
   spring: {
