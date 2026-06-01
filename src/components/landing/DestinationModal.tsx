@@ -382,7 +382,7 @@ export function DestinationModal({
                   return allThingsToDo
                     .filter((a) => !staticNames.has(a.name.toLowerCase()))
                     .map((a) => (
-                      <ActivityFullRow key={`db-${a.activity_id}`} name={a.name} emoji={a.emoji} category={a.category} description={a.description} duration={a.duration} cost={a.cost} isHiddenGem={a.is_hidden_gem} kidsOk={a.kids_ok} mapsUrl={a.maps_url} />
+                      <ActivityFullRow key={`db-${a.activity_id}`} name={a.name} emoji={a.emoji} category={a.category} description={a.description} duration={a.duration} cost={a.cost} isHiddenGem={a.is_hidden_gem} kidsOk={a.kids_ok} mapsUrl={a.maps_url} website={(a as any).website} phone={(a as any).phone} />
                     ))
                 })()}
               </div>
@@ -458,12 +458,14 @@ function PreviewFoodRow({ food }: { food: DbFood }) {
   )
 }
 
-function ActivityFullRow({ name, emoji, category, description, duration, cost, isHiddenGem, kidsOk, mapsUrl }: {
+function ActivityFullRow({ name, emoji, category, description, duration, cost, isHiddenGem, kidsOk, mapsUrl, website, phone }: {
   name: string; emoji: string; category: string; description: string
-  duration: string; cost: string; isHiddenGem: boolean; kidsOk: boolean; mapsUrl: string
+  duration: string; cost: string; isHiddenGem: boolean; kidsOk: boolean
+  mapsUrl: string; website?: string; phone?: string
 }) {
   const displayEmoji = emoji || CAT_EMOJI[category] || '📍'
   const url = mapsUrl || `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(name + ' Victoria')}`
+  const cleanWebsite = website && !website.includes('google.com') ? website : undefined
   return (
     <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, padding: '11px 14px', borderRadius: 12, background: isHiddenGem ? '#FFFBF5' : 'var(--bg-base)', border: `1.5px solid ${isHiddenGem ? 'rgba(184,115,51,0.25)' : 'var(--border)'}` }}>
       <span style={{ fontSize: 22, flexShrink: 0, lineHeight: 1.3 }}>{displayEmoji}</span>
@@ -471,43 +473,76 @@ function ActivityFullRow({ name, emoji, category, description, duration, cost, i
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', marginBottom: 3 }}>
           <span style={{ fontSize: 13, fontWeight: 700, color: '#1C1C1A' }}>{name}</span>
           {isHiddenGem && <span style={{ fontSize: 10, fontWeight: 700, color: WARM, background: '#FFF5EB', padding: '1px 6px', borderRadius: 5 }}>Local gem</span>}
-          {kidsOk && <span style={{ fontSize: 10, color: GREEN, background: 'var(--green-light)', padding: '1px 6px', borderRadius: 5, fontWeight: 600 }}>Kid Friendly</span>}
+          {kidsOk && <span style={{ fontSize: 10, color: GREEN, background: '#E8F5EE', padding: '1px 6px', borderRadius: 5, fontWeight: 600 }}>Kid Friendly</span>}
         </div>
         {description && <p style={{ fontSize: 12, color: '#4A4948', lineHeight: 1.55, margin: 0 }}>{description}</p>}
-        <div style={{ display: 'flex', gap: 10, marginTop: 5, fontSize: 11, color: 'var(--text-muted)' }}>
-          <span>⏱ {duration}</span>
-          <span>{cost === 'free' ? '✓ Free' : cost}</span>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 8 }}>
+          <div style={{ display: 'flex', gap: 10, fontSize: 11, color: 'var(--text-muted)' }}>
+            {duration && <span>⏱ {duration}</span>}
+            <span>{cost === 'free' ? '✓ Free' : cost}</span>
+          </div>
+          <div style={{ display: 'flex', gap: 5 }}>
+            {cleanWebsite && (
+              <a href={cleanWebsite} target="_blank" rel="noopener noreferrer"
+                title="Website" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 28, height: 28, borderRadius: 7, background: '#F8F7F4', border: '1px solid var(--border)', color: '#374151', textDecoration: 'none', fontSize: 13 }}>
+                🌐
+              </a>
+            )}
+            {phone && (
+              <a href={`tel:${phone}`} title={phone}
+                style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 28, height: 28, borderRadius: 7, background: '#F0FDF4', border: '1px solid #BBF7D0', color: '#16A34A', textDecoration: 'none', fontSize: 13 }}>
+                📞
+              </a>
+            )}
+            <a href={url} target="_blank" rel="noopener noreferrer" title="Open in Google Maps"
+              style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 28, height: 28, borderRadius: 7, background: '#1C1C1A', color: '#fff', textDecoration: 'none', fontSize: 13 }}>
+              📍
+            </a>
+          </div>
         </div>
       </div>
-      <a href={url} target="_blank" rel="noopener noreferrer" style={{ flexShrink: 0, fontSize: 11, fontWeight: 700, color: '#fff', background: '#1C1C1A', padding: '4px 10px', borderRadius: 7, textDecoration: 'none', marginTop: 2 }}>
-        View on map ↗
-      </a>
     </div>
   )
 }
 
 function FoodFullRow({ food }: { food: DbFood }) {
   const emoji = FOOD_CAT_EMOJI[food.category] ?? '🍽'
-  const attr = food.attributes as { rating?: number; review_count?: number; cuisine_tags?: string[]; google_place_id?: string }
-  const mapsUrl = attr.google_place_id
-    ? `https://www.google.com/maps/place/?q=place_id:${attr.google_place_id}`
-    : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(food.name + ' Victoria')}`
+  const attr = food.attributes as { rating?: number; review_count?: number; cuisine_tags?: string[]; website_uri?: string; opening_hours_text?: string }
+  const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(food.name + ' Victoria')}`
+  const website = attr.website_uri && !attr.website_uri.includes('google.com') ? attr.website_uri : undefined
+  const phone = (food as any).phone as string | undefined
   return (
-    <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, padding: '11px 14px', borderRadius: 12, background: 'var(--bg-base)', border: '1px solid var(--border)' }}>
-      <span style={{ fontSize: 22, flexShrink: 0, lineHeight: 1.3 }}>{emoji}</span>
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: 13, fontWeight: 700, color: '#1C1C1A', marginBottom: 2 }}>{food.name}</div>
-        <div style={{ display: 'flex', gap: 8, fontSize: 11, color: 'var(--text-muted)', flexWrap: 'wrap' }}>
-          <span>{food.category}</span>
-          {attr.cuisine_tags?.length ? <span>{attr.cuisine_tags.slice(0, 2).join(', ')}</span> : null}
-          {attr.rating && <span style={{ color: '#D97706', fontWeight: 700 }}>★ {attr.rating}</span>}
-          {attr.review_count && <span>({attr.review_count.toLocaleString()})</span>}
+    <div style={{ padding: '11px 14px', borderRadius: 12, background: 'var(--bg-base)', border: '1px solid var(--border)' }}>
+      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+        <span style={{ fontSize: 22, flexShrink: 0, lineHeight: 1.3 }}>{emoji}</span>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: '#1C1C1A', marginBottom: 2 }}>{food.name}</div>
+          <div style={{ display: 'flex', gap: 8, fontSize: 11, color: 'var(--text-muted)', flexWrap: 'wrap' }}>
+            <span>{food.category}</span>
+            {attr.cuisine_tags?.length ? <span>{attr.cuisine_tags.slice(0, 2).join(', ')}</span> : null}
+          </div>
+          {food.address && <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>{food.address}</div>}
+          {attr.opening_hours_text && <div style={{ fontSize: 11, color: '#6B7280', marginTop: 2 }}>{attr.opening_hours_text}</div>}
         </div>
-        {food.address && <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>{food.address}</div>}
       </div>
-      <a href={mapsUrl} target="_blank" rel="noopener noreferrer" style={{ flexShrink: 0, fontSize: 11, fontWeight: 700, color: '#fff', background: '#1C1C1A', padding: '4px 10px', borderRadius: 7, textDecoration: 'none', marginTop: 2 }}>
-        View on map ↗
-      </a>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 5, marginTop: 8 }}>
+        {website && (
+          <a href={website} target="_blank" rel="noopener noreferrer" title="Website"
+            style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 28, height: 28, borderRadius: 7, background: '#F8F7F4', border: '1px solid var(--border)', color: '#374151', textDecoration: 'none', fontSize: 13 }}>
+            🌐
+          </a>
+        )}
+        {phone && (
+          <a href={`tel:${phone}`} title={phone}
+            style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 28, height: 28, borderRadius: 7, background: '#F0FDF4', border: '1px solid #BBF7D0', color: '#16A34A', textDecoration: 'none', fontSize: 13 }}>
+            📞
+          </a>
+        )}
+        <a href={mapsUrl} target="_blank" rel="noopener noreferrer" title="Open in Google Maps"
+          style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 28, height: 28, borderRadius: 7, background: '#1C1C1A', color: '#fff', textDecoration: 'none', fontSize: 13 }}>
+          📍
+        </a>
+      </div>
     </div>
   )
 }

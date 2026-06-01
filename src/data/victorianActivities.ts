@@ -38,6 +38,7 @@ export interface Activity {
   mapsUrl: string
   tags: string[]
   websiteUri?: string
+  phone?: string
   editorialSummary?: string
   openingHoursPeriods?: OpenHoursPeriod[]
   rating?: number

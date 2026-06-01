@@ -413,6 +413,7 @@ export function ExperiencePanel({ hideTimeline = false }: { hideTimeline?: boole
               mapsUrl: safeMapsUrl(a.maps_url, a.name),
               tags: a.tags ?? [],
               websiteUri: aAttr.website_uri as string | undefined,
+              phone: (a as any).phone as string | undefined,
             }
           })
 
@@ -958,18 +959,28 @@ function FoodCard({ poi, destName, highlighted, onMapPin, isLocalFav }: {
         <div style={{ fontSize: 11, color: '#6B7280' }}>{openStatus.text}</div>
       )}
 
-      {/* Buttons */}
-      <div style={{ display: 'flex', gap: 6, marginTop: 2 }}>
+      {/* Action row */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4 }}>
         {poi.website && !poi.website.includes('google.com') && (
           <a href={poi.website} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()}
             style={{ flex: 1, textAlign: 'center', padding: '7px 10px', borderRadius: 8, background: '#F8F7F4', border: '1px solid var(--border)', color: '#374151', fontSize: 11.5, fontWeight: 700, textDecoration: 'none', whiteSpace: 'nowrap' }}>
             Website ↗
           </a>
         )}
-        <a href={mapsUrl} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()}
-          style={{ flex: 1, textAlign: 'center', padding: '7px 10px', borderRadius: 8, background: '#1C1B1F', color: '#fff', fontSize: 11.5, fontWeight: 700, textDecoration: 'none', whiteSpace: 'nowrap' }}>
-          Open in Maps ↗
-        </a>
+        <div style={{ display: 'flex', gap: 5, marginLeft: 'auto' }}>
+          {(poi as any).phone && (
+            <a href={`tel:${(poi as any).phone}`} onClick={(e) => e.stopPropagation()}
+              title={(poi as any).phone}
+              style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 32, height: 32, borderRadius: 8, background: '#F0FDF4', border: '1px solid #BBF7D0', color: '#16A34A', textDecoration: 'none', fontSize: 15 }}>
+              📞
+            </a>
+          )}
+          <a href={mapsUrl} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()}
+            title="Open in Google Maps"
+            style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 32, height: 32, borderRadius: 8, background: '#1C1B1F', color: '#fff', textDecoration: 'none', fontSize: 15 }}>
+            📍
+          </a>
+        </div>
       </div>
     </div>
   )
@@ -1049,17 +1060,27 @@ function ActivityCard({ act, expanded, highlighted, onToggle, isAdded, onAdd, on
               {openStatus.isOpen ? 'Open now' : `Closed${openStatus.nextOpen ? ` — opens ${openStatus.nextOpen}` : ''}`}
             </div>
           )}
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
             {websiteUrl && (
               <a href={websiteUrl} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()}
                 style={{ padding: '9px 14px', borderRadius: 9, background: '#F8F7F4', border: '1px solid var(--border)', color: '#374151', fontSize: 12, fontWeight: 700, textDecoration: 'none', whiteSpace: 'nowrap' }}>
                 Website ↗
               </a>
             )}
-            <a href={mapsUrl} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()}
-              style={{ flex: websiteUrl ? undefined : 1, display: 'block', textAlign: 'center', padding: '9px 14px', borderRadius: 9, background: '#1C1B1F', color: '#fff', fontSize: 12, fontWeight: 700, textDecoration: 'none', whiteSpace: 'nowrap' }}>
-              Open in Maps ↗
-            </a>
+            <div style={{ display: 'flex', gap: 6, marginLeft: 'auto' }}>
+              {act.phone && (
+                <a href={`tel:${act.phone}`} onClick={(e) => e.stopPropagation()}
+                  title={act.phone}
+                  style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 36, height: 36, borderRadius: 9, background: '#F0FDF4', border: '1px solid #BBF7D0', color: '#16A34A', textDecoration: 'none', fontSize: 16 }}>
+                  📞
+                </a>
+              )}
+              <a href={mapsUrl} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()}
+                title="Open in Google Maps"
+                style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 36, height: 36, borderRadius: 9, background: '#1C1B1F', color: '#fff', textDecoration: 'none', fontSize: 16 }}>
+                📍
+              </a>
+            </div>
             {onAdd && !isAdded && (
               <button onClick={(e) => { e.stopPropagation(); onAdd() }}
                 style={{ padding: '9px 14px', borderRadius: 9, border: `1.5px solid ${GREEN}`, background: '#E8F5EE', color: GREEN, fontSize: 12, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}>
