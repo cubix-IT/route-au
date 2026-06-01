@@ -5,199 +5,206 @@ Last updated: 2026-06-01
 
 ## ⚠️ PERMANENT RULE — NO GOOGLE API, NO PAID APIS
 
-Google Places API caused A$1,992 in charges during May 2026.
-ALL Google API code, keys, and data permanently removed on 2026-06-01.
+Google Places API caused A$1,992 in charges during May 2026. ALL Google API
+code, keys, and data permanently removed 2026-06-01. Billing dispute filed.
 
 **NEVER add any paid API. This is a hobby project. All services must be free.**
 
-Current free stack: Overpass API (OSM) + Wikipedia + Supabase + Vercel Hobby + Open-Meteo + OSRM + Photon + CartoDB
+Free stack: Overpass API (OSM) · Wikipedia · Supabase · Vercel Hobby ·
+Open-Meteo · OSRM · Photon · CartoDB
+
+---
+
+## Free Data Top-Up (formerly "enrichment" — renamed to avoid trauma 😄)
+
+### Cron: `0 1 * * *` (UTC) = 11am AEST daily
+
+**Why 11am AEST?**
+Overpass servers are in Germany. The busy time is European daytime (8am–10pm CET).
+- ❌ Old schedule: `0 17 * * *` UTC = 3am AEST = **7pm Germany** — peak load
+- ✅ New schedule: `0 1 * * *` UTC = 11am AEST = **3am Germany** — lowest load
+
+At 3am German time, Overpass is almost idle. Queries complete in 1-2s instead of timing out.
+
+### Behaviour
+- **8 destinations per run** (safe: 8 × ~7s = ~56s, Vercel limit 60s)
+- **3s pause between destinations** — prevents 429 burst rate limiting
+- All 139 destinations cycle every ~17 days
+- Hard stops: 9,000 Overpass calls/day · DB >450MB · HTTP 429 · 2x timeout
+- source field: **must be 'static'** (DB constraint) — OSM origin in attributes.source
+
+### Manual trigger (when Overpass is working)
+```
+curl -X POST "https://unplanned-escapes.vercel.app/api/cron/enrich?force=1&limit=8"
+```
+
+### Check usage
+```
+curl https://unplanned-escapes.vercel.app/api/status
+```
 
 ---
 
 ## Architecture
 
-The app pre-fetches all POI data via Overpass (OSM) into Supabase. Frontend reads from Supabase only.
+All pre-fetchable data → Supabase DB populated by cron. Frontend reads Supabase only.
 
-**APIs that stay real-time** (can't be pre-cached):
+**Real-time APIs (can't pre-cache):**
 - Open-Meteo — weather (free, no key)
-- OSRM — road route geometry (free, no key)
+- OSRM — route geometry (free, no key)
 - Photon — geocoding (free, no key)
 - VicEmergency — live hazard alerts (free)
 
-**Everything else from Supabase DB:**
-
-| Source | Table(s) | Cron | Schedule |
+**Supabase tables:**
+| Table | Rows | Source | Notes |
 |---|---|---|---|
-| Overpass API (OpenStreetMap) | activities, food_places, nature_spots, accommodation | enrich-places | Daily 6am AEST |
-| Service Victoria Fuel API | fuel_stations, fuel_prices | fuel-prices | Daily 3am AEST |
-| Wikipedia + Claude | destination_summaries | enrich-summaries | Weekly Sunday 2am AEST |
-
-**Supabase project:** `tofpkcjrrefuzzfqojjj.supabase.co`
+| activities | 17 | static + manual | 8 Daylesford curated manually, 9 other curated |
+| food_places | 372 | Overpass OSM | chains filtered out |
+| nature_spots | 79 | Overpass OSM | survey parcels filtered |
+| accommodation | 5,665 | Overpass OSM | hidden from wizard pending review |
+| sub_destinations | 139 | static | |
+| clusters | 22 | static | |
+| destination_summaries | ? | Wikipedia + Claude | weekly Sunday 2am |
+| fuel_stations | 1,740 | Service Victoria | |
+| fuel_prices | 3,361 | Service Victoria | |
 
 ---
 
-## Enrichment — Overpass API (FREE ONLY)
+## OSM Classification Logic (api/cron/enrich.ts)
 
-`api/cron/enrich.ts` — runs daily at 6am AEST (cron: `0 19 * * *`)
-- 1 Overpass query per destination (15km radius, all POI types combined)
-- 5 destinations per run → all 139 cycle every ~28 days
-- Wikipedia fetched for top attraction description (1 call per destination)
-- Hard stops built in — cron kills itself if limits approached
+### What goes where
+- **activities**: tourism=attraction/museum/gallery/viewpoint, natural=hot_spring/spring,
+  railway=station, historic=*, waterway=lake/reservoir, leisure=park/garden,
+  amenity=marketplace/theatre/cinema/spa
+- **food_places**: amenity=cafe/restaurant/pub/bar/bakery/winery/biergarten,
+  shop=bakery/coffee, craft=brewery/cider/winery/distillery, tourism=winery
+- **nature_spots**: natural=peak/beach/waterfall/cliff, leisure=nature_reserve,
+  boundary=national_park
 
-**Usage limits monitored:**
-| Service | Safe limit | Stop condition |
+### Quality filters
+- **Food**: must have website OR phone OR opening_hours. Chain blacklist: McDonald's,
+  KFC, Subway, Hungry Jack's, Red Rooster, Oporto, Grill'd, Domino's etc.
+- **Nature**: must have contact info OR visitor-destination name (falls, lake, gorge,
+  national park etc). Survey parcels excluded (letter+number codes like "I85").
+- **Activities**: all named OSM places in target categories qualify (no rating needed)
+
+### Activity categories
+| Category | Emoji | Trigger |
 |---|---|---|
-| Overpass API | 9,000/day | HTTP 429 or 2x timeout in a row |
-| Wikipedia | 200/min | HTTP 429 → skip destination |
-| Supabase DB | 450MB | 500MB free limit |
-| Vercel | 1M/mo | Currently ~460/mo (0.05%) |
-
-**Check live usage:** `GET /api/status`
-
----
-
-## Database Schema (Supabase — free tier, 500MB limit)
-
-Tables:
-- `clusters` — 22 Victorian travel regions
-- `sub_destinations` — 139 specific towns/areas (FK to clusters)
-- `activities` — things to do (Overpass OSM source, `osm-` slug prefix)
-- `food_places` — cafes, pubs, restaurants, wineries (Overpass OSM)
-- `nature_spots` — hikes, beaches, viewpoints, national parks (Overpass OSM)
-- `accommodation` — hotels, campsites, caravan parks (Overpass OSM)
-- `fuel_stations` — Service Victoria station data
-- `fuel_prices` — prices per fuel type per station
-- `destination_summaries` — Wikipedia + Claude AI summary per destination
-- `cron_log` — per-run log (every job writes here with usage stats in notes JSON)
-- `deployment_log` — plan name, start/complete timestamps, git sha
-- `changelog` — all releases + backlog
-
-**Current row counts (2026-06-01):**
-| Table | Rows | Source |
-|---|---|---|
-| activities | ~5–140 | Overpass OSM (growing daily) |
-| food_places | ~259–1,400 | Overpass OSM (growing daily) |
-| nature_spots | ~349 | Overpass OSM |
-| accommodation | ~5,665 | Overpass OSM |
-| sub_destinations | 139 | Static |
-
-**Note:** All Google Places `gp-` rows deleted 2026-06-01. OSM enrichment cron running daily.
-
-**Column naming:** `{table_singular}_id` for PKs — e.g. `sub_dest_id`, `activity_id`
-
-RLS: Public read all content tables. Service-role write only.
+| viewpoint | 🌄 | lookout, viewpoint, peak, summit |
+| nature | 🌿 | lake, waterfall, garden, botanic, forest, reserve |
+| beach | 🏖️ | beach, coast |
+| wellness | ♨️ | hot spring, mineral spring, bathhouse, spa |
+| history | 🏛️ | railway station, historic, museum, heritage, ruins |
+| art | 🎨 | gallery, art centre |
+| markets | 🛒 | market, sunday market, farmers market |
+| wildlife | 🦘 | wildlife, sanctuary, zoo, koala |
+| active | 🧗 | adventure, zipline, treetop, walking track, golf |
+| relaxation | 🧖 | spa, wellness retreat |
+| entertainment | 🎵 | stadium, theatre, cinema |
+| winery | 🍷 | winery, cellar door, vineyard |
+| brewery | 🍺 | brewery, brewpub |
+| distillery | 🥃 | distillery, gin, whisky |
 
 ---
 
-## Cron Jobs
+## Cron Schedule Summary
 
-### `/api/cron/enrich.ts` — Daily OSM enrichment (6am AEST)
-- Overpass API: 1 combined query per destination, 15km radius
-- Wikipedia: 1 call per destination for description (350ms sleep between calls)
-- Upserts to activities, food_places, nature_spots tables
-- Unique conflict key: `slug` (format: `osm-{type}-{osm_id}`)
-- Hard stops: Overpass daily limit, DB size guard, timeout guard
-- Logs to cron_log with full usage JSON in notes field
-
-### `/api/cron/fuel.ts` — Daily fuel prices (3am AEST)
-- Service Victoria Fair Fuel API → fuel_stations + fuel_prices
-- 1,740 stations, ~3,361 prices
-
-### `/api/cron/summaries.ts` — Weekly AI summaries (Sunday 2am AEST)
-- Wikipedia text + Claude Haiku → destination_summaries
-- 10 destinations per run
+| Cron | UTC | AEST | Purpose |
+|---|---|---|---|
+| `0 1 * * *` | 1:00am | 11:00am | Overpass top-up (Overpass at 3am Germany = quietest) |
+| `0 17 * * *` | 5:00pm | 3:00am | Fuel prices (Service Victoria) |
+| `0 16 * * 0` | 4:00pm Sun | 2:00am Mon | Destination summaries (Wikipedia + Claude) |
 
 ---
 
-## File Map (key files)
+## Data Licences (must attribute in UI)
+- **OpenStreetMap**: ODbL — "© OpenStreetMap contributors" in footer (**TODO**)
+- **Wikipedia**: CC-BY-SA 4.0 — attribution in footer (**TODO**)
+- **Wikidata**: CC0 — no attribution required
+
+---
+
+## File Map
 
 ```
 route-au/
 ├── api/
-│   ├── _lib/supabase.ts        ← adminSupabase client (service role key)
+│   ├── _lib/supabase.ts          ← adminSupabase client (service role)
 │   ├── cron/
-│   │   ├── enrich.ts           ← Overpass + Wikipedia enrichment (FREE)
-│   │   ├── fuel.ts             ← Service Victoria fuel prices
-│   │   └── summaries.ts        ← Wikipedia + Claude summaries
-│   ├── status.ts               ← GET /api/status — usage dashboard
-│   ├── places.ts               ← Returns empty array (Google removed)
-│   ├── fuel.ts                 ← Fuel prices from Supabase
-│   ├── hazards.ts              ← VicEmergency proxy (real-time, free)
-│   └── destination-summary.ts  ← Claude AI summary endpoint
+│   │   ├── enrich.ts             ← Overpass + Wikipedia top-up (FREE)
+│   │   ├── fuel.ts               ← Service Victoria fuel prices
+│   │   └── summaries.ts          ← Wikipedia + Claude summaries
+│   ├── status.ts                 ← GET /api/status — live usage dashboard
+│   ├── places.ts                 ← Returns empty (Google removed)
+│   ├── fuel.ts                   ← Fuel prices from Supabase
+│   ├── hazards.ts                ← VicEmergency (real-time, free)
+│   └── destination-summary.ts   ← Claude AI summary endpoint
 ├── src/
-│   ├── lib/
-│   │   ├── overpass.ts         ← Overpass queries (client-side, for live POIs)
-│   │   └── supabase.ts         ← VITE_SUPABASE_URL + anon key client
+│   ├── lib/overpass.ts           ← Client-side Overpass (live POIs fallback)
 │   ├── hooks/
-│   │   ├── usePlannerData.ts   ← reads DB: activities, food, nature, fuel
-│   │   └── useActivities.ts    ← static curated activities only
+│   │   ├── usePlannerData.ts     ← DB: activities, food, nature, fuel
+│   │   └── useActivities.ts      ← Static curated activities only
 │   ├── components/
 │   │   ├── landing/
-│   │   │   ├── LandingPage.tsx         ← Hero search, cluster cards
-│   │   │   └── DestinationModal.tsx    ← "What's here" — Supabase activities+food+nature
+│   │   │   ├── LandingPage.tsx
+│   │   │   └── DestinationModal.tsx  ← "What's here" — queries all 3 tables
 │   │   ├── planner/
-│   │   │   ├── ExperiencePanel.tsx     ← Desktop result: Things to Do / Eat / Food on Route
-│   │   │   └── MobilePlanner.tsx       ← Mobile result page (Material You)
-│   │   └── map/MapContainer.tsx
-│   ├── data/
-│   │   └── victorianActivities.ts      ← Types only (no static data)
-│   └── store/
-│       ├── useAppStore.ts
-│       └── db.ts                       ← IndexedDB client cache
-├── vercel.json                 ← Cron + function maxDuration config
-└── SESSION_PLAN.md             ← THIS FILE
+│   │   │   ├── ExperiencePanel.tsx   ← Desktop result page
+│   │   │   └── MobilePlanner.tsx     ← Mobile result page
+│   │   └── wizard/ProfileWizard.tsx  ← Accommodation step HIDDEN
+│   └── store/useAppStore.ts
+├── vercel.json                   ← Cron schedule + function timeouts
+└── SESSION_PLAN.md               ← THIS FILE
 ```
 
 ---
 
-## Design Rules (do not violate)
+## Design Rules
 
-- **NO PAID APIS. EVER.** (Google, Foursquare, Mapbox paid, etc.)
+- **NO PAID APIS. EVER.** (see billing incident May 2026)
 - NO emojis in UI chrome (buttons, headers, labels, badges)
 - Professional tone — knowledgeable travel advisor, not a kids app
-- Activity category markers (small icons) are OK
 - "Local favourite" not "hidden gem"
 - No "return home" in itinerary
-- Zustand selectors: always scalar `(s) => s.x` — never object `(s) => ({ x: s.x })` (causes infinite re-renders)
+- Zustand: always scalar selectors `(s) => s.x` — never `(s) => ({ x: s.x })`
+- Maps links: use Google Maps name-search (free for users to open, no API call)
+- DB source field: must be 'static' — OSM origin tracked in attributes.source JSON
 
 ---
 
 ## How to Resume a Session
 
-1. Read this file
-2. `git log --oneline -10` — see latest commits
-3. `npm run dev` — localhost at http://localhost:5174
-4. `curl https://unplanned-escapes.vercel.app/api/status` — check all usage limits
-5. `vercel --prod` — deploy to production
+```bash
+git log --oneline -10          # latest commits
+npm run dev                    # localhost:5174
+curl https://unplanned-escapes.vercel.app/api/status   # check usage
+vercel --prod                  # deploy
+```
 
 ---
 
-## Current State (2026-06-01)
+## Current State (2026-06-01 end of session)
 
-### What happened this session:
-- **Google Places API billing emergency** — A$1,992 charged in May 2026
-- All Google Places API code permanently removed (9691e21, 039437a)
-- All gp- database rows deleted (4,223 records across 4 tables)
-- Rebuilt enrichment on Overpass API (OSM) — completely free
-- Added /api/status monitoring endpoint for all service limits
-- Google billing dispute report generated: /home/raj/google_api_removal_report.pdf
+### What was done today
+- **DISASTER RECOVERY**: Google Places API caused A$1,992 bill — all removed
+- All Google code deleted, DB cleaned (4,223 gp- rows deleted)
+- Rebuilt on Overpass API (free forever)
+- Added `/api/status` usage monitoring dashboard
+- Fixed source constraint bug (`'osm'` → `'static'`)
+- Fixed activity categories: winery/brewery/distillery own categories
+- Filtered chain restaurants (49 deleted), survey parcel noise (654 deleted)
+- Manually inserted 8 Daylesford activities (Sunday Market, Railway, Lake,
+  Mineral Springs, Wombat Hill, Convent Gallery, Bathhouse, Lake Walk)
+- Cron rescheduled to 11am AEST = 3am Germany (Overpass off-peak)
+- Accommodation hidden from wizard pending data
+- Google billing dispute report: /home/raj/google_api_removal_report.pdf
 
-### Current enrichment status:
-- OSM enrichment cron running daily at 6am AEST
-- ~5–10 destinations enriched so far with OSM data
-- Remaining 130+ destinations will be enriched over next ~28 days by cron
-- Manual trigger: `curl -X POST https://unplanned-escapes.vercel.app/api/cron/enrich?force=1&limit=5`
-
----
-
-## Next Session Priorities
-
-1. **Improve OSM data quality** — add Wikipedia cross-reference as quality signal; some activities may be sparse for very remote areas
-2. **Business listing feature** — allow businesses to claim/enhance listing for small fee (future Stripe integration)
-3. **Paywall** — decide free vs paid features; Stripe not yet installed
-4. **Domain launch** — unplannedescapes.com.au → Cloudflare (free plan only) → Vercel
-5. **User auth** — Supabase Auth (already in stack)
-6. **Events system** — festivals, markets, Sunday-only events
-7. **Dynamic drive times** from user's actual origin
-8. **PWA update toast**
-9. **Update Privacy/Attribution page** — remove Google Places reference, add OpenStreetMap/ODbL attribution
+### Known issues / next session
+1. **Add OSM + Wikipedia attribution to footer** (legally required by ODbL + CC-BY-SA)
+2. **Re-enable accommodation wizard step** when data is confirmed good
+3. **Activities still sparse** for most destinations — 3am top-up will fill over ~17 days
+4. **Inner Melbourne suburbs** (Carlton, Brunswick, CBD etc.) skipped — too dense for Overpass,
+   need tighter radius or different approach
+5. **Business listing feature** — allow venues to claim/enhance listing (future Stripe)
+6. **Domain** — unplannedescapes.com.au → Cloudflare free → Vercel
