@@ -184,13 +184,13 @@ ${[
   { job: fuelJob,   label: 'Fuel Prices',          schedule: 'Daily 3am AEST' },
   { job: summJob,   label: 'AI Summaries',          schedule: 'Weekly Sunday' },
 ].map(({ job, label, schedule }) => {
-  const ok = !job?.last_error_at || (job?.last_success_at && job.last_success_at > job.last_error_at)
+  const ok = !job?.last_error_at || (job?.last_success_at && job.last_success_at >= job.last_error_at)
   return `<div class="job-row">
     ${dot(!!ok)}
     <div>
       <div class="job-name">${label}</div>
       <div class="job-meta">${schedule} · last run: ${aest(job?.last_run_at ?? null)} (${timeAgo(job?.last_run_at ?? null)}) · last success: ${aest(job?.last_success_at ?? null)}</div>
-      ${job?.last_error_message ? `<div style="font-size:11px;color:#DC2626;margin-top:2px">Error: ${job.last_error_message}</div>` : ''}
+      ${!ok && job?.last_error_message ? `<div style="font-size:11px;color:#DC2626;margin-top:2px">Error: ${job.last_error_message}</div>` : ''}
     </div>
   </div>`
 }).join('')}
