@@ -402,7 +402,7 @@ out tags 150;`
         name: name_, category: actCat,
         emoji: activityEmoji(actCat),
         description: tags.description || null,
-        duration: null, cost: 'Free',
+        duration: null, cost: 'free',
         lat: elLat, lng: elLng, address,
         kids_ok: tags.min_age ? parseInt(tags.min_age) <= 5 : true,
         is_hidden_gem: false,
