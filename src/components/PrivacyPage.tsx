@@ -57,7 +57,8 @@ export function PrivacyPage({ onBack }: { onBack: () => void }) {
             <strong>Your preferences</strong> (departure town, trip type, activity preferences) are stored only on your device using your browser's local storage. This data never leaves your device and is cleared when you start a new trip.
           </p>
           <p style={{ ...p, marginBottom: 0 }}>
-            <strong>No tracking.</strong> There are no ads, no analytics cookies, and no third-party tracking pixels on this site.
+            <strong>No ads or tracking cookies.</strong> There are no advertising networks or tracking pixels on this site.
+            We use <a href="https://vercel.com/analytics" target="_blank" rel="noopener noreferrer" style={{ color: GREEN }}>Vercel Web Analytics</a> to understand how many people visit — this collects only anonymous page view counts with no personal data, no cookies, and no cross-site tracking. You cannot be identified from this data.
           </p>
         </Section>
 
@@ -166,6 +167,13 @@ export function PrivacyPage({ onBack }: { onBack: () => void }) {
               url="https://vercel.com"
               what="Hosts and serves this web application globally."
               licence="Commercial service — free hobby tier"
+              licenceUrl="https://vercel.com/legal/privacy-policy"
+            />
+            <SourceEntry
+              name="Vercel Web Analytics"
+              url="https://vercel.com/analytics"
+              what="Privacy-friendly page view analytics. Collects anonymous visit counts only — no cookies, no personal data, no cross-site tracking, and no way to identify individual users."
+              licence="Commercial service — free tier"
               licenceUrl="https://vercel.com/legal/privacy-policy"
             />
             <SourceEntry
