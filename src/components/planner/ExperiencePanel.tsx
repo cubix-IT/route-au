@@ -571,8 +571,8 @@ export function ExperiencePanel({ hideTimeline = false }: { hideTimeline?: boole
                 return !((a.rating as number | undefined) && (a.review_count as number | undefined))
               })
               const hasEnoughRated = ratedFood.length >= 1
-              // Always show rated food first — unrated food hidden under "Show more"
-              const primaryFood = ratedFood
+              // Show rated food first; fall back to unrated when nothing is rated (OSM sources)
+              const primaryFood = (hasEnoughRated ? ratedFood : unratedFood)
                 .filter((f) => !curatedNames.has(f.name.toLowerCase())) // don't duplicate curated items
 
               const FOOD_CAT_LABEL: Record<string, string> = {

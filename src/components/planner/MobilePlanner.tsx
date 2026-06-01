@@ -447,7 +447,7 @@ export function MobilePlanner() {
                     const foodOnly = d.dbFood.filter((f) => !SPA_CATS.has(f.category.toLowerCase()) && !/\bmarkets?\b/i.test(f.name))
                     const ratedF = foodOnly.filter((f) => { const a = (f.attributes as Record<string,unknown>) ?? {}; return (a.rating as number|undefined) && (a.review_count as number|undefined) })
                     const unratedF = foodOnly.filter((f) => { const a = (f.attributes as Record<string,unknown>) ?? {}; return !((a.rating as number|undefined) && (a.review_count as number|undefined)) })
-                    const primaryList = ratedF.length >= 2 ? ratedF : foodOnly
+                    const primaryList = ratedF.length >= 1 ? ratedF : unratedF
 
                     const FOOD_CAT_LABEL: Record<string,string> = {
                       cafe:'Cafe', restaurant:'Restaurant', winery:'Winery', pub:'Pub',
