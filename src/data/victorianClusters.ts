@@ -149,7 +149,7 @@ export const VICTORIAN_CLUSTERS: VicCluster[] = [
     themes: ['Beach', 'Hot springs', 'Wine', 'Relaxation'],
     seasonalScores: { summer: 10, autumn: 7, winter: 8, spring: 8 },
     image: '♨️',
-    imageUrl: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=1200&q=80',
+    imageUrl: 'https://images.unsplash.com/photo-1551460763-4ed53b44ae6d?w=1200&q=80',
     gradientFrom: '#0a3a5a',
     gradientTo: '#1a6a7a',
     subDests: [
@@ -373,7 +373,7 @@ export const VICTORIAN_CLUSTERS: VicCluster[] = [
     themes: ['Coastal', 'Cliffs', 'Surf', 'Rainforest'],
     seasonalScores: { summer: 8, autumn: 8, winter: 7, spring: 9 },
     image: '🌊',
-    imageUrl: 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=1200&q=80',
+    imageUrl: 'https://plus.unsplash.com/premium_photo-1706517229039-3e0a3eeb27ef?w=1200&q=80',
     gradientFrom: '#0c3460',
     gradientTo: '#0b5e47',
     subDests: [
@@ -479,7 +479,7 @@ export const VICTORIAN_CLUSTERS: VicCluster[] = [
     themes: ['History', 'Wildlife', 'Coastal', 'Heritage'],
     seasonalScores: { summer: 7, autumn: 7, winter: 6, spring: 7 },
     image: '🦭',
-    imageUrl: 'https://images.unsplash.com/photo-1466220549276-aef9ce186540?w=1200&q=80',
+    imageUrl: 'https://images.unsplash.com/photo-1622289356022-e71d31348959?w=1200&q=80',
     gradientFrom: '#1a3a5a',
     gradientTo: '#2a5a4a',
     subDests: [
@@ -525,7 +525,7 @@ export const VICTORIAN_CLUSTERS: VicCluster[] = [
     themes: ['Beach', 'History', 'Surfing', 'Coastal'],
     seasonalScores: { summer: 9, autumn: 6, winter: 5, spring: 8 },
     image: '🏖️',
-    imageUrl: 'https://images.unsplash.com/photo-1505118380757-91f5f5632de0?w=1200&q=80',
+    imageUrl: 'https://images.unsplash.com/photo-1664304431401-0c5c68a879e6?w=1200&q=80',
     gradientFrom: '#0a3a6a',
     gradientTo: '#1a6a5a',
     subDests: [
@@ -683,7 +683,7 @@ export const VICTORIAN_CLUSTERS: VicCluster[] = [
     themes: ['Nature', 'Wildlife', 'Photography', 'Remote'],
     seasonalScores: { summer: 3, autumn: 7, winter: 7, spring: 9 },
     image: '🌅',
-    imageUrl: 'https://images.unsplash.com/photo-1518173946687-a4c8892bbd9f?w=1200&q=80',
+    imageUrl: 'https://images.unsplash.com/photo-1446768500601-ac47e5ec3719?w=1200&q=80',
     gradientFrom: '#4a0a3a',
     gradientTo: '#6a2a5a',
     subDests: [
@@ -815,7 +815,7 @@ export const VICTORIAN_CLUSTERS: VicCluster[] = [
     themes: ['Wine', 'Food', 'Cycling', 'Scenic'],
     seasonalScores: { summer: 6, autumn: 9, winter: 6, spring: 8 },
     image: '🍾',
-    imageUrl: 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=1200&q=80',
+    imageUrl: 'https://images.unsplash.com/photo-1637181156153-bedd1098f8c1?w=1200&q=80',
     gradientFrom: '#3a4a1a',
     gradientTo: '#5a6a2a',
     subDests: [
@@ -861,7 +861,7 @@ export const VICTORIAN_CLUSTERS: VicCluster[] = [
     themes: ['Hiking', 'Snow', 'Nature', 'Scenic'],
     seasonalScores: { summer: 8, autumn: 8, winter: 7, spring: 9 },
     image: '🏔️',
-    imageUrl: 'https://images.unsplash.com/photo-1551698618-1dde5ef4d9d0?w=1200&q=80',
+    imageUrl: 'https://images.unsplash.com/photo-1651045083441-528243165a98?w=1200&q=80',
     gradientFrom: '#1a3a5a',
     gradientTo: '#2a5a7a',
     subDests: [
@@ -897,7 +897,7 @@ export const VICTORIAN_CLUSTERS: VicCluster[] = [
     themes: ['Skiing', 'Water sports', 'Hiking', 'Village'],
     seasonalScores: { summer: 8, autumn: 7, winter: 10, spring: 7 },
     image: '⛷️',
-    imageUrl: 'https://images.unsplash.com/photo-1501854140801-50d01698950b?w=1200&q=80',
+    imageUrl: 'https://images.unsplash.com/photo-1713089782825-5d9a4c60f2f8?w=1200&q=80',
     gradientFrom: '#1a2a4a',
     gradientTo: '#3a5a7a',
     subDests: [
@@ -943,7 +943,7 @@ export const VICTORIAN_CLUSTERS: VicCluster[] = [
     themes: ['History', 'River', 'Paddle steamers', 'Wine'],
     seasonalScores: { summer: 6, autumn: 8, winter: 7, spring: 8 },
     image: '⛵',
-    imageUrl: 'https://images.unsplash.com/photo-1547471080-7cc2caa01a7e?w=1200&q=80',
+    imageUrl: 'https://images.unsplash.com/photo-1613223302051-f9b6f66680ac?w=1200&q=80',
     gradientFrom: '#2a4a5a',
     gradientTo: '#4a6a3a',
     subDests: [
@@ -989,7 +989,7 @@ export const VICTORIAN_CLUSTERS: VicCluster[] = [
     themes: ['History', 'River', 'Food', 'Relaxation'],
     seasonalScores: { summer: 5, autumn: 7, winter: 8, spring: 7 },
     image: '🍊',
-    imageUrl: 'https://images.unsplash.com/photo-1547471080-7cc2caa01a7e?w=1200&q=80',
+    imageUrl: 'https://plus.unsplash.com/premium_photo-1726754728088-5d0949fb6dcf?w=1200&q=80',
     gradientFrom: '#5a3a0a',
     gradientTo: '#7a5a1a',
     subDests: [
@@ -1035,7 +1035,7 @@ export const VICTORIAN_CLUSTERS: VicCluster[] = [
     themes: ['History', 'Food', 'Art', 'Family'],
     seasonalScores: { summer: 6, autumn: 7, winter: 7, spring: 7 },
     image: '⚙️',
-    imageUrl: 'https://images.unsplash.com/photo-1477959858617-67f85cf4f1df?w=1200&q=80',
+    imageUrl: 'https://images.unsplash.com/photo-1694517794266-ba945442cb36?w=1200&q=80',
     gradientFrom: '#3a2a0a',
     gradientTo: '#6a4a1a',
     subDests: [
@@ -1081,7 +1081,7 @@ export const VICTORIAN_CLUSTERS: VicCluster[] = [
     themes: ['Wine', 'Art', 'History', 'Food'],
     seasonalScores: { summer: 5, autumn: 8, winter: 7, spring: 7 },
     image: '🏛️',
-    imageUrl: 'https://images.unsplash.com/photo-1480714378408-67cf0d13bc1b?w=1200&q=80',
+    imageUrl: 'https://images.unsplash.com/photo-1694356304049-9d2687ef24dd?w=1200&q=80',
     gradientFrom: '#2a1a3a',
     gradientTo: '#4a2a5a',
     subDests: [
@@ -1137,7 +1137,7 @@ export const VICTORIAN_CLUSTERS: VicCluster[] = [
     themes: ['Hiking', 'Camping', 'Wildlife', 'Beaches'],
     seasonalScores: { summer: 8, autumn: 7, winter: 5, spring: 9 },
     image: '🏕️',
-    imageUrl: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=1200&q=80',
+    imageUrl: 'https://images.unsplash.com/photo-1630627269807-7c9a2745f34c?w=1200&q=80',
     gradientFrom: '#0a3a2a',
     gradientTo: '#1a5a3a',
     subDests: [
@@ -1173,7 +1173,7 @@ export const VICTORIAN_CLUSTERS: VicCluster[] = [
     themes: ['Lakes', 'Fishing', 'Wilderness', 'Kayaking'],
     seasonalScores: { summer: 9, autumn: 7, winter: 5, spring: 7 },
     image: '🛶',
-    imageUrl: 'https://images.unsplash.com/photo-1441974231531-c6227db76b6e?w=1200&q=80',
+    imageUrl: 'https://images.unsplash.com/photo-1637181156153-bedd1098f8c1?w=1200&q=80',
     gradientFrom: '#0a2a4a',
     gradientTo: '#1a4a3a',
     subDests: [
@@ -1285,7 +1285,7 @@ export const VICTORIAN_CLUSTERS: VicCluster[] = [
     themes: ['Food', 'Culture', 'Art', 'Sports', 'Markets', 'Beach'],
     seasonalScores: { summer: 8, autumn: 8, winter: 7, spring: 8 },
     image: '🏙️',
-    imageUrl: 'https://images.unsplash.com/photo-1514395462421-57f8b8e7f4b4?w=1200&q=80',
+    imageUrl: 'https://images.unsplash.com/photo-1594300070414-34b8021779bf?w=1200&q=80',
     gradientFrom: '#1a1a2e',
     gradientTo: '#16213e',
     subDests: [
