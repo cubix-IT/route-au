@@ -357,10 +357,11 @@ const CORNER_PALETTES: Record<string, { c1: string[]; c2: string[] }> = {
     c1: ['#8B2500', '#B84010', '#D4600A', '#C03008'],
     c2: ['#7A1E00', '#A03808', '#C85010', '#B02808'],
   },
-  // Winter: deep pine forest green + warm ember amber — fire inside, mist outside
+  // Winter: icy slate blue-grey (top-left) + rich amber copper (bottom-right)
+  // Cold misty ranges outside, warm fireplace inside
   winter: {
-    c1: ['#1A3A2A', '#0F2D1F', '#234D35', '#162E22'],
-    c2: ['#7A3D0A', '#9B5010', '#6B3208', '#8A4510'],
+    c1: ['#2E4A6B', '#1E3A5A', '#3A5878', '#263F60'],
+    c2: ['#B85C0A', '#D4720C', '#9A4A08', '#C8680A'],
   },
   // Spring: wattle gold, wildflower pink, sage — Grampians bloom
   spring: {

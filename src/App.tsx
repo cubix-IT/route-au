@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
-import { Toaster } from 'react-hot-toast'
+import { Toaster, toast } from 'react-hot-toast'
+import { useRegisterSW } from 'virtual:pwa-register/react'
 import { Header } from '@/components/layout/Header'
 import { MapContainer } from '@/components/map/MapContainer'
 import { FloatingTimeline } from '@/components/planner/FloatingTimeline'
@@ -36,6 +37,17 @@ function useIsWide() {
 
 function App() {
   useOfflineSync()
+
+  useRegisterSW({
+    onNeedRefresh() {
+      toast('App updated — refresh to get the latest.', {
+        duration: 6000,
+        icon: '🔄',
+        style: { cursor: 'pointer' },
+        id: 'sw-update',
+      })
+    },
+  })
 
   const isWizardOpen = useAppStore((s) => s.isWizardOpen)
   const activeItinerary = useAppStore((s) => s.activeItinerary)
