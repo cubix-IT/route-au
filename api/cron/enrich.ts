@@ -412,7 +412,7 @@ out center tags 200;`
         lat: elLat, lng: elLng, address,
         kids_ok: tags.min_age ? parseInt(tags.min_age) <= 5 : true,
         is_hidden_gem: false,
-        maps_url: elLat && elLng ? `https://www.openstreetmap.org/?mlat=${elLat}&mlon=${elLng}#map=16/${elLat}/${elLng}` : null,
+        maps_url: elLat && elLng ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(name_)}+Victoria+Australia` : null,
         website, phone, tags: Object.keys(tags),
         source: 'static',
         attributes: {
