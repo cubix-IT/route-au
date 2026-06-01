@@ -397,6 +397,8 @@ out body ${distFromCBD < 15 ? 100 : distFromCBD < 80 ? 150 : 200};`
           source: 'static',
           website_uri: website,
           opening_hours_text: tags.opening_hours || null,
+          wikipedia: tags.wikipedia || null,
+          wikidata: tags.wikidata || null,
         },
       })
     } else {
@@ -417,6 +419,8 @@ out body ${distFromCBD < 15 ? 100 : distFromCBD < 80 ? 150 : 200};`
           source: 'static',
           website_uri: website,
           opening_hours_text: tags.opening_hours || null,
+          wikipedia: tags.wikipedia || null,
+          wikidata: tags.wikidata || null,
         },
       })
     }
@@ -474,20 +478,58 @@ async function generateDescriptions(
   activities: any[],
   foods: any[],
 ) {
-  const apiKey = process.env.ANTHROPIC_API_KEY
-  if (!apiKey || !adminSupabase) return
+  if (!adminSupabase) return
 
-  // Only describe items that don't already have one
-  const actNeedDesc = activities.filter(a => !a.description).slice(0, 20)
-  const foodNeedDesc = foods.filter(f => !f.description).slice(0, 20)
-  if (actNeedDesc.length === 0 && foodNeedDesc.length === 0) return
-
-  const items = [
-    ...actNeedDesc.map(a => ({ slug: a.slug, name: a.name, type: 'activity', category: a.category })),
-    ...foodNeedDesc.map(f => ({ slug: f.slug, name: f.name, type: 'food', category: f.category })),
+  const allItems = [
+    ...activities.filter(a => !a.description).slice(0, 20).map(a => ({ ...a, _table: 'activities' })),
+    ...foods.filter(f => !f.description).slice(0, 20).map(f => ({ ...f, _table: 'food_places' })),
   ]
+  if (allItems.length === 0) return
+
+  const resolved: Record<string, string> = {}
+
+  // 1. Wikidata — short factual description from structured data
+  for (const item of allItems) {
+    const wdId = item.tags?.includes?.('wikidata') ? null : null // wikidata tag stored in OSM tags array
+    // OSM tags are stored as Object.keys(tags) — wikidata value not preserved, skip
+    void wdId
+  }
+
+  // 2. Wikipedia — fetch lead paragraph for items with wikipedia OSM tag
+  for (const item of allItems) {
+    const wpTag = item.attributes?.wikipedia // e.g. "en:Walhalla, Victoria"
+    if (!wpTag) continue
+    const title = wpTag.replace(/^en:/i, '').replace(/ /g, '_')
+    try {
+      const r = await fetch(
+        `https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(title)}`,
+        { headers: { 'User-Agent': 'UnplannedEscapes/1.0 (support@cubixit.com.au)' }, signal: AbortSignal.timeout(5000) }
+      )
+      if (r.ok) {
+        const d = await r.json() as { extract?: string }
+        const extract = d.extract?.split('.')[0]
+        if (extract && extract.length > 20) resolved[item.slug] = extract + '.'
+      }
+    } catch { /* skip */ }
+  }
+
+  // 3. Claude Haiku — for remaining items, pass real OSM context so descriptions are specific
+  const apiKey = process.env.ANTHROPIC_API_KEY
+  if (!apiKey) return
+
+  const needClaude = allItems.filter(i => !resolved[i.slug])
+  if (needClaude.length === 0) return
 
   try {
+    const itemList = needClaude.map(i => {
+      const parts = [`name:"${i.name}"`, `category:${i.category}`]
+      if (i.address) parts.push(`address:"${i.address}"`)
+      if (i.attributes?.opening_hours_text) parts.push(`hours:"${i.attributes.opening_hours_text}"`)
+      if (i.website) parts.push(`has website`)
+      if (i.phone) parts.push(`has phone`)
+      return `- slug:"${i.slug}" ${parts.join(' ')}`
+    }).join('\n')
+
     const r = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
@@ -497,40 +539,46 @@ async function generateDescriptions(
       },
       body: JSON.stringify({
         model: 'claude-haiku-4-5-20251001',
-        max_tokens: 1200,
-        temperature: 0.3,
-        system: 'You are a concise travel writer for Victoria, Australia. ' +
-          'Given a list of places, write a single engaging sentence (max 20 words) describing each one — ' +
-          'what it is and why a visitor would go there. Be specific, vivid, and factual. ' +
-          'Respond with a JSON object mapping each slug to its description. No markdown, no extra text.',
+        max_tokens: 1500,
+        temperature: 0.2,
+        system: `You are a local travel writer for Victoria, Australia.
+Write one specific, vivid sentence (15-25 words) for each place — describing what it actually is and what makes it worth visiting.
+Use the address, hours, and category clues to be accurate. Avoid generic phrases like "a great place to visit" or "must-see attraction".
+Be concrete: mention the food type, the view, the history, the atmosphere.
+Respond ONLY with valid JSON mapping slug to description. No markdown.`,
         messages: [{
           role: 'user',
-          content: `Destination: ${destName}, Victoria\n\nPlaces:\n${items.map(i => `- slug:"${i.slug}" name:"${i.name}" category:${i.category}`).join('\n')}\n\nReturn JSON: {"slug1":"description","slug2":"description",...}`,
+          content: `Places near ${destName}, Victoria:\n${itemList}\n\nJSON: {"slug":"description",...}`,
         }],
       }),
-      signal: AbortSignal.timeout(15000),
+      signal: AbortSignal.timeout(20000),
     })
 
     if (!r.ok) return
     const data = await r.json() as { content?: { text: string }[] }
     const text = data.content?.[0]?.text?.trim() ?? ''
-    const descriptions: Record<string, string> = JSON.parse(text)
+    const start = text.indexOf('{'), end = text.lastIndexOf('}')
+    if (start === -1 || end === -1) return
+    const descriptions: Record<string, string> = JSON.parse(text.slice(start, end + 1))
 
-    // Write descriptions back to DB for activities and food
     for (const [dslug, desc] of Object.entries(descriptions)) {
       if (!desc || typeof desc !== 'string') continue
-      const cleanDesc = desc.slice(0, 200)
-      const act = actNeedDesc.find(a => a.slug === dslug)
-      if (act) {
-        await adminSupabase.from('activities').update({ description: cleanDesc }).eq('slug', dslug)
-      } else {
-        await adminSupabase.from('food_places').update({ description: cleanDesc }).eq('slug', dslug)
-      }
+      resolved[dslug] = desc.slice(0, 220)
     }
-    console.log(`[enrich] ${slug}: generated ${Object.keys(descriptions).length} descriptions`)
   } catch (e) {
     console.error('[enrich] description generation error:', e instanceof Error ? e.message : e)
+    return
   }
+
+  // Write to DB
+  let written = 0
+  for (const [dslug, desc] of Object.entries(resolved)) {
+    const item = allItems.find(i => i.slug === dslug)
+    if (!item) continue
+    const { error } = await adminSupabase.from(item._table).update({ description: desc }).eq('slug', dslug)
+    if (!error) written++
+  }
+  if (written > 0) console.log(`[enrich] ${slug}: wrote ${written} descriptions`)
 }
 
 // ── Handler ──────────────────────────────────────────────────────────────────
