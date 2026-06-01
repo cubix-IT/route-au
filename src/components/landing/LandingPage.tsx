@@ -381,14 +381,14 @@ function SeasonalWatercolour({ season }: { season: string }) {
   // Each corner: stack several radial-gradient divs with varying radius/offset
   // to simulate pigment pooling and feathering into white paper
   const topLeft = [
-    { colors: c1, rx: '55%', ry: '50%', ox: '-8%', oy: '-10%', opacity: 0.32 },
-    { colors: c1, rx: '42%', ry: '38%', ox: '-14%', oy: '-16%', opacity: 0.22 },
-    { colors: c1, rx: '28%', ry: '24%', ox: '-18%', oy: '-20%', opacity: 0.16 },
+    { colors: c1, rx: '60%', ry: '55%', ox: '-5%', oy: '-8%', opacity: 0.55 },
+    { colors: c1, rx: '45%', ry: '40%', ox: '-12%', oy: '-14%', opacity: 0.38 },
+    { colors: c1, rx: '30%', ry: '26%', ox: '-16%', oy: '-18%', opacity: 0.25 },
   ]
   const bottomRight = [
-    { colors: c2, rx: '55%', ry: '50%', ox: '108%', oy: '110%', opacity: 0.28 },
-    { colors: c2, rx: '42%', ry: '38%', ox: '114%', oy: '116%', opacity: 0.20 },
-    { colors: c2, rx: '28%', ry: '24%', ox: '118%', oy: '120%', opacity: 0.14 },
+    { colors: c2, rx: '60%', ry: '55%', ox: '105%', oy: '108%', opacity: 0.50 },
+    { colors: c2, rx: '45%', ry: '40%', ox: '112%', oy: '114%', opacity: 0.35 },
+    { colors: c2, rx: '30%', ry: '26%', ox: '116%', oy: '118%', opacity: 0.22 },
   ]
 
   const renderWash = (layers: typeof topLeft) =>
@@ -399,10 +399,9 @@ function SeasonalWatercolour({ season }: { season: string }) {
         return (
           <div key={`${li}-${ci}`} style={{
             position: 'absolute', inset: 0,
-            background: `radial-gradient(ellipse ${layer.rx} ${layer.ry} at calc(${layer.ox} + ${jitterX}px) calc(${layer.oy} + ${jitterY}px), ${color} 0%, ${color}99 18%, ${color}44 38%, ${color}11 58%, transparent 72%)`,
-            opacity: layer.opacity * (0.85 - ci * 0.15),
-            filter: `blur(${4 + ci * 3 + li * 2}px)`,
-            mixBlendMode: 'multiply',
+            background: `radial-gradient(ellipse ${layer.rx} ${layer.ry} at calc(${layer.ox} + ${jitterX}px) calc(${layer.oy} + ${jitterY}px), ${color} 0%, ${color}cc 20%, ${color}55 42%, ${color}18 60%, transparent 75%)`,
+            opacity: layer.opacity * (0.9 - ci * 0.12),
+            filter: `blur(${6 + ci * 4 + li * 3}px)`,
           }} />
         )
       })
