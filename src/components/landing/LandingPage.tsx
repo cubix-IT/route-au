@@ -145,7 +145,7 @@ const VICTORIA_HIGHLIGHTS: Record<string, string[]> = {
     // Snow & alpine
     'snow gums draped in ice crystals after a High Country snowfall, the silence total and absolute?',
     'Victoria\'s highest ski resort at Hotham letting you ski through to Falls Creek — longest run in Australia?',
-    'Mount Buller village alive in winter — ski in, eat well, and wake to fresh powder?',
+    'Mount Buller village alive in winter — ski all day, eat well, and wake to fresh snowfall?',
     'the alpine road to Mount Buffalo blanketed in snow, the chalet warming up inside?',
     // Cosy towns
     'Beechworth\'s intact gold-rush granite streetscape lit up on a cold winter night?',
