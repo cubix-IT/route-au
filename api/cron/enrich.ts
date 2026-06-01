@@ -27,7 +27,7 @@ const REFRESH_DAYS = 28    // re-enrich each destination once a month
 
 // ── Usage hard limits ────────────────────────────────────────────────────────
 const OVERPASS_DAILY_LIMIT  = 9_000   // stop run if daily total hits this
-const OVERPASS_TIMEOUT_MS   = 8_000   // stop run if a query takes longer (Vercel fn limit is 60s)
+const OVERPASS_TIMEOUT_MS   = 10_000  // stop run if a query takes longer (node-only queries ~5s)
 const WIKIPEDIA_SLEEP_MS    = 350     // min gap between Wikipedia calls
 const USER_AGENT = 'UnplannedEscapes/1.0 (unplanned-escapes.vercel.app; contact@unplannedescapes.com.au)'
 
@@ -314,24 +314,17 @@ async function enrichSubDest(
   // to avoid timeout. Rural destinations use wider 20km radius.
   const r = 15_000  // 15km radius works for both urban and rural
 
-  // Single combined Overpass query — one call per destination (not 25 like Google)
-  const query = `[out:json][timeout:25];
+  // node-only queries — fast, typically under 3s even for large rural areas
+  const query = `[out:json][timeout:15];
 (
-  nwr["tourism"~"^(attraction|museum|gallery|viewpoint|theme_park|zoo|aquarium|artwork)$"]["name"](around:${r},${lat},${lng});
-  nwr["leisure"~"^(nature_reserve|sports_centre|stadium|golf_course|miniature_golf|water_park|marina|garden|park)$"]["name"](around:${r},${lat},${lng});
-  nwr["boundary"~"^(national_park|protected_area)$"]["name"](around:${r},${lat},${lng});
-  nwr["natural"~"^(peak|beach|waterfall|hot_spring|cliff|spring)$"]["name"](around:${r},${lat},${lng});
-  nwr["amenity"~"^(theatre|cinema|marketplace|spa)$"]["name"](around:${r},${lat},${lng});
-  nwr["amenity"="marketplace"]["name"](around:${r},${lat},${lng});
-  nwr["amenity"~"^(cafe|restaurant|pub|bar|bakery|winery|fast_food|biergarten)$"]["name"](around:${r},${lat},${lng});
-  nwr["shop"~"^(bakery|pastry|deli|coffee)$"]["name"](around:${r},${lat},${lng});
-  nwr["craft"~"^(brewery|cider|winery|wine|distillery)$"]["name"](around:${r},${lat},${lng});
-  nwr["tourism"~"^(winery|wine_cellar)$"]["name"](around:${r},${lat},${lng});
-  nwr["railway"="station"]["name"](around:${r},${lat},${lng});
-  nwr["historic"~"^(yes|building|monument|memorial|ruins|railway_station)$"]["name"](around:${r},${lat},${lng});
-  nwr["waterway"~"^(waterfall|lake|reservoir|dam)$"]["name"](around:${r},${lat},${lng});
+  node["tourism"~"^(attraction|museum|gallery|viewpoint|zoo|aquarium|winery|wine_cellar)$"]["name"](around:${r},${lat},${lng});
+  node["natural"~"^(peak|beach|waterfall|hot_spring|spring)$"]["name"](around:${r},${lat},${lng});
+  node["amenity"~"^(cafe|restaurant|pub|bar|bakery|winery|fast_food|marketplace|spa)$"]["name"](around:${r},${lat},${lng});
+  node["shop"~"^(bakery|coffee)$"]["name"](around:${r},${lat},${lng});
+  node["craft"~"^(brewery|winery|distillery)$"]["name"](around:${r},${lat},${lng});
+  node["leisure"~"^(nature_reserve|garden|park)$"]["name"](around:${r},${lat},${lng});
 );
-out center tags 200;`
+out tags 150;`
 
   const elements = await fetchOverpass(query, usage)
   if (!elements) return 0
