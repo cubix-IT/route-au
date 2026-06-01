@@ -208,3 +208,4 @@ vercel --prod                  # deploy
    need tighter radius or different approach
 5. **Business listing feature** — allow venues to claim/enhance listing (future Stripe)
 6. **Domain** — unplannedescapes.com.au → Cloudflare free → Vercel
+7. **OSM contributions** — add "Edit on OSM" link on activity/food cards so users can fix bad data; improvements feed back into next enrichment cycle (P3)
