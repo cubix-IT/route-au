@@ -599,30 +599,34 @@ export function LandingPage({ onPrivacy }: { onPrivacy?: () => void } = {}) {
       }}>
         <div style={{ maxWidth: 1100, margin: '0 auto' }}>
           {/* Top row */}
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 16, marginBottom: 24 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 16, marginBottom: 20 }}>
             <div style={{ fontFamily: "'Fraunces', Georgia, serif", fontSize: 16, fontWeight: 700, color: '#fff', letterSpacing: '-0.02em', lineHeight: 1.2 }}>
               Unplanned Escapes
               <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.55)', letterSpacing: '0.09em', textTransform: 'uppercase', fontWeight: 500, marginTop: 1 }}>Victoria</div>
             </div>
-            <div style={{ display: 'flex', gap: 20, alignItems: 'center' }}>
-              <button onClick={onPrivacy} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.7)', fontSize: 12.5, cursor: 'pointer', padding: 0, letterSpacing: '-0.01em' }}>
-                Privacy &amp; Data
-              </button>
-              <span style={{ color: 'rgba(255,255,255,0.2)' }}>·</span>
-              <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)' }}>Maps © OpenStreetMap · © CARTO</span>
-            </div>
+            <button onClick={onPrivacy} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.7)', fontSize: 12.5, cursor: 'pointer', padding: 0, letterSpacing: '-0.01em' }}>
+              Privacy &amp; About
+            </button>
+          </div>
+          {/* Attribution row */}
+          <div style={{ marginBottom: 16, fontSize: 11.5, color: 'rgba(255,255,255,0.5)', lineHeight: 1.7 }}>
+            Map data ©{' '}
+            <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer" style={{ color: 'rgba(255,255,255,0.75)' }}>OpenStreetMap contributors</a>
+            {' '}(ODbL) · Map tiles ©{' '}
+            <a href="https://carto.com/attributions" target="_blank" rel="noopener noreferrer" style={{ color: 'rgba(255,255,255,0.75)' }}>CARTO</a>
+            {' '}· Destination content ©{' '}
+            <a href="https://en.wikipedia.org" target="_blank" rel="noopener noreferrer" style={{ color: 'rgba(255,255,255,0.75)' }}>Wikipedia contributors</a>
+            {' '}(CC BY-SA) · Fuel data © State of Victoria · Weather by{' '}
+            <a href="https://open-meteo.com" target="_blank" rel="noopener noreferrer" style={{ color: 'rgba(255,255,255,0.75)' }}>Open-Meteo</a>
           </div>
           {/* Bottom row */}
-          <div style={{ borderTop: '1px solid rgba(255,255,255,0.12)', paddingTop: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
+          <div style={{ borderTop: '1px solid rgba(255,255,255,0.12)', paddingTop: 14, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
             <span style={{ fontSize: 11.5, color: 'rgba(255,255,255,0.5)' }}>
               Helping Victorians escape, one weekend at a time.
             </span>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-              <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)' }}>v1.3.6</span>
-              <span style={{ fontSize: 11.5, color: 'rgba(255,255,255,0.5)' }}>
-                Created by <span style={{ color: 'rgba(255,255,255,0.8)', fontWeight: 600 }}>Cubix IT Solutions</span>
-              </span>
-            </div>
+            <span style={{ fontSize: 11.5, color: 'rgba(255,255,255,0.5)' }}>
+              Created by <span style={{ color: 'rgba(255,255,255,0.8)', fontWeight: 600 }}>Cubix IT Solutions</span>
+            </span>
           </div>
         </div>
       </footer>

@@ -846,8 +846,7 @@ export function ExperiencePanel({ hideTimeline = false }: { hideTimeline?: boole
         {/* ── Footer ── */}
         <div style={{ padding: '24px 16px 20px', borderTop: '1px solid var(--border)', marginTop: 8, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span style={{ fontSize: 11, color: '#9CA3AF' }}>Place data © Google · Map © OpenStreetMap</span>
-            <span style={{ fontSize: 10, color: '#C8C4BD', fontWeight: 600 }}>v1.3.6</span>
+            <span style={{ fontSize: 11, color: '#9CA3AF' }}>Data © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer" style={{ color: '#9CA3AF' }}>OpenStreetMap</a> (ODbL) · Tiles © <a href="https://carto.com/attributions" target="_blank" rel="noopener noreferrer" style={{ color: '#9CA3AF' }}>CARTO</a> · Content © <a href="https://en.wikipedia.org" target="_blank" rel="noopener noreferrer" style={{ color: '#9CA3AF' }}>Wikipedia</a> (CC BY-SA)</span>
           </div>
           <div style={{ display: 'flex', gap: 12 }}>
             <button onClick={() => window.dispatchEvent(new CustomEvent('show-privacy'))} style={{ fontSize: 11, color: '#9CA3AF', background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontWeight: 500 }}>Privacy & Attribution</button>
