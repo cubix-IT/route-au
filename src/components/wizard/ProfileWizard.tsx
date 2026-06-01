@@ -1087,15 +1087,7 @@ function StepPreferences({
   destCoord?: Coordinate
   hideDepartureTime?: boolean
 }) {
-  void hasKids; void kidsAge
-
-  const stays: { type: AccommodationPreference; emoji: string; label: string }[] = [
-    { type: 'Hotel',       emoji: '🏨', label: 'Hotel / motel' },
-    { type: 'Glamping',    emoji: '🛖', label: 'Glamping' },
-    { type: 'CaravanPark', emoji: '🚐', label: 'Caravan park' },
-    { type: 'FreeCamping', emoji: '⛺', label: 'Free camping' },
-    { type: 'Any',         emoji: '✨', label: "Don't mind" },
-  ]
+  void hasKids; void kidsAge; void accommodation; void setAccommodation
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 22 }}>
