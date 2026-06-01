@@ -133,80 +133,90 @@ function featureLabel(f: PhotonFeature): string {
 // ── Origin search box ────────────────────────────────────────────────
 
 
-// ── Rotating Victoria highlights ─────────────────────────────────────
+// ── Rotating Victoria highlights (seasonal) ──────────────────────────
 
-const VICTORIA_HIGHLIGHTS = [
-  // Phillip Island
-  'hundreds of little penguins waddling ashore at Phillip Island at dusk?',
-  // Grampians
-  'wildflowers blanketing the Grampians from every ridge and gully in spring?',
-  'the sunrise from Boroka Lookout — the entire Grampians spread below you?',
-  'ancient Aboriginal rock art at Brambuk — paintings that predate European settlement by thousands of years?',
-  // Great Ocean Road
-  'dozens of wild koalas in the roadside gums at Kennett River on the Great Ocean Road?',
-  'the Twelve Apostles at golden hour, limestone stacks rising from the Southern Ocean?',
-  'Loch Ard Gorge before sunrise — ochre cliffs flushing pink before the crowds arrive?',
-  'Australia\'s largest fur seal colony just a short walk from Cape Bridgewater?',
-  'Cape Otway lighthouse stark white against a building storm — the oldest on mainland Australia?',
-  // Wilson's Prom
-  'wombats grazing fearlessly around your tent at Wilson\'s Promontory at dusk?',
-  'the Prom at low tide, Squeaky Beach sand creaking underfoot, not another soul in sight?',
-  // Warrnambool
-  'southern right whales nursing their calves from the clifftop at Logans Beach?',
-  // Bright & Alpine
-  'the Ovens River in Bright in May — Japanese maples and elms turning red and gold?',
-  'snow gums draped in ice crystals after a High Country snowfall, the silence total and absolute?',
-  'platypus feeding at dusk in the clear pools near Mount Beauty — barely making a ripple?',
-  'Victoria\'s highest ski resort at Hotham letting you ski through to Falls Creek — longest run in Australia?',
-  // Yarra Valley
-  'misty vineyard rows in the Yarra Valley just after an autumn rain?',
-  'hot air balloons drifting over the Yarra Valley at first light — baskets skimming the mist?',
-  'Four Pillars Gin making some of Australia\'s most awarded spirits in a Yarra Valley shed?',
-  // Mornington Peninsula
-  'steam rising from open-air mineral pools at Peninsula Hot Springs under a winter sky?',
-  'wild dolphins leaping through the waves off Sorrento on a summer morning?',
-  'the panorama from Arthurs Seat — the entire Mornington Peninsula and both bays laid out below you?',
-  // Murray River
-  'a genuine 1860s paddle steamer churning up the Murray at Echuca?',
-  'sea eagles circling above the Murray at Barmah on a perfectly still autumn morning?',
-  // Dandenongs
-  'king parrots eating from your hand at Grants Picnic Ground in the Dandenongs?',
-  'Puffing Billy winding through tree fern gullies — Victoria\'s most-loved steam railway?',
-  // Beechworth & High Country
-  'Beechworth\'s intact gold-rush granite streetscape — unchanged since the 1860s?',
-  'the King Valley Prosecco Road in autumn — Italian winemakers, chestnut trees, and long lunch tables?',
-  // East Gippsland
-  'glow-worms turning the cave ceiling at Buchan into a galaxy of cool blue-green light?',
-  'kayaking the calm channels of the Gippsland Lakes at dawn — the water a perfect mirror?',
-  'Mallacoota\'s Croajingolong — so wild and remote UNESCO declared it a World Biosphere Reserve?',
-  // Ballarat
-  'panning for real gold at Sovereign Hill on the very ground where the rush began in 1851?',
-  'the Eureka Stockade site in Ballarat where miners took on the Crown — and sparked democracy?',
-  // Bendigo
-  'a full-size Chinese processional dragon from 1879 coiled in its own museum in Bendigo?',
-  'Bendigo\'s art gallery hosting major international shows that most Melbourne galleries don\'t get?',
-  // Melbourne
-  'Melbourne\'s laneway street art changing every week — Hosier Lane as a living gallery?',
-  'the Queen Victoria Market running since 1878 — the largest open-air market in the Southern Hemisphere?',
-  'rooftop bars above Melbourne\'s CBD where you can watch the city light up at dusk?',
-  'the Royal Botanic Gardens in Melbourne — 38 hectares of immaculate gardens right in the city?',
-  // Geelong
-  'Geelong\'s waterfront carousel — hand-carved in the 1890s and still spinning today?',
-  'Barwon Heads rivermouth where the Barwon meets the sea — one of Victoria\'s most photogenic spots?',
-  'Geelong Art Gallery holding one of the finest regional collections in the country?',
-  // Shepparton
-  'Shepparton\'s extraordinary art museum — a building so bold it stopped people in the street?',
-  'the Goulburn Valley in February — every orchard dripping with peaches, nectarines, and apricots?',
-  // Wodonga
-  'Lake Hume stretching 20 times the size of Sydney Harbour across the Victoria-NSW border?',
-  'the Murray to Mountains Rail Trail — one of Australia\'s great cycling journeys starting right in Wodonga?',
-  // Daylesford
-  'mineral springs bubbling up from the ground at Hepburn — free to taste straight from the earth?',
-  'Hanging Rock rising from the plains like a fist — the geology that inspired a gothic masterpiece?',
-  // Misc
-  'kangaroos grazing on the fairways at Anglesea Golf Club — wild mobs, free to watch, every day?',
-  'the fossil site at Flat Rocks, Inverloch — where world-class polar dinosaur bones were found?',
-]
+const VICTORIA_HIGHLIGHTS: Record<string, string[]> = {
+  winter: [
+    // Hot springs & wellness
+    'steam rising from open-air mineral pools at Peninsula Hot Springs on a cold winter morning?',
+    'mineral springs bubbling up from the ground at Hepburn — free to taste straight from the earth?',
+    'the Hepburn Bathhouse — a Victorian-era mineral spa where you soak while it rains outside?',
+    'Daylesford in winter — wood fires, spa retreats, and the whole town slowing right down?',
+    // Snow & alpine
+    'snow gums draped in ice crystals after a High Country snowfall, the silence total and absolute?',
+    'Victoria\'s highest ski resort at Hotham letting you ski through to Falls Creek — longest run in Australia?',
+    'Mount Buller village alive in winter — ski in, eat well, and wake to fresh powder?',
+    'the alpine road to Mount Buffalo blanketed in snow, the chalet warming up inside?',
+    // Cosy towns
+    'Beechworth\'s intact gold-rush granite streetscape lit up on a cold winter night?',
+    'Maldon\'s main street unchanged since the 1850s — antiques, tea rooms, and total quiet?',
+    'Walhalla — a gold-rush ghost town hidden in a steep valley, barely touched since 1900?',
+    'glow-worms turning the cave ceiling at Buchan into a galaxy of cool blue-green light?',
+    // Wildlife (winter is great for whale watching, wildlife)
+    'southern right whales nursing their calves from the clifftop at Logans Beach, Warrnambool?',
+    'the Twelve Apostles at golden hour, limestone stacks rising from the Southern Ocean?',
+    'wombats grazing fearlessly around your tent at Wilson\'s Promontory at dusk?',
+    'king parrots eating from your hand at Grants Picnic Ground in the Dandenongs?',
+    // Food & wine
+    'a genuine 1860s paddle steamer churning up the Murray at Echuca on a crisp winter morning?',
+    'the King Valley in winter — Italian winemakers, truffle season, and long lunch tables by the fire?',
+    'Puffing Billy winding through misty tree fern gullies on a cold Dandenongs morning?',
+    'Hanging Rock on a winter morning — mist in the gullies, not another soul on the trail?',
+  ],
+  autumn: [
+    'the Ovens River in Bright in May — Japanese maples and elms turning red and gold?',
+    'misty vineyard rows in the Yarra Valley just after an autumn rain?',
+    'hot air balloons drifting over the Yarra Valley at first light — baskets skimming the mist?',
+    'sea eagles circling above the Murray at Barmah on a perfectly still autumn morning?',
+    'the King Valley Prosecco Road in autumn — Italian winemakers, chestnut trees, and long lunch tables?',
+    'Four Pillars Gin making some of Australia\'s most awarded spirits in a Yarra Valley shed?',
+    'mineral springs bubbling up from the ground at Hepburn — free to taste straight from the earth?',
+    'hundreds of little penguins waddling ashore at Phillip Island at dusk?',
+    'the Twelve Apostles at golden hour, limestone stacks rising from the Southern Ocean?',
+    'Loch Ard Gorge before sunrise — ochre cliffs flushing pink before the crowds arrive?',
+    'wombats grazing fearlessly around your tent at Wilson\'s Promontory at dusk?',
+    'Beechworth\'s intact gold-rush granite streetscape — unchanged since the 1860s?',
+    'glow-worms turning the cave ceiling at Buchan into a galaxy of cool blue-green light?',
+    'panning for real gold at Sovereign Hill on the very ground where the rush began in 1851?',
+    'Bendigo\'s art gallery hosting major international shows that most Melbourne galleries don\'t get?',
+    'Hanging Rock rising from the plains like a fist — the geology that inspired a gothic masterpiece?',
+  ],
+  spring: [
+    'wildflowers blanketing the Grampians from every ridge and gully in spring?',
+    'the sunrise from Boroka Lookout — the entire Grampians spread below you?',
+    'ancient Aboriginal rock art in the Grampians — paintings that predate European settlement by thousands of years?',
+    'dozens of wild koalas in the roadside gums at Kennett River on the Great Ocean Road?',
+    'the Twelve Apostles at golden hour, limestone stacks rising from the Southern Ocean?',
+    'Cape Otway lighthouse stark white against a building storm — the oldest on mainland Australia?',
+    'hot air balloons drifting over the Yarra Valley at first light — baskets skimming the mist?',
+    'platypus feeding at dusk in the clear pools near Mount Beauty — barely making a ripple?',
+    'southern right whales nursing their calves from the clifftop at Logans Beach?',
+    'the Prom at low tide, Squeaky Beach sand creaking underfoot, not another soul in sight?',
+    'king parrots eating from your hand at Grants Picnic Ground in the Dandenongs?',
+    'Puffing Billy winding through tree fern gullies — Victoria\'s most-loved steam railway?',
+    'kayaking the calm channels of the Gippsland Lakes at dawn — the water a perfect mirror?',
+    'kangaroos grazing on the fairways at Anglesea Golf Club — wild mobs, free to watch, every day?',
+    'Geelong\'s waterfront carousel — hand-carved in the 1890s and still spinning today?',
+  ],
+  summer: [
+    'wild dolphins leaping through the waves off Sorrento on a summer morning?',
+    'the panorama from Arthurs Seat — the entire Mornington Peninsula and both bays laid out below you?',
+    'hundreds of little penguins waddling ashore at Phillip Island at dusk?',
+    'Australia\'s largest fur seal colony just a short walk from Cape Bridgewater?',
+    'the Prom at low tide, Squeaky Beach sand creaking underfoot, not another soul in sight?',
+    'kayaking the calm channels of the Gippsland Lakes at dawn — the water a perfect mirror?',
+    'Mallacoota\'s Croajingolong — so wild and remote UNESCO declared it a World Biosphere Reserve?',
+    'dozens of wild koalas in the roadside gums at Kennett River on the Great Ocean Road?',
+    'the Queen Victoria Market running since 1878 — the largest open-air market in the Southern Hemisphere?',
+    'rooftop bars above Melbourne\'s CBD where you can watch the city light up at dusk?',
+    'a genuine 1860s paddle steamer churning up the Murray at Echuca on a summer evening?',
+    'the Goulburn Valley in February — every orchard dripping with peaches, nectarines, and apricots?',
+    'Lake Hume stretching 20 times the size of Sydney Harbour across the Victoria-NSW border?',
+    'kangaroos grazing on the fairways at Anglesea Golf Club — wild mobs, free to watch, every day?',
+    'the fossil site at Flat Rocks, Inverloch — where world-class polar dinosaur bones were found?',
+    'Loch Ard Gorge before sunrise — ochre cliffs flushing pink before the crowds arrive?',
+  ],
+}
 
 // ── Simple From / To search (hero) ────────────────────────────────────
 
@@ -347,10 +357,10 @@ const CORNER_PALETTES: Record<string, { c1: string[]; c2: string[] }> = {
     c1: ['#8B2500', '#B84010', '#D4600A', '#C03008'],
     c2: ['#7A1E00', '#A03808', '#C85010', '#B02808'],
   },
-  // Winter: deep slate indigo, midnight blue — misty ranges and frost
+  // Winter: deep pine forest green + warm ember amber — fire inside, mist outside
   winter: {
-    c1: ['#0D1F3C', '#162A50', '#1E3460', '#0A1830'],
-    c2: ['#0A1A30', '#122240', '#1A2C50', '#081428'],
+    c1: ['#1A3A2A', '#0F2D1F', '#234D35', '#162E22'],
+    c2: ['#7A3D0A', '#9B5010', '#6B3208', '#8A4510'],
   },
   // Spring: wattle gold, wildflower pink, sage — Grampians bloom
   spring: {
@@ -411,9 +421,10 @@ export function LandingPage() {
     (a, b) => (b.seasonalScores[season] ?? 0) - (a.seasonalScores[season] ?? 0)
   )
   const { setWizardOpen, setPreselectedDest, setTripPlanState, setOriginSet } = useAppStore()
+  const seasonHighlights = VICTORIA_HIGHLIGHTS[season] ?? VICTORIA_HIGHLIGHTS.summer
   const highlight = useMemo(
-    () => VICTORIA_HIGHLIGHTS[Math.floor(Math.random() * VICTORIA_HIGHLIGHTS.length)],
-    [],
+    () => seasonHighlights[Math.floor(Math.random() * seasonHighlights.length)],
+    [season],
   )
 
   const handleSearch = useCallback((
