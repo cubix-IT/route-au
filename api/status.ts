@@ -33,7 +33,7 @@ function level(used: number, limit: number): Level {
   return 'ok'
 }
 
-export default async function handler(_req: VercelRequest, res: VercelResponse) {
+export default async function handler(req: VercelRequest, res: VercelResponse) {
   const today = new Date().toISOString().slice(0, 10)
   const thisMonth = new Date().toISOString().slice(0, 7)
 
