@@ -10,7 +10,7 @@ function formatDate(iso: string): string {
 }
 
 // Group entries by deploy (same deployed_at within 60 seconds)
-function groupByDeploy(rows: { deployed_at: string; title: string; description: string | null; commit_sha: string | null }[]) {
+function groupByDeploy(rows: { deployed_at: string; title: string; description: string | null; git_sha: string | null }[]) {
   const groups: { date: string; sha: string | null; entries: typeof rows }[] = []
   for (const row of rows) {
     const last = groups[groups.length - 1]
@@ -18,7 +18,7 @@ function groupByDeploy(rows: { deployed_at: string; title: string; description: 
     if (last && diff < 60_000) {
       last.entries.push(row)
     } else {
-      groups.push({ date: row.deployed_at, sha: row.commit_sha, entries: [row] })
+      groups.push({ date: row.deployed_at, sha: row.git_sha, entries: [row] })
     }
   }
   return groups
@@ -28,7 +28,7 @@ export default async function handler(_req: VercelRequest, res: VercelResponse) 
   const { data: rows, error } = adminSupabase
     ? await adminSupabase
         .from('changelog')
-        .select('deployed_at, title, description, commit_sha')
+        .select('deployed_at, title, description, git_sha')
         .order('deployed_at', { ascending: false })
         .limit(100)
     : { data: [], error: null }

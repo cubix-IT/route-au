@@ -98,10 +98,9 @@ function formatTitle(subject: string): string {
 const now = new Date().toISOString()
 const rows = featCommits.map(c => ({
   deployed_at: now,
-  commit_sha: c.sha,
+  git_sha: c.sha,
   title: formatTitle(c.subject),
   description: c.body || null,
-  category: 'feature' as const,
 }))
 
 const { error: changelogErr } = await db.from('changelog').insert(rows)
