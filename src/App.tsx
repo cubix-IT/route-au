@@ -150,4 +150,35 @@ function App() {
   )
 }
 
-export default App
+import { Component, type ReactNode } from 'react'
+
+class AppErrorBoundary extends Component<{ children: ReactNode }, { crashed: boolean; msg: string }> {
+  state = { crashed: false, msg: '' }
+  static getDerivedStateFromError(err: Error) { return { crashed: true, msg: err?.message ?? 'Unknown error' } }
+  componentDidCatch(err: Error, info: { componentStack: string }) {
+    console.error('[AppErrorBoundary]', err, info.componentStack)
+  }
+  render() {
+    if (!this.state.crashed) return this.props.children
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100dvh', padding: 32, textAlign: 'center', background: '#F8F7F4', fontFamily: 'system-ui, sans-serif' }}>
+        <div style={{ fontSize: 48, marginBottom: 16 }}>🗺️</div>
+        <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 8, color: '#1C1B1F' }}>Something went wrong</h2>
+        <p style={{ fontSize: 14, color: '#6B7280', marginBottom: 24, maxWidth: 280, lineHeight: 1.6 }}>
+          The app hit an unexpected error. Tap below to reload.
+        </p>
+        <button
+          onClick={() => window.location.reload()}
+          style={{ background: '#3A6B4F', color: '#fff', border: 'none', borderRadius: 12, padding: '12px 28px', fontSize: 15, fontWeight: 700, cursor: 'pointer' }}
+        >
+          Reload app
+        </button>
+        <p style={{ fontSize: 11, color: '#9CA3AF', marginTop: 16 }}>{this.state.msg}</p>
+      </div>
+    )
+  }
+}
+
+export default function AppWithBoundary() {
+  return <AppErrorBoundary><App /></AppErrorBoundary>
+}

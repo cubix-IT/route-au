@@ -1,5 +1,16 @@
 import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
+
+// Synchronous migration — must run before Zustand reads the new key
+try {
+  if (typeof localStorage !== 'undefined') {
+    const old = localStorage.getItem('route-au-v4')
+    if (old && !localStorage.getItem('unplanned-escapes-v4')) {
+      localStorage.setItem('unplanned-escapes-v4', old)
+    }
+    localStorage.removeItem('route-au-v4')
+  }
+} catch { /* SSR / private browsing — ignore */ }
 import type { User, Session } from '@supabase/supabase-js'
 import type {
   Coordinate,
@@ -256,16 +267,6 @@ export const useAppStore = create<AppState>()(
     {
       name: 'unplanned-escapes-v4',
       storage: createJSONStorage(() => localStorage),
-      onRehydrateStorage: () => () => {
-        // One-time migration from old route-au-v4 key
-        try {
-          const old = localStorage.getItem('route-au-v4')
-          if (old && !localStorage.getItem('unplanned-escapes-v4')) {
-            localStorage.setItem('unplanned-escapes-v4', old)
-          }
-          localStorage.removeItem('route-au-v4')
-        } catch { /* ignore */ }
-      },
       partialize: (state) => ({
         userProfile: state.userProfile,
         vehicleProfile: state.vehicleProfile,

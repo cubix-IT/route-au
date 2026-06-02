@@ -37,14 +37,6 @@ let dbPromise: Promise<IDBPDatabase<UnplannedEscapesDB>> | null = null
 
 export function getDB() {
   if (!dbPromise) {
-    // Migrate data from old route-au-db if it exists
-    if (typeof indexedDB !== 'undefined') {
-      indexedDB.databases?.().then((dbs) => {
-        if (dbs.some((d) => d.name === 'route-au-db')) {
-          indexedDB.deleteDatabase('route-au-db')
-        }
-      }).catch(() => {})
-    }
     dbPromise = openDB<UnplannedEscapesDB>('unplanned-escapes-db', 4, {
       upgrade(db, oldVersion) {
         if (oldVersion < 1) {
