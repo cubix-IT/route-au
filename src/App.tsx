@@ -172,10 +172,13 @@ class AppErrorBoundary extends Component<{ children: ReactNode }, { crashed: boo
           The app hit an unexpected error. Tap below to reload — this has been logged for us to fix.
         </p>
         <button
-          onClick={() => window.location.reload()}
+          onClick={() => {
+            try { localStorage.removeItem('unplanned-escapes-v4') } catch {}
+            window.location.href = '/'
+          }}
           style={{ background: '#3A6B4F', color: '#fff', border: 'none', borderRadius: 12, padding: '12px 28px', fontSize: 15, fontWeight: 700, cursor: 'pointer' }}
         >
-          Reload app
+          Go back to home
         </button>
         {this.state.msg && (
           <p style={{ fontSize: 11, color: '#9CA3AF', marginTop: 16, maxWidth: 320, wordBreak: 'break-word' }}>{this.state.msg}</p>
