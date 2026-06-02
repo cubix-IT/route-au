@@ -151,12 +151,16 @@ function App() {
 }
 
 import { Component, type ReactNode } from 'react'
+import { captureError } from '@/lib/bugLogger'
 
-class AppErrorBoundary extends Component<{ children: ReactNode }, { crashed: boolean; msg: string }> {
-  state = { crashed: false, msg: '' }
-  static getDerivedStateFromError(err: Error) { return { crashed: true, msg: err?.message ?? 'Unknown error' } }
+class AppErrorBoundary extends Component<{ children: ReactNode }, { crashed: boolean; msg: string; stack: string }> {
+  state = { crashed: false, msg: '', stack: '' }
+  static getDerivedStateFromError(err: Error) {
+    return { crashed: true, msg: err?.message ?? String(err), stack: err?.stack ?? '' }
+  }
   componentDidCatch(err: Error, info: { componentStack: string }) {
     console.error('[AppErrorBoundary]', err, info.componentStack)
+    captureError('AppErrorBoundary', info.componentStack?.split('\n')[1]?.trim() ?? 'unknown', err)
   }
   render() {
     if (!this.state.crashed) return this.props.children
@@ -165,7 +169,7 @@ class AppErrorBoundary extends Component<{ children: ReactNode }, { crashed: boo
         <div style={{ fontSize: 48, marginBottom: 16 }}>🗺️</div>
         <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 8, color: '#1C1B1F' }}>Something went wrong</h2>
         <p style={{ fontSize: 14, color: '#6B7280', marginBottom: 24, maxWidth: 280, lineHeight: 1.6 }}>
-          The app hit an unexpected error. Tap below to reload.
+          The app hit an unexpected error. Tap below to reload — this has been logged for us to fix.
         </p>
         <button
           onClick={() => window.location.reload()}
@@ -173,7 +177,9 @@ class AppErrorBoundary extends Component<{ children: ReactNode }, { crashed: boo
         >
           Reload app
         </button>
-        <p style={{ fontSize: 11, color: '#9CA3AF', marginTop: 16 }}>{this.state.msg}</p>
+        {this.state.msg && (
+          <p style={{ fontSize: 11, color: '#9CA3AF', marginTop: 16, maxWidth: 320, wordBreak: 'break-word' }}>{this.state.msg}</p>
+        )}
       </div>
     )
   }
