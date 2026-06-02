@@ -280,7 +280,6 @@ export const useAppStore = create<AppState>()(
         destCoord: state.destCoord,
         selectedCorridorId: state.selectedCorridorId,
         diningPrefs: state.diningPrefs,
-        activeItinerary: state.activeItinerary,
         addedDiningStops: state.addedDiningStops,
         addedActivities: state.addedActivities,
       }),

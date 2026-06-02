@@ -144,8 +144,8 @@ export function MobilePlanner() {
 
   const fetchFuel = async () => {
     if (!d.activeItinerary || !d.vehicleProfile || !hasFuel) return
-    const wp = d.activeItinerary.route.waypoints
-    if (wp.length < 2) return
+    const wp = d.activeItinerary.route?.waypoints
+    if (!wp || wp.length < 2) return
     const origin = wp[0].coord
     const dest = wp[wp.length - 1].coord
     const mid = { lat: (origin.lat + dest.lat) / 2, lng: (origin.lng + dest.lng) / 2 }

@@ -204,8 +204,8 @@ export function ExperiencePanel({ hideTimeline = false }: { hideTimeline?: boole
     if (!d.activeItinerary || !d.vehicleProfile) return
     if (d.vehicleProfile.fuel_type === 'Electric') return
     if ((d.vehicleProfile as unknown as { skip_fuel?: boolean }).skip_fuel) return
-    const waypoints = d.activeItinerary.route.waypoints
-    if (waypoints.length < 2) return
+    const waypoints = d.activeItinerary.route?.waypoints
+    if (!waypoints || waypoints.length < 2) return
 
     const origin = waypoints[0].coord
     const dest = waypoints[waypoints.length - 1].coord
@@ -331,7 +331,7 @@ export function ExperiencePanel({ hideTimeline = false }: { hideTimeline?: boole
       <div style={{ padding: '0 0 32px', flex: 1 }}>
 
         {/* Guardrail alerts */}
-        {d.activeItinerary.all_warnings.length > 0 && (
+        {(d.activeItinerary.all_warnings?.length ?? 0) > 0 && (
           <div style={{ padding: '12px 16px 0', display: 'flex', flexDirection: 'column', gap: 6 }}>
             {d.activeItinerary.all_warnings.map((w) => <AdvisoryBanner key={w.id} warning={w} />)}
           </div>

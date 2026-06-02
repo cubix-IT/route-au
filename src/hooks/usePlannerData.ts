@@ -308,7 +308,7 @@ export function usePlannerData() {
   const shortDest = destName.split(',')[0].split('&')[0].trim()
   const shortOrigin = originName.split(',')[0]
   const totalKm = Math.round(activeItinerary?.total_km ?? 0)
-  const driveHours = Math.round((activeItinerary?.route.estimated_drive_hours ?? 0) * 10) / 10
+  const driveHours = Math.round((activeItinerary?.route?.estimated_drive_hours ?? 0) * 10) / 10
 
   const fuelCost = vehicleProfile && activeItinerary
     ? calcFuelCost(
