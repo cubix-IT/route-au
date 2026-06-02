@@ -2,8 +2,6 @@ import { useState } from 'react'
 import type { ItineraryDay, ScheduleItem } from '@/types'
 import { GuardrailBanner } from './GuardrailBanner'
 import { formatKm, formatDate } from '@/utils/formatters'
-import { useAppStore } from '@/store/useAppStore'
-import { FOOD_DRINK } from '@/data/foodDrink'
 
 interface Props {
   day: ItineraryDay
@@ -11,14 +9,6 @@ interface Props {
 
 export function DayCard({ day }: Props) {
   const [expanded, setExpanded] = useState(day.day_number === 1)
-  const addedDiningStops = useAppStore((s) => s.addedDiningStops)
-  const removeDiningStop = useAppStore((s) => s.removeDiningStop)
-  const setActiveTab = useAppStore((s) => s.setActiveTab)
-
-  const myDiningStops = addedDiningStops
-    .filter((s) => s.dayNumber === day.day_number)
-    .map((s) => FOOD_DRINK.find((f) => f.id === s.foodId))
-    .filter(Boolean)
 
   const hasWarnings = day.warnings.length > 0
   const driveHrs = Math.floor(day.drive_hours)
@@ -135,68 +125,7 @@ export function DayCard({ day }: Props) {
             </div>
           )}
 
-          {/* User-chosen dining stops */}
-          {myDiningStops.length > 0 && (
-            <div style={{ marginTop: 16 }}>
-              <div style={{
-                fontSize: 11, fontWeight: 700, color: 'var(--text-muted)',
-                textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8,
-              }}>
-                Your dining picks
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                {myDiningStops.map((venue) => venue && (
-                  <div
-                    key={venue.id}
-                    style={{
-                      display: 'flex', alignItems: 'center', gap: 10,
-                      background: 'rgba(245,158,11,0.06)',
-                      border: '1px solid var(--amber-dim)',
-                      borderRadius: 10, padding: '8px 12px',
-                    }}
-                  >
-                    <span style={{ fontSize: 16 }}>🍽️</span>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--amber)' }}>
-                        {venue.name}
-                      </div>
-                      {venue.signature_dish && (
-                        <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
-                          Try: {venue.signature_dish}
-                        </div>
-                      )}
-                    </div>
-                    <button
-                      onClick={() => removeDiningStop(venue.id)}
-                      style={{
-                        background: 'none', border: 'none',
-                        color: 'var(--text-muted)', fontSize: 14,
-                        cursor: 'pointer', padding: '0 4px',
-                      }}
-                      title="Remove"
-                    >
-                      ✕
-                    </button>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
 
-          {/* Add dining stop nudge (only if none added yet) */}
-          {myDiningStops.length === 0 && (
-            <button
-              onClick={() => setActiveTab('dining')}
-              style={{
-                marginTop: 14, width: '100%', padding: '8px 0',
-                background: 'none', border: '1px dashed var(--border)',
-                borderRadius: 9, color: 'var(--text-muted)',
-                fontSize: 12, cursor: 'pointer',
-              }}
-            >
-              🍽️ Add a dining stop for this day
-            </button>
-          )}
 
           {/* Warnings */}
           {day.warnings.length > 0 && (

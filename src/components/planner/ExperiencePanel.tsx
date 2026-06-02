@@ -299,7 +299,7 @@ export function ExperiencePanel({ hideTimeline = false }: { hideTimeline?: boole
         {(([
           ['all',        'All'],
           ['activities', '🗺 Things to Do'],
-          ...((d.food?.length ?? 0) > 0 ? [['food', '🍽 Eat & Drink']] : []),
+          ...((d.dbFood?.length ?? 0) > 0 ? [['food', '🍽 Eat & Drink']] : []),
           ...(!isOneDayTrip ? [['stay', '🏨 Stay']] : []),
           ...(d.vehicleProfile && d.vehicleProfile.fuel_type !== 'Electric' && !(d.vehicleProfile as unknown as { skip_fuel?: boolean }).skip_fuel ? [['fuel', '⛽ Fuel']] : []),
         ]) as [string, string][]).map(([f, label]) => (
@@ -537,7 +537,7 @@ export function ExperiencePanel({ hideTimeline = false }: { hideTimeline?: boole
 
         {/* ── Eat & Drink ── */}
         {(filter === 'all' || filter === 'food') && (() => {
-          const allFoods = d.food ?? []
+          const allFoods = d.dbFood ?? []
           if (allFoods.length === 0) return null
           // In 'all' mode show top 6; 'food' tab shows everything
           const foods = filter === 'food' ? allFoods : allFoods.slice(0, 6)
@@ -555,7 +555,7 @@ export function ExperiencePanel({ hideTimeline = false }: { hideTimeline?: boole
               empty={!d.dbLoading && foods.length === 0}
             >
               <div style={{ padding: '0 16px', display: 'flex', flexDirection: 'column', gap: 8 }}>
-                {foods.map((f) => {
+                {foods.map((f: import('@/hooks/usePlannerData').DbFoodPlace) => {
                   const attr = f.attributes as { website_uri?: string; opening_hours_text?: string }
                   const emoji = FOOD_CAT_EMOJI[f.category] ?? '🍽'
                   const website = attr.website_uri

@@ -81,6 +81,7 @@ export interface DbNatureSpot {
   lat: number | null
   lng: number | null
   source: string
+  attributes: Record<string, unknown>
 }
 
 export interface DbAccommodation {
@@ -165,13 +166,13 @@ async function fetchDestinationFromDB(
     (cLat && cLng
       ? supabase
           .from('nature_spots')
-          .select('nature_spot_id,slug,name,type,description,lat,lng,source')
+          .select('nature_spot_id,slug,name,type,description,lat,lng,source,attributes')
           .gte('lat', latMin).lte('lat', latMax)
           .gte('lng', lngMin).lte('lng', lngMax)
           .limit(200)
       : supabase
           .from('nature_spots')
-          .select('nature_spot_id,slug,name,type,description,lat,lng,source')
+          .select('nature_spot_id,slug,name,type,description,lat,lng,source,attributes')
           .eq('sub_dest_id', id)
           .limit(200)
     ),
@@ -196,15 +197,13 @@ async function fetchDestinationFromDB(
       .single(),
   ])
 
-  const qualitySort = <T extends { attributes: Record<string, unknown> }>(arr: T[]): T[] =>
-    [...arr].sort((a, b) =>
-      ((b.attributes?.quality_score as number) ?? 0) - ((a.attributes?.quality_score as number) ?? 0)
-    )
+  const byQuality = (a: { attributes: Record<string,unknown> }, b: { attributes: Record<string,unknown> }) =>
+    (((b.attributes?.quality_score as number) ?? 0) - ((a.attributes?.quality_score as number) ?? 0))
 
   return {
-    activities: qualitySort((activitiesRes.data ?? []) as DbActivity[]),
-    food: qualitySort((foodRes.data ?? []) as DbFoodPlace[]),
-    nature: qualitySort((natureRes.data ?? []) as DbNatureSpot[]),
+    activities: ([...(activitiesRes.data ?? [])] as DbActivity[]).sort(byQuality),
+    food: ([...(foodRes.data ?? [])] as DbFoodPlace[]).sort(byQuality),
+    nature: ([...(natureRes.data ?? [])] as DbNatureSpot[]).sort(byQuality),
     accommodation: (accomRes.data ?? []) as DbAccommodation[],
     wikiSummary: summaryRes.data?.wiki_text ?? null,
   }
@@ -231,6 +230,7 @@ export function usePlannerData() {
   // DB-sourced state (Supabase — primary)
   const [dbActivities, setDbActivities] = useState<DbActivity[]>([])
   const [dbNature, setDbNature] = useState<DbNatureSpot[]>([])
+  const [dbFood, setDbFood] = useState<DbFoodPlace[]>([])
   const [dbAccommodation, setDbAccommodation] = useState<DbAccommodation[]>([])
   const [dbLoading, setDbLoading] = useState(false)
 
@@ -248,6 +248,7 @@ export function usePlannerData() {
     // Reset
     setDbActivities([])
     setDbNature([])
+    setDbFood([])
     setDbAccommodation([])
     setLivePOIs(null)
     setWikiSummary(null)
@@ -259,6 +260,7 @@ export function usePlannerData() {
       if (result) {
         setDbActivities(result.activities)
         setDbNature(result.nature)
+        setDbFood(result.food)
         setDbAccommodation(result.accommodation)
         if (result.wikiSummary) setWikiSummary(result.wikiSummary)
       }
@@ -396,7 +398,7 @@ export function usePlannerData() {
     totalKm, driveHours, fuelCost, dayLabel,
     season, seasonMeta,
     // DB data (primary — fast, comprehensive, closed places filtered)
-    dbActivities: openActivities, dbNature: uniqueNature, dbAccommodation, accommodationPOIs,
+    dbActivities: openActivities, dbNature: uniqueNature, dbFood, dbAccommodation, accommodationPOIs,
     dbLoading, dbActivityCount, dbAccomCount,
     // legacy Overpass (fallback)
     livePOIs, wikiSummary,

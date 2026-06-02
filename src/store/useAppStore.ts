@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
+import type { User, Session } from '@supabase/supabase-js'
 import type {
   Coordinate,
   DiningPref,
@@ -108,7 +109,7 @@ interface AppState {
   isOffline: boolean
   setOffline: (offline: boolean) => void
 
-  activeTab: 'itinerary' | 'dining' | 'pois'
+  activeTab: 'itinerary' | 'pois'
   setActiveTab: (tab: AppState['activeTab']) => void
 
   // Map pin reactivity — updated when the ExperiencePanel filter changes
@@ -124,6 +125,15 @@ interface AppState {
   // Overpass/OSM data mode
   placesLimitedMode: boolean
   setPlacesLimitedMode: (v: boolean) => void
+
+  // Auth state — not persisted (Supabase manages its own session)
+  authUser: User | null
+  authSession: Session | null
+  setAuthState: (user: User | null, session: Session | null) => void
+  isAuthModalOpen: boolean
+  setAuthModalOpen: (open: boolean) => void
+  savedTrips: Itinerary[]
+  setSavedTrips: (trips: Itinerary[]) => void
 }
 
 export const useAppStore = create<AppState>()(
@@ -234,6 +244,14 @@ export const useAppStore = create<AppState>()(
 
       placesLimitedMode: false,
       setPlacesLimitedMode: (v) => set({ placesLimitedMode: v }),
+
+      authUser: null,
+      authSession: null,
+      setAuthState: (user, session) => set({ authUser: user, authSession: session }),
+      isAuthModalOpen: false,
+      setAuthModalOpen: (open) => set({ isAuthModalOpen: open }),
+      savedTrips: [],
+      setSavedTrips: (trips) => set({ savedTrips: trips }),
     }),
     {
       name: 'route-au-v4',

@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react'
 import { useAppStore } from '@/store/useAppStore'
 import { DayCard } from './DayCard'
 import { GuardrailBanner } from './GuardrailBanner'
-import { DiningExplorer } from './DiningExplorer'
 import { exportGPX } from '@/utils/gpxExport'
 import { useWeather } from '@/hooks/useWeather'
 import type { Activity, ActivityCategory } from '@/data/victorianActivities'
@@ -32,7 +31,6 @@ export function ItineraryPanel() {
       }}>
         {([
           ['itinerary', 'Your Plan'],
-          ['dining', 'Food on Route'],
           ['pois', 'Things to Do'],
         ] as const).map(([tab, label]) => (
           <button
@@ -67,7 +65,6 @@ export function ItineraryPanel() {
             onNewTrip={() => setWizardOpen(true)}
           />
         )}
-        {activeTab === 'dining' && <DiningExplorer />}
         {activeTab === 'pois' && <ExploreTab />}
       </div>
     </div>
@@ -258,8 +255,6 @@ type FilterKey = 'all' | ActivityCategory
 
 const FILTER_LABELS: { key: FilterKey; label: string }[] = [
   { key: 'all', label: 'All' },
-  { key: 'food', label: 'Food & Drink' },
-  { key: 'drink', label: 'Drink' },
   { key: 'nature', label: 'Nature' },
   { key: 'active', label: 'Active' },
   { key: 'wildlife', label: 'Wildlife' },
@@ -272,12 +267,10 @@ const FILTER_LABELS: { key: FilterKey; label: string }[] = [
 const GREEN_EXPLORE = '#3A6B4F'
 
 const POI_CFG_EXPLORE: Record<LivePOI['type'], { label: string; emoji: string }> = {
-  cafe:       { label: 'Cafes',              emoji: '☕' },
-  restaurant: { label: 'Restaurants',        emoji: '🍽' },
   pub:        { label: 'Pubs',              emoji: '🍺' },
-  fast_food:  { label: 'Takeaway',           emoji: '🥡' },
-  bakery:     { label: 'Bakeries',           emoji: '🥐' },
   winery:     { label: 'Wineries',           emoji: '🍷' },
+  brewery:    { label: 'Breweries',          emoji: '🍺' },
+  distillery: { label: 'Distilleries',       emoji: '🥃' },
   viewpoint:  { label: 'Viewpoints & Peaks', emoji: '👁' },
   attraction: { label: 'Attractions',        emoji: '🏛' },
   hiking:     { label: 'Hiking routes',      emoji: '🥾' },
@@ -323,8 +316,8 @@ function ExploreTab() {
     (f) => f.key === 'all' || availableCategories.has(f.key as ActivityCategory)
   )
 
-  // Group live POIs by type, cap at 5 per type, exclude food (food goes in Food tab)
-  const nonFoodLivePOIs = (livePOIs ?? []).filter((p) => p.type !== 'cafe' && p.type !== 'restaurant' && p.type !== 'pub')
+  // Group live POIs by type, cap at 5 per type
+  const nonFoodLivePOIs = livePOIs ?? []
   const byType: Partial<Record<LivePOI['type'], LivePOI[]>> = {}
   for (const poi of nonFoodLivePOIs) {
     if (!byType[poi.type]) byType[poi.type] = []
@@ -424,7 +417,7 @@ function ExploreTab() {
             <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 8 }}>
               From OpenStreetMap
             </div>
-            {(['hiking', 'viewpoint', 'attraction'] as LivePOI['type'][]).map((type) => {
+            {(['hiking', 'viewpoint', 'attraction', 'winery', 'brewery', 'distillery', 'pub'] as LivePOI['type'][]).map((type) => {
               const items = byType[type]
               if (!items?.length) return null
               const cfg = POI_CFG_EXPLORE[type]

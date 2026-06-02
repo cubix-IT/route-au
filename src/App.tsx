@@ -10,7 +10,9 @@ import { MobilePlanner } from '@/components/planner/MobilePlanner'
 import { PlannerMetrics } from '@/components/planner/PlannerMetrics'
 import { TripSummaryPanel } from '@/components/planner/TripSummaryPanel'
 import { useOfflineSync } from '@/hooks/useOfflineSync'
+import { useAuth } from '@/hooks/useAuth'
 import { useAppStore } from '@/store/useAppStore'
+import { AuthModal } from '@/components/auth/AuthModal'
 
 type View = 'landing' | 'planner'
 
@@ -35,6 +37,7 @@ function useIsWide() {
 }
 
 function App() {
+  useAuth()
   useOfflineSync()
 
   const { updateServiceWorker } = useRegisterSW({
@@ -45,6 +48,7 @@ function App() {
   })
 
   const isWizardOpen = useAppStore((s) => s.isWizardOpen)
+  const isAuthModalOpen = useAppStore((s) => s.isAuthModalOpen)
   const activeItinerary = useAppStore((s) => s.activeItinerary)
   const isMobile = useIsMobile()
   const isWide   = useIsWide()
@@ -126,6 +130,7 @@ function App() {
       )}
 
       {isWizardOpen && <ProfileWizard />}
+      {isAuthModalOpen && <AuthModal />}
 
       <Toaster
         position="bottom-right"

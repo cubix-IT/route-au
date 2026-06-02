@@ -7,7 +7,7 @@ import type { ActivityCategory } from '@/data/victorianActivities'
 const GREEN = '#3A6B4F'
 
 const POI_EMOJI: Record<LivePOI['type'], string> = {
-  cafe: '☕', restaurant: '🍽', pub: '🍺', fast_food: '🥡', bakery: '🥐', winery: '🍷',
+  pub: '🍺', winery: '🍷', brewery: '🍺', distillery: '🥃',
   viewpoint: '👁', attraction: '🏛', hiking: '🥾',
 }
 
@@ -34,12 +34,10 @@ const POI_TAG: Record<LivePOI['type'], { label: string; color: string; bg: strin
   hiking:     { label: 'Hiking Trail',  color: '#2563EB', bg: '#EFF6FF' },
   viewpoint:  { label: 'Scenic View',   color: '#4338CA', bg: '#EEF2FF' },
   attraction: { label: 'Attraction',    color: '#7C3AED', bg: '#F5F3FF' },
-  cafe:       { label: 'Cafe',          color: '#B45309', bg: '#FEF3C7' },
-  restaurant: { label: 'Restaurant',    color: '#B45309', bg: '#FEF3C7' },
   pub:        { label: 'Pub',           color: '#B87333', bg: '#FFF5EB' },
-  fast_food:  { label: 'Takeaway',      color: '#9A3412', bg: '#FFF7ED' },
-  bakery:     { label: 'Bakery',        color: '#92400E', bg: '#FFFBEB' },
   winery:     { label: 'Winery',        color: '#7E22CE', bg: '#FAF5FF' },
+  brewery:    { label: 'Brewery',       color: '#92400E', bg: '#FFFBEB' },
+  distillery: { label: 'Distillery',    color: '#374151', bg: '#F3F4F6' },
 }
 
 export function ThingsTile() {
@@ -63,10 +61,8 @@ export function ThingsTile() {
     }).catch(() => setLivePOIs([]))
   }, [destId, destCoord?.lat, destCoord?.lng, destName]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Non-food Overpass POIs
-  const nonFoodPOIs = (livePOIs ?? []).filter(
-    (p) => p.type !== 'cafe' && p.type !== 'restaurant' && p.type !== 'pub'
-  ).slice(0, 4)
+  // Overpass POIs for activities and experiences
+  const nonFoodPOIs = (livePOIs ?? []).slice(0, 4)
 
   // Show curated activities (top 4) + Overpass POIs (top 4), interleaved
   const curatedTop = activities.slice(0, 4)

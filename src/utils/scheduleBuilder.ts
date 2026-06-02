@@ -1,7 +1,4 @@
 import type { ItineraryDay, ScheduleItem, ScoredPOI } from '@/types'
-import type { DiningPref } from '@/types'
-import type { FoodDrinkPOI } from '@/data/foodDrink'
-import { getFoodForCorridor } from '@/data/foodDrink'
 import { getActivitiesForSubDest } from '@/data/victorianActivities'
 
 let itemCounter = 0
@@ -38,17 +35,13 @@ const POI_EMOJI: Record<string, string> = {
   Cycling: '🚵', Wineries: '🍷', CraftBeer: '🍺', Stargazing: '🌌',
 }
 
-const MEAL_EMOJI: Record<string, string> = {
-  breakfast: '☕', lunch: '🍽️', dinner: '🍷', drinks: '🍺',
-}
-
 export function buildDaySchedule(
   day: ItineraryDay,
-  corridorId: string,
+  _corridorId: string,
   destId: string,
   originLabel: string,
   pois: ScoredPOI[],
-  diningPrefs: DiningPref[],
+  _diningPrefs: string[],
   departureHour = 7,
   isLastDay = false,
   hasKids = false,
@@ -77,9 +70,8 @@ export function buildDaySchedule(
       type: 'depart',
     })
 
-    const wantsCafe = diningPrefs.some(p => ['Cafes', 'Bakeries', 'Roadhouses'].includes(p))
-    // En-route break only if drive > 1.5 hrs AND user wants a food stop
-    if (driveHours >= 1.5 && wantsCafe) {
+    // En-route break for long drives
+    if (driveHours >= 1.5) {
       const stopAt = addMinutes(h, m, Math.round(driveMinutes * 0.45))
       h = stopAt.h; m = stopAt.m
       items.push({
@@ -140,9 +132,7 @@ export function buildDaySchedule(
       h = after.h; m = after.m
     }
 
-    const wantsFood = diningPrefs.length > 0 && !diningPrefs.every(p => p === 'SelfCatering')
-    // Lunch only if user wants food stops
-    if (wantsFood) {
+    if (true) { // lunch always shown for multi-stop days
       if (h * 60 + m < 12 * 60 + 30) { h = 12; m = 30 }
       const lunchAct = foodAtDest[0]
       const lunchDur = 75
@@ -205,18 +195,17 @@ export function buildDaySchedule(
     type: 'depart',
   })
 
-  // 2. Breakfast stop only if drive is long enough AND user wants food
-  const wantsMorningFood = diningPrefs.some(p => ['Cafes', 'Bakeries', 'Roadhouses', 'CasualDining'].includes(p))
-  if (driveHours >= 1.5 && wantsMorningFood) {
-    const breakfast = getFoodForCorridor(corridorId, diningPrefs, 'breakfast')
-    const breakfastStop = breakfast[0]
-    if (breakfastStop) {
-      const bt = addMinutes(h, m, 60)
-      h = bt.h; m = bt.m
-      items.push(makeFoodItem(breakfastStop, fmt(h, m), 'breakfast'))
-      const after = addMinutes(h, m, 45)
-      h = after.h; m = after.m
-    }
+  // 2. Breakfast stop for long drives
+  if (driveHours >= 1.5) {
+    const bt = addMinutes(h, m, 60)
+    h = bt.h; m = bt.m
+    items.push({
+      id: nextId(), time: fmt(h, m), emoji: '☕',
+      title: 'Grab a coffee', subtitle: 'Fuel up before you hit the road',
+      duration_min: 20, type: 'breakfast',
+    })
+    const after = addMinutes(h, m, 20)
+    h = after.h; m = after.m
   }
 
   // 3. Drive to first stop (30% of drive time)
@@ -241,44 +230,16 @@ export function buildDaySchedule(
     h = after.h; m = after.m
   }
 
-  // 5. Lunch — only if drive is long enough AND user wants food stops
-  const wantsLunch = diningPrefs.length > 0
-  if (driveHours >= 2 && wantsLunch) {
+  // 5. Lunch break for longer drives
+  if (driveHours >= 2) {
     if (h * 60 + m < 12 * 60 + 30) { h = 12; m = 30 }
-
-    if (diningPrefs.includes('SelfCatering')) {
-      items.push({
-        id: nextId(),
-        time: fmt(h, m),
-        emoji: '🥪',
-        title: 'Lunch break',
-        subtitle: 'Pack a picnic or find a local spot',
-        duration_min: 45,
-        type: 'lunch',
-      })
-      const after = addMinutes(h, m, 45)
-      h = after.h; m = after.m
-    } else {
-      const lunch = getFoodForCorridor(corridorId, diningPrefs, 'lunch')
-      const lunchStop = lunch[0]
-      if (lunchStop) {
-        items.push(makeFoodItem(lunchStop, fmt(h, m), 'lunch'))
-        const after = addMinutes(h, m, 75)
-        h = after.h; m = after.m
-      } else {
-        items.push({
-          id: nextId(),
-          time: fmt(h, m),
-          emoji: '🍽️',
-          title: 'Lunch',
-          subtitle: 'Find a local cafe or restaurant along the way',
-          duration_min: 60,
-          type: 'lunch',
-        })
-        const after = addMinutes(h, m, 60)
-        h = after.h; m = after.m
-      }
-    }
+    items.push({
+      id: nextId(), time: fmt(h, m), emoji: '🍽️',
+      title: 'Lunch', subtitle: 'Find a local spot to refuel',
+      duration_min: 45, type: 'lunch',
+    })
+    const after = addMinutes(h, m, 45)
+    h = after.h; m = after.m
   }
 
   // 6. Afternoon POIs
@@ -340,35 +301,15 @@ export function buildDaySchedule(
   })
 
   const dinnerH = h + 1
-  if (diningPrefs.length > 0) {
-    if (diningPrefs.includes('SelfCatering')) {
-      items.push({
-        id: nextId(),
-        time: fmt(dinnerH, 0),
-        emoji: '🔥',
-        title: 'Cook dinner',
-        subtitle: 'Camp cook or self-cater for the evening',
-        duration_min: 60,
-        type: 'dinner',
-      })
-    } else {
-      const dinner = getFoodForCorridor(corridorId, diningPrefs, 'dinner')
-      const dinnerStop = dinner[0]
-      if (dinnerStop) {
-        items.push(makeFoodItem(dinnerStop, fmt(dinnerH, 0), 'dinner'))
-      } else {
-        items.push({
-          id: nextId(),
-          time: fmt(dinnerH, 0),
-          emoji: hasKids ? '🍕' : '🍺',
-          title: 'Dinner',
-          subtitle: hasKids ? 'Find somewhere relaxed for the family' : 'Find the local pub or restaurant',
-          duration_min: 75,
-          type: 'dinner',
-        })
-      }
-    }
-  }
+  items.push({
+    id: nextId(),
+    time: fmt(dinnerH, 0),
+    emoji: hasKids ? '🍕' : '🍺',
+    title: 'Dinner',
+    subtitle: hasKids ? 'Find somewhere relaxed for the family' : 'Find the local pub or restaurant',
+    duration_min: 75,
+    type: 'dinner',
+  })
 
   if (!hasKids) {
     items.push({
@@ -386,18 +327,3 @@ export function buildDaySchedule(
   return items
 }
 
-function makeFoodItem(food: FoodDrinkPOI, time: string, meal: 'breakfast' | 'lunch' | 'dinner' | 'drinks'): ScheduleItem {
-  const durationMap = { breakfast: 45, lunch: 70, dinner: 90, drinks: 60 }
-  return {
-    id: nextId(),
-    time,
-    emoji: MEAL_EMOJI[meal],
-    title: food.name,
-    subtitle: food.signature_dish
-      ? `${food.description.slice(0, 45)}… · Try: ${food.signature_dish}`
-      : food.description.slice(0, 65) + '…',
-    duration_min: durationMap[meal],
-    type: meal,
-    is_highlight: food.price_range === '$$$',
-  }
-}
