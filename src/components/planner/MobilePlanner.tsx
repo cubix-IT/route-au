@@ -538,7 +538,7 @@ export function MobilePlanner() {
 
         {/* Footer */}
         <div style={{ padding: '20px 16px', borderTop: '1px solid rgba(0,0,0,0.07)', marginTop: 8, textAlign: 'center' }}>
-          <div style={{ fontSize: 11, color: '#9CA3AF', marginBottom: 6 }}>Place data © Google · Map © OpenStreetMap · <span style={{ fontWeight: 600 }}>v1.3.6</span></div>
+          <div style={{ fontSize: 11, color: '#9CA3AF', marginBottom: 6 }}>Data © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer" style={{ color: '#9CA3AF' }}>OpenStreetMap</a> (ODbL) · Heritage © <a href="https://vhd.heritagecouncil.vic.gov.au" target="_blank" rel="noopener noreferrer" style={{ color: '#9CA3AF' }}>Heritage Council Vic</a> (CC BY 4.0)</div>
           <div style={{ display: 'flex', justifyContent: 'center', gap: 16 }}>
             <a href="/privacy" target="_blank" rel="noopener noreferrer" style={{ fontSize: 11, color: '#9CA3AF', textDecoration: 'none', fontWeight: 500 }}>Privacy & Attribution</a>
             <a href="mailto:support@cubixit.com.au" style={{ fontSize: 11, color: '#9CA3AF', textDecoration: 'none', fontWeight: 500 }}>Feedback</a>

@@ -626,7 +626,8 @@ export function LandingPage() {
             <a href="https://carto.com/attributions" target="_blank" rel="noopener noreferrer" style={{ color: 'rgba(255,255,255,0.75)' }}>CARTO</a>
             {' '}· Destination content ©{' '}
             <a href="https://en.wikipedia.org" target="_blank" rel="noopener noreferrer" style={{ color: 'rgba(255,255,255,0.75)' }}>Wikipedia contributors</a>
-            {' '}(CC BY-SA) · Fuel data © State of Victoria · Weather by{' '}
+            {' '}(CC BY-SA) · Heritage data © <a href="https://vhd.heritagecouncil.vic.gov.au" target="_blank" rel="noopener noreferrer" style={{ color: 'rgba(255,255,255,0.75)' }}>Heritage Council Victoria</a>
+            {' '}(CC BY 4.0) · Fuel data © State of Victoria · Weather by{' '}
             <a href="https://open-meteo.com" target="_blank" rel="noopener noreferrer" style={{ color: 'rgba(255,255,255,0.75)' }}>Open-Meteo</a>
           </div>
           {/* Bottom row */}

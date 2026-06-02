@@ -93,6 +93,18 @@ export default function handler(_req: VercelRequest, res: VercelResponse) {
     </div>
 
     <div class="source-group">
+      <div class="source-group-label">Heritage &amp; History</div>
+      <div class="source-entry">
+        <div class="source-entry-header">
+          <a href="https://vhd.heritagecouncil.vic.gov.au" target="_blank" rel="noopener noreferrer">Victorian Heritage Database ↗</a>
+          <a href="https://creativecommons.org/licenses/by/4.0/" class="licence-badge" target="_blank" rel="noopener noreferrer">CC BY 4.0</a>
+        </div>
+        <p class="source-desc">Official register of Victoria's most significant heritage places, maintained by Heritage Council Victoria. We use the Victorian Heritage Register (VHR) listings to add historically significant buildings and sites to destination activity lists.</p>
+        <p class="source-attr">© Heritage Council Victoria (State of Victoria)</p>
+      </div>
+    </div>
+
+    <div class="source-group">
       <div class="source-group-label">Maps &amp; Navigation</div>
       <div class="source-entry">
         <div class="source-entry-header">
@@ -247,6 +259,7 @@ export default function handler(_req: VercelRequest, res: VercelResponse) {
       Map data © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">OpenStreetMap contributors</a> (ODbL) ·
       Map tiles © <a href="https://carto.com/attributions" target="_blank" rel="noopener noreferrer">CARTO</a> ·
       Destination summaries © <a href="https://en.wikipedia.org" target="_blank" rel="noopener noreferrer">Wikipedia contributors</a> (CC BY-SA) ·
+      Heritage data © <a href="https://vhd.heritagecouncil.vic.gov.au" target="_blank" rel="noopener noreferrer">Heritage Council Victoria</a> (CC BY 4.0) ·
       Fuel data © State of Victoria
     </p>
   </div>
