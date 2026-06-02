@@ -25,10 +25,12 @@ All sources are free, open, and require no API keys unless noted.
 - **Limits**: 200 req/min with User-Agent — we sleep 350ms between calls
 - **Pageviews**: `https://wikimedia.org/api/rest_v1/metrics/pageviews/...` — 3-month avg
 
-## Open-Meteo
+## MET Norway (`api.met.no`)
 - **What**: Weather forecasts for destination
-- **Auth**: None required
-- **Licence**: Free for non-commercial use
+- **Endpoint**: `https://api.met.no/weatherapi/locationforecast/2.0/compact`
+- **Auth**: None required — User-Agent header identifying the app is required
+- **Licence**: Norwegian Licence for Open Data (NLOD) — free, **commercial use allowed**
+- **Attribution**: © Meteorologisk institutt (MET Norway)
 
 ## Service Victoria Fair Fuel API
 - **What**: Real-time fuel prices near route
