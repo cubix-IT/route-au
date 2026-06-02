@@ -708,8 +708,99 @@ out center tags ${limit};`
     else console.error('[enrich] nature upsert error:', error.message)
   }
 
+  // Generate descriptions via Claude Haiku for items with no OSM/Wikipedia description
+  // Cost: ~$0.003/day max (prepaid Anthropic credit — no auto-reload risk)
+  await generateDescriptions(slug, name, activities, foods)
+
   console.log(`[enrich] ${slug}: ${activities.length} activities, ${foods.length} food, ${nature.length} nature — overpass calls so far: ${usage.overpassCallsToday}`)
   return upserted
+}
+
+async function generateDescriptions(
+  slug: string,
+  destName: string,
+  activities: any[],
+  foods: any[],
+) {
+  if (!adminSupabase) return
+  const apiKey = process.env.ANTHROPIC_API_KEY
+  if (!apiKey) return
+
+  const allItems = [
+    ...activities.filter(a => !a.description).slice(0, 20).map(a => ({ ...a, _table: 'activities' })),
+    ...foods.filter(f => !f.description).slice(0, 20).map(f => ({ ...f, _table: 'food_places' })),
+  ]
+  if (allItems.length === 0) return
+
+  // Wikipedia first — free, often covers notable places
+  const resolved: Record<string, string> = {}
+  for (const item of allItems) {
+    const wpTag = item.attributes?.wikipedia
+    if (!wpTag) continue
+    const title = wpTag.replace(/^en:/i, '').replace(/ /g, '_')
+    try {
+      const r = await fetch(
+        `https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(title)}`,
+        { headers: { 'User-Agent': USER_AGENT }, signal: AbortSignal.timeout(5000) }
+      )
+      if (r.ok) {
+        const d = await r.json() as { extract?: string }
+        const extract = d.extract?.split('.')[0]
+        if (extract && extract.length > 20) resolved[item.slug] = extract + '.'
+      }
+    } catch { /* skip */ }
+  }
+
+  // Haiku for remaining — one batch call per destination, ~$0.003/day max
+  const needHaiku = allItems.filter(i => !resolved[i.slug])
+  if (needHaiku.length === 0) return
+
+  try {
+    const itemList = needHaiku.map(i => {
+      const parts = [`name:"${i.name}"`, `category:${i.category}`]
+      if (i.address) parts.push(`address:"${i.address}"`)
+      if (i.attributes?.opening_hours_text) parts.push(`hours:"${i.attributes.opening_hours_text}"`)
+      if (i.website) parts.push(`has website`)
+      if (i.phone) parts.push(`has phone`)
+      return `- slug:"${i.slug}" ${parts.join(' ')}`
+    }).join('\n')
+
+    const r = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'x-api-key': apiKey, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 1500,
+        temperature: 0.2,
+        system: `You are a local travel writer for Victoria, Australia. Write one specific, vivid sentence (15-25 words) for each place. Be concrete — mention the food type, view, history, or atmosphere. Respond ONLY with valid JSON mapping slug to description.`,
+        messages: [{ role: 'user', content: `Places near ${destName}, Victoria:\n${itemList}\n\nJSON: {"slug":"description",...}` }],
+      }),
+      signal: AbortSignal.timeout(20000),
+    })
+
+    if (!r.ok) return
+    const data = await r.json() as { content?: { text: string }[] }
+    const text = data.content?.[0]?.text?.trim() ?? ''
+    const start = text.indexOf('{'), end = text.lastIndexOf('}')
+    if (start === -1 || end === -1) return
+    const descriptions: Record<string, string> = JSON.parse(text.slice(start, end + 1))
+    for (const [dslug, desc] of Object.entries(descriptions)) {
+      if (desc && typeof desc === 'string') resolved[dslug] = desc.slice(0, 220)
+    }
+  } catch (e) {
+    console.error('[enrich] haiku error:', e instanceof Error ? e.message : e)
+    return
+  }
+
+  // Write resolved descriptions to DB
+  let written = 0
+  for (const [dslug, desc] of Object.entries(resolved)) {
+    const item = allItems.find(i => i.slug === dslug)
+    if (!item) continue
+    const { error } = await adminSupabase.from(item._table).update({ description: desc }).eq('slug', dslug)
+    if (!error) written++
+  }
+  if (written > 0) console.log(`[enrich] ${slug}: wrote ${written} descriptions via Wikipedia/Haiku`)
 }
 
 

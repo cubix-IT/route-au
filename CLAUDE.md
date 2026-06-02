@@ -11,7 +11,9 @@ Working directory: /home/raj/unplanned-escapes
 - @docs/roadmap.md — current phase, pending tasks, backlog
 
 ## Critical rules
-- **NO PAID APIs** — Google Places caused A$1,992 bill in May 2026. No googleapis, no Google Places, ever.
+- **NO NEW PAID APIs without telling Raj first** — Google Places caused A$1,992 bill May 2026. Never add a paid/non-commercial API without explicitly saying "this costs X per month" and getting approval.
+- **Approved paid service:** Anthropic Claude Haiku only — prepaid credit, no auto-reload, ~$0.003/day max. Safe.
+- **Never add:** Any per-request API with no hard monthly cap (Google APIs, AWS unguarded, etc.)
 - **Deploy via `npm run deploy`** — never `vercel --prod` directly (bypasses deploy_log table)
 - **DB source column** — always `'static'`, never `'osm'` or `'google'` (CHECK constraint)
 - **Zustand selectors** — scalar only: `(s) => s.x`, never `(s) => ({ x: s.x, y: s.y })`

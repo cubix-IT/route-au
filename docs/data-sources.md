@@ -53,4 +53,7 @@ All sources are free, open, and require no API keys unless noted.
 - **What**: AI-generated descriptions for POIs with no Wikipedia article
 - **Key**: `ANTHROPIC_API_KEY` (Vercel env, server-side only)
 - **Model**: `claude-haiku-4-5-20251001`
-- **Cost**: Paid API — only fires during cron enrichment, not on user requests
+- **Cost**: ~$0.003/day · ~$0.09/month · prepaid credit, no auto-reload = hard cap
+- **Pricing**: $0.80/M input tokens, $4/M output tokens (Haiku 4.5)
+- **Only fires**: in enrichment cron, never on user requests
+- **Safe because**: Raj's Anthropic account is prepaid with no auto-reload — if credit runs out it stops, no debt
