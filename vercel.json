@@ -12,6 +12,7 @@
     { "path": "/api/cron/limits",    "schedule": "0 23 * * 0" }
   ],
   "functions": {
+    "api/webhooks/vercel-deploy.ts": { "maxDuration": 10 },
     "api/cron/enrich.ts":    { "maxDuration": 60 },
     "api/cron/fuel.ts":      { "maxDuration": 30 },
     "api/cron/summaries.ts": { "maxDuration": 30 },
