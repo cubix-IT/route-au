@@ -167,10 +167,11 @@ interface UsageState {
 }
 
 const OVERPASS_ENDPOINT = 'https://overpass-api.de/api/interpreter'
-// Fallback mirrors if primary is slow
+// Fallback mirrors tried in order when primary is slow/down
 const OVERPASS_MIRRORS = [
   'https://overpass-api.de/api/interpreter',
   'https://overpass.kumi.systems/api/interpreter',
+  'https://overpass.private.coffee/api/interpreter',
 ]
 
 async function getDailyOverpassCount(): Promise<number> {

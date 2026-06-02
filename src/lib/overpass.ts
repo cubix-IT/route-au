@@ -21,6 +21,7 @@ export interface LivePOI {
 
 const OVERPASS = 'https://overpass-api.de/api/interpreter'
 const OVERPASS_MIRROR = 'https://overpass.kumi.systems/api/interpreter'
+const OVERPASS_MIRROR2 = 'https://overpass.private.coffee/api/interpreter'
 
 const poiCache = new Map<string, LivePOI[]>()
 const wikiCache = new Map<string, string | null>()
@@ -56,7 +57,7 @@ function saveWikiLS(key: string, value: string | null): void {
 try { loadWikiLS() } catch { /* */ }
 
 async function overpassFetch(query: string, timeoutMs = 8000): Promise<any[]> {
-  for (const endpoint of [OVERPASS, OVERPASS_MIRROR]) {
+  for (const endpoint of [OVERPASS, OVERPASS_MIRROR, OVERPASS_MIRROR2]) {
     try {
       const res = await fetch(endpoint, {
         method: 'POST', body: query,
