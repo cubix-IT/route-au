@@ -220,18 +220,6 @@ const VICTORIA_HIGHLIGHTS: Record<string, string[]> = {
 
 // ── Simple From / To search (hero) ────────────────────────────────────
 
-// ── GPS reverse geocode via Photon ───────────────────────────────────
-async function reverseGeocode(lat: number, lng: number): Promise<{ name: string; coord: { lat: number; lng: number } } | null> {
-  try {
-    const res = await fetch(`https://photon.komoot.io/reverse?lat=${lat}&lon=${lng}&lang=en&limit=1`)
-    const json = await res.json()
-    const f: PhotonFeature | undefined = json.features?.[0]
-    if (!f) return null
-    const label = featureLabel(f)
-    if (!label) return null
-    return { name: label, coord: { lat, lng } }
-  } catch { return null }
-}
 
 type HeroMode = 'choose' | 'know' | 'surprise'
 
@@ -247,7 +235,6 @@ function FromToSearch({ onSearch }: {
   const [toQuery, setToQuery] = useState('')
   const [toSuggestions, setToSuggestions] = useState<SubDestResult[]>([])
   const [toChosen, setToChosen] = useState<SubDestResult | null>(null)
-  const [gpsLoading, setGpsLoading] = useState(false)
   const fromDebounce = useRef<ReturnType<typeof setTimeout> | null>(null)
   const fromRef = useRef<HTMLDivElement>(null)
   const toRef = useRef<HTMLDivElement>(null)
@@ -277,19 +264,6 @@ function FromToSearch({ onSearch }: {
     setToSuggestions(searchDestinations(val))
   }
 
-  const handleGps = () => {
-    if (!navigator.geolocation) return
-    setGpsLoading(true)
-    navigator.geolocation.getCurrentPosition(
-      async (pos) => {
-        const result = await reverseGeocode(pos.coords.latitude, pos.coords.longitude)
-        setGpsLoading(false)
-        if (result) { setFromQuery(result.name); setFromChosen(result) }
-      },
-      () => setGpsLoading(false),
-      { timeout: 8000, maximumAge: 60000 },
-    )
-  }
 
   const isMobile = typeof window !== 'undefined' && window.innerWidth < 640
   const inp: React.CSSProperties = { width: '100%', padding: '14px 14px', border: 'none', outline: 'none', fontSize: 15, color: '#1C1B1F', background: 'transparent', fontFamily: 'inherit', boxSizing: 'border-box' }
@@ -353,26 +327,12 @@ function FromToSearch({ onSearch }: {
       <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
         <input
           autoFocus
-          style={{ ...inp, paddingRight: 44 }}
+          style={inp}
           placeholder="Your suburb or city"
           value={fromQuery}
           onChange={(e) => onFromChange(e.target.value)}
           onFocus={() => { if (fromQuery.length >= 2 && !fromChosen) searchOrigin(fromQuery).then(setFromSuggestions) }}
         />
-        {/* GPS button */}
-        <button
-          onClick={handleGps}
-          title="Use my location"
-          style={{
-            position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)',
-            background: gpsLoading ? '#F3F4F6' : 'transparent', border: 'none',
-            borderRadius: 8, width: 30, height: 30, cursor: 'pointer',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: 16, color: gpsLoading ? '#9CA3AF' : '#6B7280', flexShrink: 0,
-          }}
-        >
-          {gpsLoading ? '…' : '📍'}
-        </button>
         {fromSuggestions.length > 0 && (
           <div style={drop}>
             {fromSuggestions.map((f, i) => (
