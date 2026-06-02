@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useAppStore } from '@/store/useAppStore'
 import { supabase } from '@/lib/supabase'
 import {
@@ -336,13 +336,11 @@ export function usePlannerData() {
   // Descriptions masquerading as venue names (OSM tags, event blurbs, etc.)
   const JUNK_PHRASE_PATTERN = /\bat dusk\b|\bat dawn\b|\bat night\b|\bviewing area\b|\bwombats?\s+(at|near)\b/i
 
-  const openActivities = (() => {
+  const openActivities = useMemo(() => {
     const byStatus = dbActivities.filter((a) => {
       const attr = (a as unknown as { attributes?: Record<string, unknown> }).attributes ?? {}
       if ((attr.business_status as string | undefined) && attr.business_status !== 'OPERATIONAL') return false
-      // Drop coordinate-only maps links
       if (a.maps_url && COORD_ONLY_URL.test(a.maps_url) && !a.maps_url.includes('place_id')) return false
-      // Drop junk names
       if (!a.name || a.name.trim().length < 3) return false
       if (JUNK_ACT_PATTERN.test(a.name.trim())) return false
       if (JUNK_PHRASE_PATTERN.test(a.name)) return false
@@ -355,38 +353,38 @@ export function usePlannerData() {
       seen.add(key)
       return true
     })
-  })()
+  }, [dbActivities]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Nature spots: remove OSM junk and low-credibility entries
   const NATURE_JUNK = /^(road verge|road side|roadside|verge|track|path|footpath|cycleway|footway|bridleway|unnamed|way|lane|street|road|avenue|drive|court|close|place|highway|route|service road|access road|fire track|fire road|fire trail|dirt road|gravel road|unsealed road|walking track|walking path|shared path|nature strip|median strip|drain|channel|creek crossing|culvert|bridge|roundabout|intersection|junction|node|area|region|zone|locality|suburb|township|settlement|precinct|\d+)$/i
-  const uniqueNature = (() => {
+  const uniqueNature = useMemo(() => {
     const seen = new Set<string>()
     return dbNature.filter((n) => {
       const name = n.name.trim()
-      // Must have a real name (not just a number, single word generic, or < 3 chars)
       if (name.length < 3) return false
       if (NATURE_JUNK.test(name)) return false
-      // Must have a meaningful description or at least a proper noun-ish name
       const key = name.toLowerCase()
       if (seen.has(key)) return false
       seen.add(key)
       return true
     })
-  })()
+  }, [dbNature]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const dbActivityCount = openActivities.length + uniqueNature.length
   const dbAccomCount = dbAccommodation.length
 
   // Map DbAccommodation → AccommodationPOI for components that expect the legacy type
   const VALID_ACCOM_TYPES = new Set(['hotel','motel','campsite','caravan_park','hostel','cabin','guest_house'])
-  const accommodationPOIs: AccommodationPOI[] = dbAccommodation.map((a) => ({
-    id: a.slug,
-    type: (VALID_ACCOM_TYPES.has(a.type) ? a.type : 'hotel') as AccommodationPOI['type'],
-    name: a.name,
-    lat: a.lat ?? undefined,
-    lng: a.lng ?? undefined,
-    description: a.description || undefined,
-  }))
+  const accommodationPOIs: AccommodationPOI[] = useMemo(() =>
+    dbAccommodation.map((a) => ({
+      id: a.slug,
+      type: (VALID_ACCOM_TYPES.has(a.type) ? a.type : 'hotel') as AccommodationPOI['type'],
+      name: a.name,
+      lat: a.lat ?? undefined,
+      lng: a.lng ?? undefined,
+      description: a.description || undefined,
+    }))
+  , [dbAccommodation]) // eslint-disable-line react-hooks/exhaustive-deps
 
   return {
     // store state
