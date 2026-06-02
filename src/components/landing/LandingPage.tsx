@@ -220,15 +220,10 @@ const VICTORIA_HIGHLIGHTS: Record<string, string[]> = {
 
 // ── Simple From / To search (hero) ────────────────────────────────────
 
-
-type HeroMode = 'choose' | 'know' | 'surprise'
-
 function FromToSearch({ onSearch }: {
   onSearch: (origin: { name: string; coord: { lat: number; lng: number } | null }, dest: SubDestResult | null) => void
 }) {
   const storedOrigin = useAppStore((s) => s.originName)
-  // If returning user has a stored origin, skip straight to 'know' mode
-  const [mode, setMode] = useState<HeroMode>(() => storedOrigin ? 'know' : 'choose')
   const [fromQuery, setFromQuery] = useState('')
   const [fromSuggestions, setFromSuggestions] = useState<PhotonFeature[]>([])
   const [fromChosen, setFromChosen] = useState<{ name: string; coord: { lat: number; lng: number } } | null>(null)
@@ -264,182 +259,86 @@ function FromToSearch({ onSearch }: {
     setToSuggestions(searchDestinations(val))
   }
 
-
   const isMobile = typeof window !== 'undefined' && window.innerWidth < 640
   const inp: React.CSSProperties = { width: '100%', padding: '14px 14px', border: 'none', outline: 'none', fontSize: 15, color: '#1C1B1F', background: 'transparent', fontFamily: 'inherit', boxSizing: 'border-box' }
   const lbl: React.CSSProperties = { fontSize: 9.5, fontWeight: 800, color: GREEN, textTransform: 'uppercase', letterSpacing: '0.1em', padding: '10px 14px 0' }
   const drop: React.CSSProperties = { position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: 0, background: '#fff', borderRadius: 12, border: '1px solid var(--border)', boxShadow: '0 12px 40px rgba(0,0,0,0.14)', zIndex: 200, overflow: 'hidden' }
 
-  // ── Intent choice cards ───────────────────────────────────────────────
-  if (mode === 'choose') {
-    return (
-      <div style={{ maxWidth: 680, width: '100%', margin: '0 auto' }}>
-        <p style={{ textAlign: 'center', fontSize: 14, color: '#6B7280', marginBottom: 14, letterSpacing: '-0.01em' }}>
-          Do you have somewhere in mind?
-        </p>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-          <button
-            onClick={() => setMode('know')}
-            style={{
-              background: '#fff', border: '1.5px solid rgba(0,0,0,0.08)', borderRadius: 16,
-              padding: '20px 18px', cursor: 'pointer', textAlign: 'left',
-              boxShadow: '0 4px 20px rgba(0,0,0,0.07)', transition: 'all 0.15s',
-            }}
-            onMouseEnter={(e) => { e.currentTarget.style.borderColor = GREEN; e.currentTarget.style.boxShadow = '0 6px 28px rgba(58,107,79,0.18)' }}
-            onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'rgba(0,0,0,0.08)'; e.currentTarget.style.boxShadow = '0 4px 20px rgba(0,0,0,0.07)' }}
-          >
-            <div style={{ fontSize: 26, marginBottom: 10 }}>🗺️</div>
-            <div style={{ fontSize: 14, fontWeight: 700, color: '#1C1B1F', letterSpacing: '-0.02em', marginBottom: 4 }}>
-              Yes, I know where to go
-            </div>
-            <div style={{ fontSize: 12, color: '#6B7280', lineHeight: 1.5 }}>
-              Tell us where you're from and where you're headed
-            </div>
-          </button>
-
-          <button
-            onClick={() => setMode('surprise')}
-            style={{
-              background: '#fff', border: '1.5px solid rgba(0,0,0,0.08)', borderRadius: 16,
-              padding: '20px 18px', cursor: 'pointer', textAlign: 'left',
-              boxShadow: '0 4px 20px rgba(0,0,0,0.07)', transition: 'all 0.15s',
-            }}
-            onMouseEnter={(e) => { e.currentTarget.style.borderColor = GREEN; e.currentTarget.style.boxShadow = '0 6px 28px rgba(58,107,79,0.18)' }}
-            onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'rgba(0,0,0,0.08)'; e.currentTarget.style.boxShadow = '0 4px 20px rgba(0,0,0,0.07)' }}
-          >
-            <div style={{ fontSize: 26, marginBottom: 10 }}>✨</div>
-            <div style={{ fontSize: 14, fontWeight: 700, color: '#1C1B1F', letterSpacing: '-0.02em', marginBottom: 4 }}>
-              Surprise me
-            </div>
-            <div style={{ fontSize: 12, color: '#6B7280', lineHeight: 1.5 }}>
-              Just tell us where you're coming from — we'll find you the perfect escape
-            </div>
-          </button>
-        </div>
-      </div>
-    )
-  }
-
-  // ── From field (shared by both know + surprise modes) ─────────────────
-  const fromField = (
-    <div ref={fromRef} style={{ flex: 1, position: 'relative', display: 'flex', flexDirection: 'column', minWidth: 0, borderBottom: isMobile ? '1px solid var(--border)' : 'none' }}>
-      <div style={lbl}>Where are you coming from?</div>
-      <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-        <input
-          autoFocus
-          style={inp}
-          placeholder="Your suburb or city"
-          value={fromQuery}
-          onChange={(e) => onFromChange(e.target.value)}
-          onFocus={() => { if (fromQuery.length >= 2 && !fromChosen) searchOrigin(fromQuery).then(setFromSuggestions) }}
-        />
-        {fromSuggestions.length > 0 && (
-          <div style={drop}>
-            {fromSuggestions.map((f, i) => (
-              <button key={i} onClick={() => { const label = featureLabel(f); const [lng, lat] = f.geometry.coordinates; setFromQuery(label); setFromChosen({ name: label, coord: { lat, lng } }); setFromSuggestions([]) }}
-                style={{ width: '100%', padding: '11px 16px', background: 'none', border: 'none', textAlign: 'left', fontSize: 13.5, cursor: 'pointer', color: '#1C1B1F', display: 'block' }}
-                onMouseEnter={(e) => (e.currentTarget.style.background = '#F5F4F1')}
-                onMouseLeave={(e) => (e.currentTarget.style.background = 'none')}>
-                📍 {featureLabel(f)}
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
-    </div>
-  )
-
-  // ── Surprise me mode — just From + go ────────────────────────────────
-  if (mode === 'surprise') {
-    return (
-      <div style={{ maxWidth: 680, width: '100%', margin: '0 auto' }}>
-        <button onClick={() => setMode('choose')} style={{ background: 'none', border: 'none', color: '#9CA3AF', fontSize: 12, cursor: 'pointer', marginBottom: 10, padding: 0, display: 'flex', alignItems: 'center', gap: 4 }}>
-          ← Back
-        </button>
-        <div style={{
-          background: '#fff', borderRadius: 18, boxShadow: '0 8px 40px rgba(0,0,0,0.13)',
-          border: '1px solid rgba(0,0,0,0.06)', width: '100%', overflow: 'visible',
-          display: 'flex', flexDirection: isMobile ? 'column' : 'row',
-        }}>
-          {fromField}
-          <button
-            onClick={() => onSearch({ name: fromChosen?.name ?? fromQuery, coord: fromChosen?.coord ?? null }, null)}
-            style={{
-              flexShrink: 0, padding: isMobile ? '14px 24px' : '0 24px',
-              background: GREEN, border: 'none', color: '#fff',
-              fontSize: 14, fontWeight: 700, cursor: 'pointer',
-              borderRadius: isMobile ? '0 0 18px 18px' : '0 18px 18px 0',
-              letterSpacing: '-0.01em', whiteSpace: 'nowrap',
-            }}
-            onMouseEnter={(e) => (e.currentTarget.style.background = '#2d5440')}
-            onMouseLeave={(e) => (e.currentTarget.style.background = GREEN)}
-          >
-            Find my escape →
-          </button>
-        </div>
-      </div>
-    )
-  }
-
-  // ── Know mode — From + To ─────────────────────────────────────────────
   return (
-    <div style={{ maxWidth: 680, width: '100%', margin: '0 auto' }}>
-      {!storedOrigin && (
-        <button onClick={() => setMode('choose')} style={{ background: 'none', border: 'none', color: '#9CA3AF', fontSize: 12, cursor: 'pointer', marginBottom: 10, padding: 0, display: 'flex', alignItems: 'center', gap: 4 }}>
-          ← Back
-        </button>
-      )}
-      <div style={{
-        background: '#fff', borderRadius: 18, boxShadow: '0 8px 40px rgba(0,0,0,0.13)',
-        border: '1px solid rgba(0,0,0,0.06)', width: '100%', overflow: 'visible',
-        display: 'flex', flexDirection: isMobile ? 'column' : 'row',
-      }}>
-        {fromField}
+    <div style={{
+      background: '#fff', borderRadius: 18, boxShadow: '0 8px 40px rgba(0,0,0,0.13)',
+      border: '1px solid rgba(0,0,0,0.06)', maxWidth: 680, width: '100%', margin: '0 auto',
+      display: 'flex', flexDirection: isMobile ? 'column' : 'row', overflow: 'visible',
+    }}>
 
-        {!isMobile && <div style={{ width: 1, background: 'var(--border)', alignSelf: 'stretch', margin: '10px 0' }} />}
-
-        {/* TO */}
-        <div ref={toRef} style={{ flex: 1, position: 'relative', display: 'flex', flexDirection: 'column', minWidth: 0, borderBottom: isMobile ? '1px solid var(--border)' : 'none' }}>
-          <div style={lbl}>Where to?</div>
-          <div style={{ position: 'relative' }}>
-            <input style={{ ...inp, paddingRight: toChosen ? 36 : undefined }} placeholder="Search a Victorian destination…"
-              value={toChosen ? toChosen.name : toQuery}
-              onChange={(e) => { setToChosen(null); onToChange(e.target.value) }}
-              onFocus={() => { if (toQuery.length >= 2 && !toChosen) setToSuggestions(searchDestinations(toQuery)) }}
-            />
-            {toChosen && (
-              <button onClick={() => { setToChosen(null); setToQuery('') }} style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', background: '#F3F4F6', border: 'none', borderRadius: '50%', width: 20, height: 20, fontSize: 12, cursor: 'pointer', color: '#6B7280' }}>×</button>
-            )}
-            {toSuggestions.length > 0 && !toChosen && (
-              <div style={drop}>
-                {toSuggestions.map((s) => (
-                  <button key={s.id} onClick={() => { setToChosen(s); setToQuery(s.name); setToSuggestions([]) }}
-                    style={{ width: '100%', padding: '11px 16px', background: 'none', border: 'none', textAlign: 'left', fontSize: 13.5, cursor: 'pointer', color: '#1C1B1F', display: 'block' }}
-                    onMouseEnter={(e) => (e.currentTarget.style.background = '#F5F4F1')}
-                    onMouseLeave={(e) => (e.currentTarget.style.background = 'none')}>
-                    📍 {s.name}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
+      {/* FROM */}
+      <div ref={fromRef} style={{ flex: 1, position: 'relative', display: 'flex', flexDirection: 'column', minWidth: 0, borderBottom: isMobile ? '1px solid var(--border)' : 'none' }}>
+        <div style={lbl}>From</div>
+        <div style={{ position: 'relative' }}>
+          <input style={inp} placeholder="Your suburb or city" value={fromQuery}
+            onChange={(e) => onFromChange(e.target.value)}
+            onFocus={() => { if (fromQuery.length >= 2 && !fromChosen) searchOrigin(fromQuery).then(setFromSuggestions) }}
+          />
+          {fromSuggestions.length > 0 && (
+            <div style={drop}>
+              {fromSuggestions.map((f, i) => (
+                <button key={i} onClick={() => { const label = featureLabel(f); const [lng, lat] = f.geometry.coordinates; setFromQuery(label); setFromChosen({ name: label, coord: { lat, lng } }); setFromSuggestions([]) }}
+                  style={{ width: '100%', padding: '11px 16px', background: 'none', border: 'none', textAlign: 'left', fontSize: 13.5, cursor: 'pointer', color: '#1C1B1F', display: 'block' }}
+                  onMouseEnter={(e) => (e.currentTarget.style.background = '#F5F4F1')}
+                  onMouseLeave={(e) => (e.currentTarget.style.background = 'none')}>
+                  📍 {featureLabel(f)}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
-
-        <button
-          onClick={() => onSearch({ name: fromChosen?.name ?? fromQuery, coord: fromChosen?.coord ?? null }, toChosen)}
-          style={{
-            flexShrink: 0, padding: isMobile ? '14px 24px' : '0 24px',
-            background: GREEN, border: 'none', color: '#fff',
-            fontSize: 14, fontWeight: 700, cursor: 'pointer',
-            borderRadius: isMobile ? '0 0 18px 18px' : '0 18px 18px 0',
-            letterSpacing: '-0.01em', whiteSpace: 'nowrap',
-          }}
-          onMouseEnter={(e) => (e.currentTarget.style.background = '#2d5440')}
-          onMouseLeave={(e) => (e.currentTarget.style.background = GREEN)}
-        >
-          {toChosen ? 'Plan this →' : "Let's go →"}
-        </button>
       </div>
+
+      {!isMobile && <div style={{ width: 1, background: 'var(--border)', alignSelf: 'stretch', margin: '10px 0' }} />}
+
+      {/* TO */}
+      <div ref={toRef} style={{ flex: 1, position: 'relative', display: 'flex', flexDirection: 'column', minWidth: 0, borderBottom: isMobile ? '1px solid var(--border)' : 'none' }}>
+        <div style={lbl}>To <span style={{ fontWeight: 400, fontSize: 9, color: '#9CA3AF', textTransform: 'none', letterSpacing: 0 }}>optional</span></div>
+        <div style={{ position: 'relative' }}>
+          <input style={{ ...inp, paddingRight: toChosen ? 36 : undefined }} placeholder="Anywhere in Victoria…"
+            value={toChosen ? toChosen.name : toQuery}
+            onChange={(e) => { setToChosen(null); onToChange(e.target.value) }}
+            onFocus={() => { if (toQuery.length >= 2 && !toChosen) setToSuggestions(searchDestinations(toQuery)) }}
+          />
+          {toChosen && (
+            <button onClick={() => { setToChosen(null); setToQuery('') }} style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', background: '#F3F4F6', border: 'none', borderRadius: '50%', width: 20, height: 20, fontSize: 12, cursor: 'pointer', color: '#6B7280' }}>×</button>
+          )}
+          {toSuggestions.length > 0 && !toChosen && (
+            <div style={drop}>
+              {toSuggestions.map((s) => (
+                <button key={s.id} onClick={() => { setToChosen(s); setToQuery(s.name); setToSuggestions([]) }}
+                  style={{ width: '100%', padding: '11px 16px', background: 'none', border: 'none', textAlign: 'left', fontSize: 13.5, cursor: 'pointer', color: '#1C1B1F', display: 'block' }}
+                  onMouseEnter={(e) => (e.currentTarget.style.background = '#F5F4F1')}
+                  onMouseLeave={(e) => (e.currentTarget.style.background = 'none')}>
+                  📍 {s.name}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Button */}
+      <button
+        onClick={() => onSearch({ name: fromChosen?.name ?? fromQuery, coord: fromChosen?.coord ?? null }, toChosen)}
+        style={{
+          flexShrink: 0,
+          padding: isMobile ? '14px 24px' : '0 24px',
+          background: GREEN, border: 'none', color: '#fff',
+          fontSize: 14, fontWeight: 700, cursor: 'pointer',
+          borderRadius: isMobile ? '0 0 18px 18px' : '0 18px 18px 0',
+          letterSpacing: '-0.01em', whiteSpace: 'nowrap',
+        }}
+        onMouseEnter={(e) => (e.currentTarget.style.background = '#2d5440')}
+        onMouseLeave={(e) => (e.currentTarget.style.background = GREEN)}
+      >
+        {toChosen ? 'Plan this →' : "Let's go →"}
+      </button>
     </div>
   )
 }
