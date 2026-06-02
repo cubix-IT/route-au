@@ -46,7 +46,7 @@ export function MapContainer() {
     pinMarkersRef.current.forEach((m) => m.remove())
     pinMarkersRef.current = []
 
-    const destCoord = activeItinerary?.route.waypoints.at(-1)?.coord
+    const destCoord = activeItinerary?.route?.waypoints.at(-1)?.coord
     if (!destCoord) return
 
     // Destination marker — amber pin
@@ -56,7 +56,7 @@ export function MapContainer() {
         <path d="M9 0C4 0 0 4 0 9c0 6.6 9 15 9 15s9-8.4 9-15c0-5-4-9-9-9z" fill="#B87333"/>
         <circle cx="9" cy="9" r="3.5" fill="#fff"/>
       </svg></div>`
-    const destLabel = activeItinerary?.route.waypoints.at(-1)?.label ?? ''
+    const destLabel = activeItinerary?.route?.waypoints.at(-1)?.label ?? ''
     pinMarkersRef.current.push(
       new maplibregl.Marker({ element: destEl })
         .setLngLat([destCoord.lng, destCoord.lat])
@@ -138,8 +138,8 @@ export function MapContainer() {
     if (vehicleProfile.fuel_type === 'Electric') return
     if ((vehicleProfile as { skip_fuel?: boolean }).skip_fuel) return
 
-    const waypoints = activeItinerary.route.waypoints
-    if (waypoints.length < 2) return
+    const waypoints = activeItinerary.route?.waypoints
+    if (!waypoints || waypoints.length < 2) return
 
     const origin = waypoints[0].coord
     const dest = waypoints[waypoints.length - 1].coord

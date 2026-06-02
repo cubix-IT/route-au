@@ -530,7 +530,7 @@ export function LandingPage() {
     dest: SubDestResult | null,
   ) => {
     const originCoord = origin.coord ?? { lat: -37.8136, lng: 144.9631 }
-    const name = origin.name || 'Melbourne'
+    const name = origin.name || ''
 
     // Always store the origin
     setTripPlanState({ originName: name, originCoord })

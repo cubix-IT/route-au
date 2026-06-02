@@ -1,14 +1,26 @@
 import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
 
-// Synchronous migration — must run before Zustand reads the new key
+// Synchronous migrations — run before Zustand reads the persisted key
 try {
   if (typeof localStorage !== 'undefined') {
+    // 1. Rename key from old route-au-v4 brand
     const old = localStorage.getItem('route-au-v4')
     if (old && !localStorage.getItem('unplanned-escapes-v4')) {
       localStorage.setItem('unplanned-escapes-v4', old)
     }
     localStorage.removeItem('route-au-v4')
+
+    // 2. Clear persisted originName if it's the old Melbourne default (user never set it)
+    //    and strip activeItinerary from stored state (too large, now rebuilt each session)
+    const stored = localStorage.getItem('unplanned-escapes-v4')
+    if (stored) {
+      const parsed = JSON.parse(stored)
+      let dirty = false
+      if (parsed?.state?.originName === 'Melbourne') { parsed.state.originName = ''; parsed.state.originId = ''; dirty = true }
+      if (parsed?.state?.activeItinerary !== undefined) { delete parsed.state.activeItinerary; dirty = true }
+      if (dirty) localStorage.setItem('unplanned-escapes-v4', JSON.stringify(parsed))
+    }
   }
 } catch { /* SSR / private browsing — ignore */ }
 import type { User, Session } from '@supabase/supabase-js'
@@ -156,8 +168,8 @@ export const useAppStore = create<AppState>()(
       setVehicleProfile: (p) => set({ vehicleProfile: p }),
 
       tripType: 'day',
-      originId: 'melbourne',
-      originName: 'Melbourne',
+      originId: '',
+      originName: '',
       originCoord: { lng: 144.9631, lat: -37.8136 },
       destId: 'twelve-apostles',
       destName: '12 Apostles',
