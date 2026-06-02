@@ -160,10 +160,11 @@ export default function handler(_req: VercelRequest, res: VercelResponse) {
       <div class="source-group-label">Live Information</div>
       <div class="source-entry">
         <div class="source-entry-header">
-          <a href="https://open-meteo.com" target="_blank" rel="noopener noreferrer">Open-Meteo ↗</a>
-          <a href="https://open-meteo.com/en/terms" class="licence-badge" target="_blank" rel="noopener noreferrer">Free for non-commercial use</a>
+          <a href="https://api.met.no" target="_blank" rel="noopener noreferrer">MET Norway — Locationforecast ↗</a>
+          <a href="https://api.met.no/conditions_service.html" class="licence-badge" target="_blank" rel="noopener noreferrer">Norwegian Licence for Open Data (NLOD)</a>
         </div>
-        <p class="source-desc">Weather forecasts for your destination. Only the destination coordinates are sent — no personal data.</p>
+        <p class="source-desc">Weather forecasts for your destination, provided by the Norwegian Meteorological Institute. Only destination coordinates are sent — no personal data.</p>
+        <p class="source-attr">© Meteorologisk institutt (MET Norway)</p>
       </div>
       <div class="source-entry">
         <div class="source-entry-header">

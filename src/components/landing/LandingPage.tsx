@@ -626,7 +626,7 @@ export function LandingPage() {
             <a href="https://en.wikipedia.org" target="_blank" rel="noopener noreferrer" style={{ color: 'rgba(255,255,255,0.75)' }}>Wikipedia contributors</a>
             {' '}(CC BY-SA) · Heritage data © <a href="https://vhd.heritagecouncil.vic.gov.au" target="_blank" rel="noopener noreferrer" style={{ color: 'rgba(255,255,255,0.75)' }}>Heritage Council Victoria</a>
             {' '}(CC BY 4.0) · Fuel data © State of Victoria · Weather by{' '}
-            <a href="https://open-meteo.com" target="_blank" rel="noopener noreferrer" style={{ color: 'rgba(255,255,255,0.75)' }}>Open-Meteo</a>
+            <a href="https://api.met.no" target="_blank" rel="noopener noreferrer" style={{ color: 'rgba(255,255,255,0.75)' }}>MET Norway</a>
           </div>
           {/* Bottom row */}
           <div style={{ borderTop: '1px solid rgba(255,255,255,0.12)', paddingTop: 14, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
