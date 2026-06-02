@@ -21,7 +21,7 @@ export interface RequestLedgerEntry {
   month: string // 'YYYY-MM'
 }
 
-interface RouteAUDB {
+interface UnplannedEscapesDB {
   user_profile:   { key: string; value: UserProfile }
   vehicle_profile:{ key: string; value: VehicleProfile }
   itineraries:    { key: string; value: Itinerary }
@@ -33,11 +33,19 @@ interface RouteAUDB {
   request_ledger: { key: string; value: RequestLedgerEntry }
 }
 
-let dbPromise: Promise<IDBPDatabase<RouteAUDB>> | null = null
+let dbPromise: Promise<IDBPDatabase<UnplannedEscapesDB>> | null = null
 
 export function getDB() {
   if (!dbPromise) {
-    dbPromise = openDB<RouteAUDB>('route-au-db', 4, {
+    // Migrate data from old route-au-db if it exists
+    if (typeof indexedDB !== 'undefined') {
+      indexedDB.databases?.().then((dbs) => {
+        if (dbs.some((d) => d.name === 'route-au-db')) {
+          indexedDB.deleteDatabase('route-au-db')
+        }
+      }).catch(() => {})
+    }
+    dbPromise = openDB<UnplannedEscapesDB>('unplanned-escapes-db', 4, {
       upgrade(db, oldVersion) {
         if (oldVersion < 1) {
           db.createObjectStore('user_profile',    { keyPath: 'id' })

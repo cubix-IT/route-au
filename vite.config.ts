@@ -35,9 +35,9 @@ export default defineConfig({
         ],
       },
       manifest: {
-        name: 'RouteAU — Australia\'s Road Trip Planner',
-        short_name: 'RouteAU',
-        description: 'Offline-first Australian road trip planner. Plan it. Drive it.',
+        name: 'Unplanned Escapes — Victorian Weekend Getaways',
+        short_name: 'Unplanned Escapes',
+        description: 'Discover your next Victorian weekend getaway. Plan it. Drive it.',
         theme_color: '#b45309',
         background_color: '#0f172a',
         display: 'standalone',

@@ -81,7 +81,7 @@ function EmptyWelcome({ onStart }: { onStart: () => void }) {
     }}>
       <div style={{ fontSize: 64, marginBottom: 16 }}>🗺️</div>
       <h2 style={{ fontSize: 20, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 8 }}>
-        Welcome to RouteAU
+        Welcome to Unplanned Escapes
       </h2>
       <p style={{ fontSize: 14, color: 'var(--text-muted)', marginBottom: 24, lineHeight: 1.6, maxWidth: 260 }}>
         Australia's offline-first road trip planner. Build your perfect itinerary in minutes.

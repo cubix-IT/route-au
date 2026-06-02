@@ -352,6 +352,77 @@ function sleep(ms: number): Promise<void> {
   return new Promise((r) => setTimeout(r, ms))
 }
 
+// ── Victorian Heritage Database (VHD) API ────────────────────────────────────
+// Free, no auth. Returns VHR-registered heritage places near a destination.
+// Rate limits: unspecified — we add a 200ms sleep between calls to be polite.
+// We only fetch VHR (aut=1086) — the officially registered significant buildings,
+// not the Heritage Inventory (archaeological sites, mullock heaps, etc.)
+
+const VHD_BASE = 'https://api.heritagecouncil.vic.gov.au/v1'
+
+function stripHtmlEntities(str: string): string {
+  return str
+    .replace(/&hellip;/g, '…')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/<[^>]+>/g, '')  // strip any remaining HTML tags
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+function haversineKm(lat1: number, lng1: number, lat2: number, lng2: number): number {
+  const R = 6371
+  const dLat = (lat2 - lat1) * Math.PI / 180
+  const dLng = (lng2 - lng1) * Math.PI / 180
+  const a = Math.sin(dLat / 2) ** 2 +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLng / 2) ** 2
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+}
+
+interface VhdPlace {
+  id: number
+  name: string
+  latlon: string
+  summary?: string
+  location?: string
+  url?: string
+  vhr_number?: string
+  primary_image_url?: string
+}
+
+async function fetchVhdPlaces(
+  destName: string,
+  destLat: number,
+  destLng: number,
+  radiusKm: number,
+): Promise<VhdPlace[]> {
+  try {
+    // Search by suburb name — VHR only (aut=1086), up to 50 results
+    const url = `${VHD_BASE}/places?sub=${encodeURIComponent(destName)}&aut=1086&rpp=50`
+    const res = await fetch(url, {
+      headers: { 'User-Agent': USER_AGENT },
+      signal: AbortSignal.timeout(8_000),
+    })
+    if (!res.ok) return []
+    const json = await res.json() as { _embedded?: { places?: VhdPlace[] } }
+    const places = json._embedded?.places ?? []
+
+    // Post-filter by haversine distance — VHD geo param doesn't filter, only sorts
+    return places.filter((p) => {
+      if (!p.latlon) return false
+      const [pLat, pLng] = p.latlon.split(',').map(Number)
+      if (isNaN(pLat) || isNaN(pLng)) return false
+      return haversineKm(destLat, destLng, pLat, pLng) <= radiusKm
+    })
+  } catch {
+    return []
+  }
+}
+
 // ── Main enrichment for one sub-destination ──────────────────────────────────
 
 async function enrichSubDest(
@@ -552,6 +623,59 @@ out center tags ${limit};`
       )
     }
     await sleep(200) // gentle rate limiting — 5 req/s well within 200 req/min limit
+  }
+
+  // ── Victorian Heritage Database (VHD) enrichment ─────────────────────────
+  // Fetch VHR-registered heritage buildings near this destination and merge
+  // into activities. Uses destination name as suburb search term.
+  const radiusKm = r / 1000  // same radius as Overpass, in km
+  await sleep(200)  // polite gap after Wikipedia calls
+  const vhdPlaces = await fetchVhdPlaces(name, lat, lng, radiusKm)
+
+  for (const vhd of vhdPlaces) {
+    const vhdSlug = `vhd-${vhd.id}`
+    if (seenSlugs.has(vhdSlug)) continue
+    seenSlugs.add(vhdSlug)
+
+    const [vLat, vLng] = vhd.latlon.split(',').map(Number)
+    const rawSummary = vhd.summary ? stripHtmlEntities(vhd.summary) : null
+    // Truncate to 220 chars and ensure it ends at a word boundary
+    const description = rawSummary
+      ? rawSummary.length > 220 ? rawSummary.slice(0, 217).replace(/\s\S*$/, '…') : rawSummary
+      : null
+
+    activities.push({
+      slug: vhdSlug,
+      sub_dest_id: subDestId,
+      name: vhd.name.toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase()).replace(/\bOf\b/g, 'of').replace(/\bThe\b/g, 'the').replace(/^The\b/, 'The'),
+      category: 'history',
+      emoji: '🏛️',
+      description,
+      duration: null,
+      cost: 'free',
+      lat: vLat,
+      lng: vLng,
+      address: vhd.location || null,
+      kids_ok: true,
+      is_hidden_gem: false,
+      maps_url: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(vhd.name + ' Victoria Australia')}`,
+      website: vhd.url || null,
+      phone: null,
+      tags: ['heritage', 'vhr'],
+      source: 'static',
+      attributes: {
+        source: 'static',
+        vhd_id: vhd.id,
+        vhd_url: vhd.url,
+        vhr_number: vhd.vhr_number,
+        image_url: vhd.primary_image_url,
+        quality_score: 40,  // VHR = officially significant, baseline score
+      },
+    })
+  }
+
+  if (vhdPlaces.length > 0) {
+    console.log(`[enrich] ${slug}: +${vhdPlaces.length} VHD heritage places`)
   }
 
   if (!adminSupabase) return 0

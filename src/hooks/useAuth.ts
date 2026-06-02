@@ -72,7 +72,7 @@ async function migrateLocalDataIfNeeded(userId: string) {
   if (localStorage.getItem(migratedKey)) return
 
   try {
-    const stored = localStorage.getItem('route-au-v4')
+    const stored = localStorage.getItem('unplanned-escapes-v4') ?? localStorage.getItem('route-au-v4')
     if (!stored) return
     const parsed = JSON.parse(stored)
     const userProfile = parsed?.state?.userProfile ?? null

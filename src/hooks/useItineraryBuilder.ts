@@ -27,7 +27,7 @@ export function useItineraryBuilder() {
       } = useAppStore.getState()
 
       if (!userProfile || !vehicleProfile) {
-        console.warn('[RouteAU] buildItinerary called before profiles were set')
+        console.warn('[UnplannedEscapes] buildItinerary called before profiles were set')
         return
       }
 

@@ -254,8 +254,18 @@ export const useAppStore = create<AppState>()(
       setSavedTrips: (trips) => set({ savedTrips: trips }),
     }),
     {
-      name: 'route-au-v4',
+      name: 'unplanned-escapes-v4',
       storage: createJSONStorage(() => localStorage),
+      onRehydrateStorage: () => () => {
+        // One-time migration from old route-au-v4 key
+        try {
+          const old = localStorage.getItem('route-au-v4')
+          if (old && !localStorage.getItem('unplanned-escapes-v4')) {
+            localStorage.setItem('unplanned-escapes-v4', old)
+          }
+          localStorage.removeItem('route-au-v4')
+        } catch { /* ignore */ }
+      },
       partialize: (state) => ({
         userProfile: state.userProfile,
         vehicleProfile: state.vehicleProfile,
