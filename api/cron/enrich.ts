@@ -197,55 +197,65 @@ async function fetchOverpass(
     return null
   }
 
-  const endpoint = OVERPASS_MIRRORS[mirrorIndex % OVERPASS_MIRRORS.length]
-  const start = Date.now()
-  try {
-    const res = await fetch(endpoint, {
-      method: 'POST',
-      body: query,
-      headers: { 'User-Agent': USER_AGENT },
-      signal: AbortSignal.timeout(OVERPASS_TIMEOUT_MS),
-    })
+  // Try every mirror before giving up on this query
+  for (let i = mirrorIndex; i < OVERPASS_MIRRORS.length; i++) {
+    const endpoint = OVERPASS_MIRRORS[i]
+    const start = Date.now()
+    try {
+      const res = await fetch(endpoint, {
+        method: 'POST',
+        body: query,
+        headers: { 'User-Agent': USER_AGENT },
+        signal: AbortSignal.timeout(OVERPASS_TIMEOUT_MS),
+      })
 
-    const elapsed = Date.now() - start
-    usage.overpassCallsToday++
+      const elapsed = Date.now() - start
+      usage.overpassCallsToday++
 
-    if (res.status === 429) {
-      usage.stopped = true
-      usage.stopReason = 'Overpass HTTP 429 — rate limited, stopping run'
-      return null
-    }
-    if (!res.ok) return []
-
-    // If response was very slow, note it (but don't stop yet unless consecutive)
-    if (elapsed > 8_000) {
-      usage.overpassSlowCount++
-      if (usage.overpassSlowCount >= 2) {
-        usage.stopped = true
-        usage.stopReason = `Overpass consistently slow (${elapsed}ms) — server overloaded, stopping`
-        return null
+      if (res.status === 429) {
+        // This mirror rate-limited us — try next
+        console.warn(`[overpass] ${endpoint} 429 — trying next mirror`)
+        continue
       }
-    } else {
-      usage.overpassSlowCount = 0
-    }
+      if (!res.ok) {
+        // Non-200 (e.g. 406, 503) — try next mirror
+        console.warn(`[overpass] ${endpoint} HTTP ${res.status} — trying next mirror`)
+        continue
+      }
 
-    const json = await res.json()
-    return json.elements ?? []
-  } catch (err: any) {
-    if (err?.name === 'TimeoutError') {
-      usage.overpassSlowCount++
-      if (usage.overpassSlowCount >= 2) {
-        usage.stopped = true
-        usage.stopReason = 'Overpass timeout twice in a row — stopping run'
-        return null
+      // Track consecutive slow responses across all mirrors
+      if (elapsed > 8_000) {
+        usage.overpassSlowCount++
+        if (usage.overpassSlowCount >= 3) {
+          usage.stopped = true
+          usage.stopReason = `All Overpass mirrors slow/down — stopping run`
+          return null
+        }
+      } else {
+        usage.overpassSlowCount = 0
       }
-      // Try next mirror once
-      if (mirrorIndex < OVERPASS_MIRRORS.length - 1) {
-        return fetchOverpass(query, usage, mirrorIndex + 1)
+
+      const json = await res.json()
+      return json.elements ?? []
+    } catch (err: any) {
+      if (err?.name === 'TimeoutError') {
+        console.warn(`[overpass] ${endpoint} timeout — trying next mirror`)
+        usage.overpassSlowCount++
+        continue
       }
+      // Network error — try next mirror
+      console.warn(`[overpass] ${endpoint} error: ${err?.message} — trying next mirror`)
+      continue
     }
-    return []
   }
+
+  // All mirrors failed for this query
+  usage.overpassSlowCount++
+  if (usage.overpassSlowCount >= 3) {
+    usage.stopped = true
+    usage.stopReason = 'All Overpass mirrors failed — server outage, stopping run'
+  }
+  return null
 }
 
 // ── Quality scoring ──────────────────────────────────────────────────────────
