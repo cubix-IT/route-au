@@ -56,6 +56,7 @@ interface DbNature {
 }
 interface DbFood {
   food_place_id: number; name: string; category: string
+  description: string | null
   address: string | null; attributes: Record<string, unknown>
 }
 
@@ -129,8 +130,8 @@ export function DestinationModal({
             ),
             // Food by bounding box so places enriched under nearby sub_dests still show
             (cLat && cLng
-              ? supabase.from('food_places').select('food_place_id,name,category,address,attributes').gte('lat', latMin).lte('lat', latMax).gte('lng', lngMin).lte('lng', lngMax).limit(100)
-              : supabase.from('food_places').select('food_place_id,name,category,address,attributes').eq('sub_dest_id', id).limit(100)
+              ? supabase.from('food_places').select('food_place_id,name,category,description,address,attributes').gte('lat', latMin).lte('lat', latMax).gte('lng', lngMin).lte('lng', lngMax).limit(100)
+              : supabase.from('food_places').select('food_place_id,name,category,description,address,attributes').eq('sub_dest_id', id).limit(100)
             ),
             supabase.from('destination_summaries').select('ai_summary,best_for').eq('sub_dest_id', id).single(),
           ])
@@ -192,9 +193,7 @@ export function DestinationModal({
       cost: 'Free',
       kids_ok: true,
       is_hidden_gem: false,
-      maps_url: n.attributes?.google_place_id
-        ? `https://www.google.com/maps/place/?q=place_id:${n.attributes.google_place_id}`
-        : `https://www.google.com/maps/search/?q=${encodeURIComponent(n.name + ' Victoria')}`,
+      maps_url: `https://www.google.com/maps/search/?q=${encodeURIComponent(n.name + ' Victoria')}`,
     } as DbActivity)),
   ]
   const previewActs = allThingsToDo.slice(0, PREVIEW_LIMIT)
@@ -436,20 +435,13 @@ function PreviewActivityRow({ act }: { act: DbActivity }) {
 
 function PreviewFoodRow({ food }: { food: DbFood }) {
   const emoji = FOOD_CAT_EMOJI[food.category] ?? '🍽'
-  const attr = food.attributes as { rating?: number; review_count?: number; google_place_id?: string }
-  const mapsUrl = attr.google_place_id
-    ? `https://www.google.com/maps/place/?q=place_id:${attr.google_place_id}`
-    : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(food.name + ' Victoria')}`
+  const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(food.name + ' Victoria')}`
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderRadius: 10, background: 'var(--bg-base)', border: '1px solid var(--border)' }}>
       <span style={{ fontSize: 20, flexShrink: 0 }}>{emoji}</span>
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ fontSize: 13, fontWeight: 700, color: '#1C1C1A', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{food.name}</div>
-        <div style={{ fontSize: 11, color: 'var(--text-muted)', display: 'flex', gap: 6 }}>
-          <span>{food.category}</span>
-          {attr.rating && <span>★ {attr.rating}</span>}
-          {attr.review_count && <span>({attr.review_count.toLocaleString()} reviews)</span>}
-        </div>
+        <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{food.category}</div>
       </div>
       <a href={mapsUrl} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} style={{ fontSize: 11, fontWeight: 700, color: '#fff', background: '#1C1C1A', padding: '4px 10px', borderRadius: 7, textDecoration: 'none', flexShrink: 0 }}>
         View on map ↗
@@ -521,6 +513,7 @@ function FoodFullRow({ food }: { food: DbFood }) {
             <span>{food.category}</span>
             {attr.cuisine_tags?.length ? <span>{attr.cuisine_tags.slice(0, 2).join(', ')}</span> : null}
           </div>
+          {food.description && <div style={{ fontSize: 12, color: '#374151', marginTop: 4, lineHeight: 1.5 }}>{food.description}</div>}
           {food.address && <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>{food.address}</div>}
           {attr.opening_hours_text && <div style={{ fontSize: 11, color: '#6B7280', marginTop: 2 }}>{attr.opening_hours_text}</div>}
         </div>

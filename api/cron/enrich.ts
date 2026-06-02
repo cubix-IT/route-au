@@ -44,7 +44,7 @@ const NATURE_BOUNDARY = new Set(['national_park','protected_area'])
 
 const ACT_TOURISM = new Set(['attraction','museum','artwork','gallery','viewpoint','theme_park','zoo','aquarium','alpine_hut'])
 const ACT_LEISURE = new Set(['sports_centre','stadium','golf_course','miniature_golf','swimming_pool','marina','picnic_ground','water_park','amusement_arcade'])
-const ACT_AMENITY = new Set(['theatre','cinema','arts_centre','library','marketplace'])
+const ACT_AMENITY = new Set(['theatre','cinema','arts_centre','library','marketplace','spa'])
 
 // Fast food chains — never useful for a weekend getaway app
 const CHAIN_BLACKLIST = /\b(mcdonald'?s|hungry jack'?s|kfc|subway|domino'?s|pizza hut|red rooster|oporto|nando'?s|grill'?d|betty'?s burgers|guzman|taco bell|carl'?s jr|burger king|wendy'?s|seven.?eleven|7.?eleven|bp|caltex|shell|ampol|united petroleum|woolworths|coles|aldi|chemist warehouse)\b/i
@@ -145,9 +145,12 @@ function natureType(tags: Record<string,string>): string {
 // Food: must have name + (website OR phone OR opening_hours) — shows it's an active business
 // Activities: all named OSM tourism/leisure features qualify (OSM is curated, not spam)
 // Nature: all named natural features qualify
+const CRAFT_TYPES = new Set(['brewery','cider','winery','wine','distillery'])
 function foodQualifies(tags: Record<string,string>): boolean {
   // Exclude chain fast food & fuel stations — not weekend getaway recommendations
   if (CHAIN_BLACKLIST.test(tags.name || '')) return false
+  // Craft venues (winery/brewery/distillery) are premium weekend getaway content — include even without contact details
+  if (CRAFT_TYPES.has(tags.craft) || tags.tourism === 'winery' || tags.tourism === 'wine_cellar') return true
   // Must have at least one contact/hours signal — shows it's an active local business
   return !!(tags.website || tags['contact:website'] || tags.phone || tags['contact:phone'] || tags.opening_hours)
 }
@@ -244,6 +247,52 @@ async function fetchOverpass(
   }
 }
 
+// ── Quality scoring ──────────────────────────────────────────────────────────
+// Stored as attributes.quality_score (0–100). Used to sort activities in UI.
+// Primary signal: Wikipedia monthly pageviews (if the place has a wiki article).
+// Fallback: OSM tag richness — more tags = more notable/active place.
+
+function calcQualityScore(tags: Record<string,string>, wikiViews: number): number {
+  let score = 0
+  // Pageviews signal (most powerful — reflects real-world interest)
+  if (wikiViews > 10_000) score += 55
+  else if (wikiViews > 5_000) score += 45
+  else if (wikiViews > 1_000) score += 35
+  else if (wikiViews > 200)  score += 20
+  else if (wikiViews > 0)    score += 10
+  // OSM tag signals (fallback when no wiki article)
+  if (tags.wikipedia)  score += 20
+  if (tags.wikidata)   score += 15
+  if (tags.tourism === 'attraction') score += 10
+  if (tags.website || tags['contact:website']) score += 5
+  if (tags.opening_hours) score += 3
+  if (tags.description) score += 3
+  if (tags.phone || tags['contact:phone']) score += 2
+  return Math.min(score, 100)
+}
+
+// ── Wikipedia pageviews fetch ─────────────────────────────────────────────────
+// Returns average monthly views over the last 3 months, or 0 if no article.
+
+async function fetchWikiPageviews(wikiSlug: string): Promise<number> {
+  try {
+    const end = new Date()
+    const start = new Date(end)
+    start.setMonth(start.getMonth() - 3)
+    const fmt = (d: Date) => d.toISOString().slice(0,7).replace('-','') + '01'
+    const url = `https://wikimedia.org/api/rest_v1/metrics/pageviews/per-article/en.wikipedia.org/all-access/all-agents/${encodeURIComponent(wikiSlug)}/monthly/${fmt(start)}/${fmt(end)}`
+    const res = await fetch(url, {
+      headers: { 'User-Agent': USER_AGENT },
+      signal: AbortSignal.timeout(5_000),
+    })
+    if (!res.ok) return 0
+    const json = await res.json() as { items?: { views: number }[] }
+    const items = json.items ?? []
+    if (!items.length) return 0
+    return Math.round(items.reduce((s, i) => s + i.views, 0) / items.length)
+  } catch { return 0 }
+}
+
 // ── Wikipedia fetch with rate limiting ──────────────────────────────────────
 
 async function fetchWikiSummary(
@@ -319,17 +368,22 @@ async function enrichSubDest(
   const distFromCBD = Math.sqrt((lat - MELB_LAT) ** 2 + (lng - MELB_LNG) ** 2) * 111
   const r = distFromCBD < 15 ? 2_000 : distFromCBD < 80 ? 10_000 : 20_000
 
-  // node-only queries — fast, typically under 3s even for large rural areas
-  const query = `[out:json][timeout:15];
+  const limit = distFromCBD < 15 ? 120 : distFromCBD < 80 ? 200 : 300
+  // nwr = node/way/relation — captures both point POIs and area-mapped venues (wineries, parks, etc.)
+  const query = `[out:json][timeout:20];
 (
-  node["tourism"~"^(attraction|museum|gallery|viewpoint|zoo|aquarium|winery|wine_cellar)$"]["name"](around:${r},${lat},${lng});
-  node["natural"~"^(peak|beach|waterfall|hot_spring|spring)$"]["name"](around:${r},${lat},${lng});
-  node["amenity"~"^(cafe|restaurant|pub|bar|bakery|winery|fast_food|marketplace|spa)$"]["name"](around:${r},${lat},${lng});
-  node["shop"~"^(bakery|coffee)$"]["name"](around:${r},${lat},${lng});
-  node["craft"~"^(brewery|winery|distillery)$"]["name"](around:${r},${lat},${lng});
-  node["leisure"~"^(nature_reserve|garden|park)$"]["name"](around:${r},${lat},${lng});
+  nwr["tourism"~"^(attraction|museum|gallery|viewpoint|zoo|aquarium|winery|wine_cellar|alpine_hut|picnic_site)$"]["name"](around:${r},${lat},${lng});
+  nwr["natural"~"^(peak|beach|waterfall|hot_spring|spring|cliff|cave_entrance)$"]["name"](around:${r},${lat},${lng});
+  nwr["amenity"~"^(cafe|restaurant|pub|bar|bakery|winery|fast_food|marketplace|spa|theatre|cinema|arts_centre|ice_cream|biergarten)$"]["name"](around:${r},${lat},${lng});
+  nwr["shop"~"^(bakery|pastry|deli|coffee|chocolate)$"]["name"](around:${r},${lat},${lng});
+  nwr["craft"~"^(brewery|cider|winery|wine|distillery)$"]["name"](around:${r},${lat},${lng});
+  nwr["leisure"~"^(nature_reserve|garden|park|marina|dog_park)$"]["name"](around:${r},${lat},${lng});
+  nwr["boundary"~"^(national_park|protected_area)$"]["name"](around:${r},${lat},${lng});
+  nwr["historic"]["name"](around:${r},${lat},${lng});
+  nwr["railway"="station"]["name"](around:${r},${lat},${lng});
+  nwr["waterway"~"^(waterfall|lake|reservoir|dam)$"]["name"](around:${r},${lat},${lng});
 );
-out body ${distFromCBD < 15 ? 100 : distFromCBD < 80 ? 150 : 200};`
+out center tags ${limit};`
 
   const elements = await fetchOverpass(query, usage)
   if (!elements) return 0
@@ -352,9 +406,9 @@ out body ${distFromCBD < 15 ? 100 : distFromCBD < 80 ? 150 : 200};`
     const elLng = el.lon ?? el.center?.lon ?? null
     const website = tags.website || tags['contact:website'] || null
     const phone   = tags.phone   || tags['contact:phone']   || null
-    const address = tags['addr:street']
+    const address = tags['addr:full'] || (tags['addr:street']
       ? `${tags['addr:housenumber'] ? tags['addr:housenumber'] + ' ' : ''}${tags['addr:street']}, ${tags['addr:suburb'] || tags['addr:city'] || ''}`.trim()
-      : null
+      : null)
 
     const cat = osmCategory(tags)
     if (!cat) continue
@@ -371,6 +425,9 @@ out body ${distFromCBD < 15 ? 100 : distFromCBD < 80 ? 150 : 200};`
           opening_hours_text: tags.opening_hours || null,
           website_uri: website,
           cuisine: tags.cuisine?.split(';')[0] || null,
+          wikipedia: tags.wikipedia || null,
+          wikidata: tags.wikidata || null,
+          quality_score: calcQualityScore(tags, 0),
         },
         source: 'static',
       })
@@ -399,6 +456,7 @@ out body ${distFromCBD < 15 ? 100 : distFromCBD < 80 ? 150 : 200};`
           opening_hours_text: tags.opening_hours || null,
           wikipedia: tags.wikipedia || null,
           wikidata: tags.wikidata || null,
+          quality_score: calcQualityScore(tags, 0),
         },
       })
     } else {
@@ -421,18 +479,68 @@ out body ${distFromCBD < 15 ? 100 : distFromCBD < 80 ? 150 : 200};`
           opening_hours_text: tags.opening_hours || null,
           wikipedia: tags.wikipedia || null,
           wikidata: tags.wikidata || null,
+          quality_score: calcQualityScore(tags, 0),
         },
       })
     }
   }
 
-  // Wikipedia description for top attraction (if found) — 1 Wikipedia call per dest
-  if (activities.length > 0 && !usage.stopped) {
-    const topAct = activities.find(a => !a.description)
-    if (topAct) {
-      const wiki = await fetchWikiSummary(topAct.name, usage)
-      if (wiki) topAct.description = wiki
+  // Wikipedia descriptions: prioritise items with an explicit `wikipedia` OSM tag, then top unnamed items
+  if (!usage.stopped) {
+    // Items with a wikipedia tag — guaranteed match, up to 5 per dest
+    const withWikiTag = [
+      ...activities.filter(a => a.attributes?.wikipedia && !a.description),
+      ...foods.filter(f => f.attributes?.wikipedia && !f.description),
+      ...nature.filter(n => n.attributes?.wikipedia && !n.description),
+    ].slice(0, 5)
+    for (const item of withWikiTag) {
+      if (usage.stopped) break
+      const title = item.attributes.wikipedia.replace(/^en:/i, '')
+      const wiki = await fetchWikiSummary(title, usage)
+      if (wiki) item.description = wiki
     }
+    // Top activity without a description — name-based lookup
+    if (!usage.stopped) {
+      const topAct = activities.find(a => !a.description)
+      if (topAct) {
+        const wiki = await fetchWikiSummary(topAct.name, usage)
+        if (wiki) topAct.description = wiki
+      }
+    }
+    // Top winery/brewery/distillery without a description
+    if (!usage.stopped) {
+      const topDrink = foods.find(f =>
+        ['Winery','Brewery','Distillery'].includes(f.category) && !f.description,
+      )
+      if (topDrink) {
+        const wiki = await fetchWikiSummary(topDrink.name, usage)
+        if (wiki) topDrink.description = wiki
+      }
+    }
+  }
+
+  // ── Wikipedia pageviews → quality_score upgrade ───────────────────────────
+  // For any item with a `wikipedia` OSM tag, fetch 3-month avg pageviews and
+  // recompute quality_score with the real popularity signal.
+  // Cap at 10 items per dest run to stay within time budget.
+  const wikiItems = [
+    ...activities.filter(a => a.attributes?.wikipedia),
+    ...nature.filter(n => n.attributes?.wikipedia),
+    ...foods.filter(f => f.attributes?.wikipedia),
+  ].slice(0, 10)
+
+  for (const item of wikiItems) {
+    const slug = (item.attributes.wikipedia as string).replace(/^en:/i, '').replace(/ /g, '_')
+    const views = await fetchWikiPageviews(slug)
+    if (views > 0) {
+      item.attributes.wiki_monthly_views = views
+      // Rebuild quality_score with actual pageviews
+      item.attributes.quality_score = calcQualityScore(
+        { wikipedia: item.attributes.wikipedia as string, wikidata: item.attributes.wikidata as string },
+        views,
+      )
+    }
+    await sleep(200) // gentle rate limiting — 5 req/s well within 200 req/min limit
   }
 
   if (!adminSupabase) return 0

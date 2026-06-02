@@ -1,10 +1,9 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { usePlannerData } from '@/hooks/usePlannerData'
 import { useAppStore } from '@/store/useAppStore'
-import type { LivePOI, RouteFoodStop, AccommodationPOI } from '@/lib/overpass'
+import type { LivePOI, AccommodationPOI } from '@/lib/overpass'
 import type { HazardAlert } from '@/lib/vicEmergency'
 import type { Activity } from '@/data/victorianActivities'
-import type { AddedDiningStop, AddedActivity } from '@/store/useAppStore'
 import type { GuardrailWarning } from '@/types'
 
 const GREEN = '#3A6B4F'
@@ -42,26 +41,6 @@ const CAT_TAG: Record<string, { label: string; color: string; bg: string }> = {
   shopping:      { label: 'Shopping',      color: '#BE185D', bg: '#FCE7F3' },
 }
 
-const POI_TAG: Record<LivePOI['type'], { emoji: string; label: string; color: string; bg: string }> = {
-  hiking:     { emoji: '🥾', label: 'Hiking',      color: '#2563EB', bg: '#EFF6FF' },
-  viewpoint:  { emoji: '👁',  label: 'Scenic View', color: '#4338CA', bg: '#EEF2FF' },
-  attraction: { emoji: '🏛',  label: 'Attraction',  color: '#7C3AED', bg: '#F5F3FF' },
-  cafe:       { emoji: '☕', label: 'Cafe',         color: '#92400E', bg: '#FFFBEB' },
-  restaurant: { emoji: '🍽',  label: 'Restaurant',  color: '#B45309', bg: '#FEF3C7' },
-  pub:        { emoji: '🍺',  label: 'Pub & Bar',   color: '#B87333', bg: '#FFF5EB' },
-  fast_food:  { emoji: '🥡',  label: 'Takeaway',    color: '#9A3412', bg: '#FFF7ED' },
-  bakery:     { emoji: '🥐',  label: 'Bakery',      color: '#92400E', bg: '#FFFBEB' },
-  winery:     { emoji: '🍷',  label: 'Winery',      color: '#7E22CE', bg: '#FAF5FF' },
-}
-
-const FOOD_CFG: Record<RouteFoodStop['type'], { emoji: string; label: string }> = {
-  cafe:       { emoji: '☕', label: 'Cafe' },
-  bakery:     { emoji: '🥐', label: 'Bakery' },
-  restaurant: { emoji: '🍽', label: 'Restaurant' },
-  pub:        { emoji: '🍺', label: 'Pub' },
-  winery:     { emoji: '🍷', label: 'Winery' },
-  roadhouse:  { emoji: '⛽', label: 'Roadhouse' },
-}
 
 
 const ACCOM_POI_CFG: Record<AccommodationPOI['type'], { emoji: string; label: string; color: string; bg: string }> = {
@@ -74,7 +53,7 @@ const ACCOM_POI_CFG: Record<AccommodationPOI['type'], { emoji: string; label: st
   guest_house:  { emoji: '🏡', label: 'Guest House', color: '#059669', bg: '#ECFDF5' },
 }
 
-type FilterMode = 'all' | 'food' | 'activities' | 'stay' | 'fuel'
+type FilterMode = 'all' | 'activities' | 'food' | 'stay' | 'fuel'
 
 interface FuelStop {
   coord: { lat: number; lng: number }
@@ -183,14 +162,11 @@ export function ExperiencePanel({ hideTimeline = false }: { hideTimeline?: boole
   const setSelectedPinId = useAppStore((s) => s.setSelectedPinId)
   const panelRef = useRef<HTMLDivElement>(null)
 
-  const [addModal, setAddModal] = useState<RouteFoodStop | null>(null)
   const [filter, setFilter] = useState<FilterMode>('all')
   const [actCategoryFilter, setActCategoryFilter] = useState<string>('all')
-  const [foodCategoryFilter, setFoodCategoryFilter] = useState<string>('all')
   const [expandedActId, setExpandedActId] = useState<string | null>(null)
   const [_expandedPoiId, setExpandedPoiId] = useState<string | null>(null)
   const [showAllAccom, setShowAllAccom] = useState(false)
-  const [showAllFood, setShowAllFood] = useState(false)
   const [showAllActivities, setShowAllActivities] = useState(false)
   const [fuelStops, setFuelStops] = useState<FuelStop[]>([])
   const [fuelLoading, setFuelLoading] = useState(false)
@@ -199,7 +175,7 @@ export function ExperiencePanel({ hideTimeline = false }: { hideTimeline?: boole
 
   const isOneDayTrip = (d.activeItinerary?.total_days ?? 0) === 1
 
-  const syncMapPins = useCallback((_f: FilterMode, pois: LivePOI[], stops?: FuelStop[], catFilter?: string) => {
+  const syncMapPins = useCallback((_f: FilterMode, pois: LivePOI[], stops?: FuelStop[]) => {
     if (_f === 'fuel') {
       setDisplayedMapPins((stops ?? []).filter((s) => s.station).map((s) => ({
         id: `fuel-${s.label}`, lat: s.station!.lat, lng: s.station!.lng,
@@ -208,31 +184,9 @@ export function ExperiencePanel({ hideTimeline = false }: { hideTimeline?: boole
       })))
       return
     }
-    if (d.dbFood.length > 0 || d.dbActivities.length > 0) {
-      const SPA_CATS = new Set(['spa','wellness','beauty_salon','beauty','gym','fitness'])
-      // Only show pins matching current filter/category
-      let foodPins: typeof d.dbFood = []
-      let actPins: typeof d.dbNature = []
-
-      if (_f === 'all' || _f === 'food') {
-        foodPins = d.dbFood
-          .filter((f) => f.lat && f.lng && !SPA_CATS.has(f.category.toLowerCase()))
-          .filter((f) => !catFilter || catFilter === 'all' || f.category.toLowerCase() === catFilter)
-          .map((f) => {
-            const attr = (f.attributes as Record<string, unknown>) ?? {}
-            return { f, rating: (attr.rating as number | undefined) ?? 0 }
-          })
-          .sort((a, b) => b.rating - a.rating)
-          .slice(0, 8)
-          .map(({ f }) => f)
-      }
-      if (_f === 'all' || _f === 'activities') {
-        actPins = d.dbNature.filter((n) => n.lat && n.lng).slice(0, 8)
-      }
+    if (d.dbActivities.length > 0) {
+      const actPins = d.dbNature.filter((n) => n.lat && n.lng).slice(0, 8)
       setDisplayedMapPins([
-        ...foodPins.map((f) => {
-          return { id: String(f.food_place_id), lat: f.lat!, lng: f.lng!, type: f.category.toLowerCase() as LivePOI['type'], name: f.name }
-        }),
         ...actPins.map((n) => ({
           id: `nature-${n.nature_spot_id}`, lat: n.lat!, lng: n.lng!,
           type: (n.type === 'viewpoint' ? 'viewpoint' : 'attraction') as LivePOI['type'],
@@ -241,12 +195,10 @@ export function ExperiencePanel({ hideTimeline = false }: { hideTimeline?: boole
       ])
       return
     }
-    const FOOD_TYPES: LivePOI['type'][] = ['cafe', 'restaurant', 'pub', 'winery', 'bakery', 'fast_food']
-    const ACT_TYPES: LivePOI['type'][] = ['hiking', 'viewpoint', 'attraction']
-    const fp = (_f === 'all' || _f === 'food') ? pois.filter((p) => FOOD_TYPES.includes(p.type) && p.lat && p.lng).slice(0, 5) : []
-    const ap = (_f === 'all' || _f === 'activities') ? pois.filter((p) => ACT_TYPES.includes(p.type) && p.lat && p.lng).slice(0, 5) : []
-    setDisplayedMapPins([...fp, ...ap].map((p) => ({ id: p.id, lat: p.lat!, lng: p.lng!, type: p.type, name: p.name })))
-  }, [setDisplayedMapPins, d.dbFood, d.dbActivities, d.dbNature])
+    const ACT_TYPES: LivePOI['type'][] = ['hiking', 'viewpoint', 'attraction', 'winery', 'brewery', 'distillery', 'pub']
+    const ap = pois.filter((p) => ACT_TYPES.includes(p.type) && p.lat && p.lng).slice(0, 10)
+    setDisplayedMapPins(ap.map((p) => ({ id: p.id, lat: p.lat!, lng: p.lng!, type: p.type, name: p.name })))
+  }, [d.dbActivities.length, d.dbNature.length]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const fetchFuelStops = useCallback(async () => {
     if (!d.activeItinerary || !d.vehicleProfile) return
@@ -290,20 +242,29 @@ export function ExperiencePanel({ hideTimeline = false }: { hideTimeline?: boole
     setFilter(f)
     setActivePOIFilter(f)
     setActCategoryFilter('all')
-    setFoodCategoryFilter('all')
     if (f === 'fuel') {
       const stops = fuelStops.length > 0 ? fuelStops : await fetchFuelStops()
-      syncMapPins(f, d.livePOIs ?? [], stops, 'all')
+      syncMapPins(f, d.livePOIs ?? [], stops)
     } else {
-      syncMapPins(f, d.livePOIs ?? [], undefined, 'all')
+      syncMapPins(f, d.livePOIs ?? [])
     }
-    setShowAllFood(false)
     setShowAllActivities(false)
   }
 
   useEffect(() => {
-    syncMapPins(filter, d.livePOIs ?? [], undefined, foodCategoryFilter)
-  }, [d.livePOIs, d.dbFood, d.dbActivities, d.dbNature, foodCategoryFilter]) // eslint-disable-line react-hooks/exhaustive-deps
+    const ACT_TYPES: LivePOI['type'][] = ['hiking', 'viewpoint', 'attraction', 'winery', 'brewery', 'distillery', 'pub']
+    if (d.dbActivities.length > 0) {
+      const actPins = d.dbNature.filter((n) => n.lat && n.lng).slice(0, 8)
+      setDisplayedMapPins(actPins.map((n) => ({
+        id: `nature-${n.nature_spot_id}`, lat: n.lat!, lng: n.lng!,
+        type: (n.type === 'viewpoint' ? 'viewpoint' : 'attraction') as LivePOI['type'],
+        name: n.name,
+      })))
+    } else if (d.livePOIs) {
+      const ap = d.livePOIs.filter((p) => ACT_TYPES.includes(p.type) && p.lat && p.lng).slice(0, 10)
+      setDisplayedMapPins(ap.map((p) => ({ id: p.id, lat: p.lat!, lng: p.lng!, type: p.type, name: p.name })))
+    }
+  }, [d.dbActivities.length, d.dbNature.length, d.livePOIs]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Scroll to and highlight a POI card when selected via map pin click
   useEffect(() => {
@@ -320,11 +281,7 @@ export function ExperiencePanel({ hideTimeline = false }: { hideTimeline?: boole
 
   if (!d.activeItinerary) return null
 
-  const addedIds = new Set(d.addedDiningStops.map((s) => s.foodId))
   const addedActIds = new Set(d.addedActivities.map((a) => a.actId))
-  const availableRouteStops = (d.routeFood ?? []).filter((s) => !addedIds.has(s.id))
-  const showFood  = filter === 'all' || filter === 'food'
-  const showStops = filter === 'all' || filter === 'food'
   const showStay  = !isOneDayTrip && (filter === 'all' || filter === 'stay')
 
   return (
@@ -339,13 +296,13 @@ export function ExperiencePanel({ hideTimeline = false }: { hideTimeline?: boole
         display: 'flex', gap: 6, overflowX: 'auto', alignItems: 'center',
         flexShrink: 0,
       }}>
-        {([
+        {(([
           ['all',        'All'],
           ['activities', '🗺 Things to Do'],
-          ['food',       '🍽 Eat & Drink'],
+          ...((d.food?.length ?? 0) > 0 ? [['food', '🍽 Eat & Drink']] : []),
           ...(!isOneDayTrip ? [['stay', '🏨 Stay']] : []),
           ...(d.vehicleProfile && d.vehicleProfile.fuel_type !== 'Electric' && !(d.vehicleProfile as unknown as { skip_fuel?: boolean }).skip_fuel ? [['fuel', '⛽ Fuel']] : []),
-        ] as const).map(([f, label]) => (
+        ]) as [string, string][]).map(([f, label]) => (
           <button key={f} onClick={() => handleFilterChange(f as FilterMode)} style={{
             padding: '6px 14px', borderRadius: 20, flexShrink: 0,
             background: filter === f ? '#1C1B1F' : '#fff',
@@ -405,7 +362,7 @@ export function ExperiencePanel({ hideTimeline = false }: { hideTimeline?: boole
               name: a.name,
               category: a.category as Activity['category'],
               emoji: a.emoji || '📍',
-              description: (aAttr.editorial_summary as string | undefined) || a.description || '',
+              description: a.description || '',
               duration: a.duration || '',
               cost: (a.cost as Activity['cost']) || 'free',
               kidsOk: a.kids_ok,
@@ -536,213 +493,118 @@ export function ExperiencePanel({ hideTimeline = false }: { hideTimeline?: boole
           )
         })()}
 
+        {/* ── Pour & Explore ── */}
+        {(filter === 'all' || filter === 'activities') && (() => {
+          const DRINK_TYPES: LivePOI['type'][] = ['winery', 'brewery', 'distillery', 'pub']
+          const DRINK_CATS = new Set(['winery', 'brewery', 'distillery', 'pub', 'bar', 'wine', 'wine_cellar'])
+          // Merge from Supabase activities (primary) + Overpass livePOIs (fallback)
+          const fromDB = d.dbActivities.filter((a) => DRINK_CATS.has(a.category.toLowerCase()))
+          const fromLive = (d.livePOIs ?? []).filter((p) => DRINK_TYPES.includes(p.type))
+          const hasDB = fromDB.length > 0
+          const hasLive = fromLive.length > 0
+          if (!hasDB && !hasLive) return null
+          return (
+            <SectionBlock
+              id="section-drinks"
+              title="Pour & Explore"
+              icon="🍷"
+              count={hasDB ? fromDB.length : fromLive.length}
+              loading={d.dbLoading}
+              empty={false}
+            >
+              <div style={{ padding: '0 16px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {hasDB ? fromDB.map((a) => {
+                  const cat = a.category.toLowerCase()
+                  const cfg = CAT_TAG[cat] ?? CAT_TAG['winery']
+                  const emoji = cat === 'brewery' ? '🍺' : cat === 'distillery' ? '🥃' : cat === 'pub' ? '🍺' : '🍷'
+                  const website = (a.attributes as Record<string,unknown>)?.website as string | undefined
+                  const mapsUrl = a.maps_url || `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(a.name + ' Victoria')}`
+                  return (
+                    <DrinkCard key={a.activity_id} name={a.name} emoji={emoji} cfg={cfg} website={website} mapsUrl={mapsUrl} />
+                  )
+                }) : fromLive.map((poi) => {
+                  const cfg = CAT_TAG[poi.type] ?? CAT_TAG['winery']
+                  const emoji = poi.type === 'brewery' ? '🍺' : poi.type === 'distillery' ? '🥃' : poi.type === 'pub' ? '🍺' : '🍷'
+                  const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(poi.name + ' Victoria')}`
+                  return (
+                    <DrinkCard key={poi.id} name={poi.name} emoji={emoji} cfg={cfg} website={poi.website} mapsUrl={mapsUrl} />
+                  )
+                })}
+              </div>
+            </SectionBlock>
+          )
+        })()}
+
         {/* ── Eat & Drink ── */}
-        {showFood && (
-          <SectionBlock
-            id="section-food"
-            title="Eat & Drink"
-            icon="🍽"
-            count={d.dbFood.length + d.curatedDining.length}
-            loading={d.dbLoading && d.dbFood.length === 0 && d.curatedDining.length === 0}
-            empty={!d.dbLoading && d.dbFood.length === 0 && d.curatedDining.length === 0}
-          >
-            {(() => {
-              const SPA_CATS = new Set(['spa','wellness','beauty_salon','beauty','gym','fitness','market','markets','farmers_market','flea_market','night_market','shopping_mall','department_store','supermarket'])
-              const foodOnly = d.dbFood.filter((f) => !SPA_CATS.has(f.category.toLowerCase()) && !/\bmarkets?\b/i.test(f.name))
-
-              // Curated local favs from foodDrink.ts (hand-picked signature spots)
-              type CuratedItem = { id: string; type: LivePOI['type']; name: string; lat?: number; lng?: number; description?: string; website?: string; isLocalFav: true }
-              const curatedItems: CuratedItem[] = [
-                ...d.curatedDining.map((f) => ({
-                  id: f.id, type: (f.category?.toLowerCase() ?? 'restaurant') as LivePOI['type'],
-                  name: f.name, lat: f.coord?.lat, lng: f.coord?.lng,
-                  description: f.signature_dish ? `★ ${f.signature_dish}` : f.description,
-                  isLocalFav: true as const,
-                })),
-              ]
-              const curatedNames = new Set(curatedItems.map((c) => c.name.toLowerCase()))
-
-              const ratedFood = foodOnly.filter((f) => {
-                const a = (f.attributes as Record<string, unknown>) ?? {}
-                return (a.rating as number | undefined) && (a.review_count as number | undefined)
-              })
-              const unratedFood = foodOnly.filter((f) => {
-                const a = (f.attributes as Record<string, unknown>) ?? {}
-                return !((a.rating as number | undefined) && (a.review_count as number | undefined))
-              })
-              const hasEnoughRated = ratedFood.length >= 1
-              // Show rated food first; fall back to unrated when nothing is rated (OSM sources)
-              const primaryFood = (hasEnoughRated ? ratedFood : unratedFood)
-                .filter((f) => !curatedNames.has(f.name.toLowerCase())) // don't duplicate curated items
-
-              const FOOD_CAT_LABEL: Record<string, string> = {
-                cafe: 'Cafe', restaurant: 'Restaurant', winery: 'Winery',
-                pub: 'Pub', bakery: 'Bakery', distillery: 'Distillery',
-                brewery: 'Brewery', fast_food: 'Takeaway', bar: 'Bar',
-                ice_cream: 'Ice Cream', food_truck: 'Food Truck',
-              }
-              const catCounts = new Map<string, number>()
-              for (const f of primaryFood) {
-                const c = f.category.toLowerCase()
-                catCounts.set(c, (catCounts.get(c) ?? 0) + 1)
-              }
-              const foodCats = [...catCounts.entries()]
-                .filter(([, n]) => n >= 1)
-                .sort((a, b) => b[1] - a[1])
-                .map(([c]) => c)
-
-              const filteredFood = foodCategoryFilter === 'all'
-                ? primaryFood
-                : primaryFood.filter((f) => f.category.toLowerCase() === foodCategoryFilter)
-              const displayed = showAllFood ? filteredFood : filteredFood.slice(0, RESULT_LIMIT)
-              const hidden = filteredFood.length - RESULT_LIMIT
-              return (
-                <>
-                  {/* Category filter chips */}
-                  {foodCats.length > 1 && (
-                    <div style={{ padding: '0 16px 10px', display: 'flex', gap: 6, overflowX: 'auto' }}>
-                      <button onClick={() => setFoodCategoryFilter('all')} style={{
-                        padding: '5px 12px', borderRadius: 20, flexShrink: 0, cursor: 'pointer', fontSize: 11, fontWeight: foodCategoryFilter === 'all' ? 700 : 500,
-                        background: foodCategoryFilter === 'all' ? '#1C1B1F' : '#fff', color: foodCategoryFilter === 'all' ? '#fff' : '#6B7280',
-                        border: `1.5px solid ${foodCategoryFilter === 'all' ? '#1C1B1F' : 'var(--border)'}`,
-                      }}>All</button>
-                      {foodCats.map((c) => (
-                        <button key={c} onClick={() => { setFoodCategoryFilter(foodCategoryFilter === c ? 'all' : c); setShowAllFood(false) }} style={{
-                          padding: '5px 12px', borderRadius: 20, flexShrink: 0, cursor: 'pointer', fontSize: 11, fontWeight: foodCategoryFilter === c ? 700 : 500,
-                          background: foodCategoryFilter === c ? '#1C1B1F' : '#fff', color: foodCategoryFilter === c ? '#fff' : '#6B7280',
-                          border: `1.5px solid ${foodCategoryFilter === c ? '#1C1B1F' : 'var(--border)'}`,
-                          whiteSpace: 'nowrap',
-                        }}>{FOOD_CAT_LABEL[c] ?? c}</button>
-                      ))}
-                    </div>
-                  )}
-                  <div className="activity-grid" style={{ padding: '0 16px' }}>
-                    {/* Curated local favs pinned at top with ◆ */}
-                    {foodCategoryFilter === 'all' && curatedItems.map((f) => (
-                      <FoodCard key={`curated-${f.id}`} poi={{ ...f, description: f.description }} destName={d.shortDest} isLocalFav />
-                    ))}
-                    {displayed.map((f) => {
-                      const attr = (f.attributes as Record<string, unknown>) ?? {}
-                      const cuisineTags = attr.cuisine_tags as string[] | undefined
-                      const pinId = String(f.food_place_id)
-                      const websiteUri = attr.website_uri as string | undefined
-                      return (
-                        <FoodCard key={f.food_place_id} poi={{
-                          id: pinId,
-                          type: f.category.toLowerCase() as LivePOI['type'],
-                          name: f.name,
-                          lat: f.lat, lng: f.lng,
-                          cuisine: cuisineTags?.join(' · '),
-                          website: websiteUri && !websiteUri.includes('google.com') ? websiteUri : undefined,
-                          description: f.description || undefined,
-                          openingHours: attr.opening_hours_text as string | undefined,
-                        }} destName={d.shortDest}
-                        highlighted={selectedPinId === pinId}
-                        onMapPin={f.lat && f.lng ? () => setSelectedPinId(pinId) : undefined} />
-                      )
-                    })}
-                  </div>
-                  {!showAllFood && hidden > 0 && (
-                    <button onClick={() => setShowAllFood(true)} style={{
-                      margin: '4px 16px 0', width: 'calc(100% - 32px)',
-                      padding: '10px', borderRadius: 10,
-                      border: '1px dashed var(--border)', background: 'none',
-                      fontSize: 12, color: '#6B7280', fontWeight: 600, cursor: 'pointer',
+        {(filter === 'all' || filter === 'food') && (() => {
+          const allFoods = d.food ?? []
+          if (allFoods.length === 0) return null
+          // In 'all' mode show top 6; 'food' tab shows everything
+          const foods = filter === 'food' ? allFoods : allFoods.slice(0, 6)
+          const FOOD_CAT_EMOJI: Record<string, string> = {
+            Cafe: '☕', Restaurant: '🍽', Pub: '🍺', Bakery: '🥐',
+            Winery: '🍷', Brewery: '🍺', Distillery: '🥃',
+          }
+          return (
+            <SectionBlock
+              id="section-food"
+              title="Eat & Drink"
+              icon="🍽"
+              count={foods.length}
+              loading={d.dbLoading}
+              empty={!d.dbLoading && foods.length === 0}
+            >
+              <div style={{ padding: '0 16px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {foods.map((f) => {
+                  const attr = f.attributes as { website_uri?: string; opening_hours_text?: string }
+                  const emoji = FOOD_CAT_EMOJI[f.category] ?? '🍽'
+                  const website = attr.website_uri
+                  const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(f.name + ' Victoria')}`
+                  return (
+                    <div key={f.food_place_id} style={{
+                      display: 'flex', alignItems: 'flex-start', gap: 12,
+                      padding: '12px 14px', borderRadius: 12,
+                      border: '1px solid var(--border)', background: 'var(--bg-card)',
                     }}>
-                      Show more rated places ↓
-                    </button>
-                  )}
-                  {hasEnoughRated && unratedFood.length > 0 && showAllFood && (
-                    <div style={{ margin: '12px 16px 0' }}>
-                      <div style={{ fontSize: 10, fontWeight: 700, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 8 }}>No reviews yet</div>
-                      <div className="activity-grid">
-                        {unratedFood.map((f) => {
-                          const attr = (f.attributes as Record<string, unknown>) ?? {}
-                          const websiteUri = (attr.website_uri as string | undefined)
-                          return (
-                            <FoodCard key={f.food_place_id} poi={{
-                              id: String(f.food_place_id),
-                              type: f.category.toLowerCase() as LivePOI['type'],
-                              name: f.name, lat: f.lat, lng: f.lng,
-                              website: websiteUri && !websiteUri.includes('google.com') ? websiteUri : undefined,
-                            }} destName={d.shortDest} />
-                          )
-                        })}
-                      </div>
-                    </div>
-                  )}
-                </>
-              )
-            })()}
-
-            {d.livePOIs !== null && d.foodPOIs.length === 0 && d.curatedDining.length === 0 && (
-              <div style={{ margin: '0 16px 12px', padding: '16px', background: '#F8F7F4', borderRadius: 12, border: '1px solid var(--border)', textAlign: 'center' }}>
-                <div style={{ fontSize: 13, color: '#6B7280', marginBottom: 10 }}>
-                  No venue data in our directory for {d.shortDest} yet.
-                </div>
-                <a
-                  href={`https://www.google.com/maps/search/?api=1&query=cafes+restaurants+near+${encodeURIComponent(d.shortDest + ' Victoria')}`}
-                  target="_blank" rel="noopener noreferrer"
-                  style={{ display: 'inline-block', padding: '9px 18px', borderRadius: 9, background: '#1C1B1F', color: '#fff', fontSize: 12, fontWeight: 700, textDecoration: 'none' }}
-                >
-                  Find food near {d.shortDest} on Google Maps ↗
-                </a>
-              </div>
-            )}
-            {d.foodPOIs.length > 0 && (
-              <a
-                href={`https://www.google.com/maps/search/?api=1&query=restaurants+near+${encodeURIComponent(d.shortDest + ' Victoria')}`}
-                target="_blank" rel="noopener noreferrer"
-                style={{ display: 'block', textAlign: 'center', margin: '12px 16px 0', fontSize: 12, color: WARM, fontWeight: 600, textDecoration: 'none' }}
-              >
-                See all food & drink near {d.shortDest} ↗
-              </a>
-            )}
-
-            {/* Route food stops */}
-            {showStops && (d.addedDiningStops.length > 0 || availableRouteStops.length > 0) && (
-              <div style={{ padding: '16px 16px 0' }}>
-                <SectionHeader title="Stops on Your Way" icon="🚗" count={availableRouteStops.length + d.addedDiningStops.length} />
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 8 }}>
-                  {d.addedDiningStops.map((stop) => (
-                    <div key={stop.foodId} style={{ background: '#E8F5EE', border: '1px solid rgba(58,107,79,0.2)', borderRadius: 10, padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 10 }}>
-                      <div style={{ flex: 1 }}>
-                        <span style={{ fontSize: 13, fontWeight: 700, color: GREEN }}>{stop.stopName}</span>
-                        <span style={{ fontSize: 11, color: '#6B7280', marginLeft: 8 }}>
-                          {stop.timeOfDay === 'morning' ? '🌅 Morning' : '☀️ Afternoon'}
-                        </span>
-                      </div>
-                      <button onClick={() => d.removeDiningStop(stop.foodId)} style={{ padding: '4px 9px', borderRadius: 6, border: '1px solid rgba(58,107,79,0.3)', background: 'transparent', color: GREEN, fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>
-                        Remove
-                      </button>
-                    </div>
-                  ))}
-                  {availableRouteStops.slice(0, 6).map((stop) => {
-                    const cfg = FOOD_CFG[stop.type]
-                    const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(stop.name + ' ' + d.shortDest)}`
-                    return (
-                      <div key={stop.id} style={{ background: '#fff', border: '1px solid var(--border)', borderRadius: 10, padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 10 }}>
-                        <span style={{ fontSize: 18 }}>{cfg.emoji}</span>
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ fontSize: 13, fontWeight: 700, color: '#1C1B1F', marginBottom: 1 }}>{stop.name}</div>
-                          <div style={{ fontSize: 10.5, color: '#6B7280' }}>
-                            {stop.distanceFromRouteKm < 0.5 ? 'On route' : `${stop.distanceFromRouteKm.toFixed(1)} km off route`}
-                            {stop.extraStopMin > 0 && ` · +${stop.extraStopMin} min`}
-                          </div>
+                      <span style={{ fontSize: 22, flexShrink: 0, lineHeight: 1.3 }}>{emoji}</span>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 2 }}>{f.name}</div>
+                        <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: f.description ? 4 : 0 }}>
+                          {f.category}{f.cuisine ? ` · ${f.cuisine}` : ''}
                         </div>
-                        <a href={mapsUrl} target="_blank" rel="noopener noreferrer" style={{ fontSize: 11, fontWeight: 700, color: '#fff', background: '#1C1B1F', padding: '5px 10px', borderRadius: 6, textDecoration: 'none', flexShrink: 0 }}>Maps ↗</a>
-                        <button onClick={() => setAddModal(stop)} style={{ padding: '5px 10px', borderRadius: 7, border: `1.5px solid ${GREEN}`, background: '#E8F5EE', color: GREEN, fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>+ Add</button>
+                        {f.description && <div style={{ fontSize: 12, color: '#374151', lineHeight: 1.5, marginBottom: 2 }}>{f.description}</div>}
+                        {attr.opening_hours_text && <div style={{ fontSize: 11, color: '#6B7280', marginTop: 2 }}>{attr.opening_hours_text}</div>}
                       </div>
-                    )
-                  })}
-                </div>
+                      <div style={{ display: 'flex', gap: 6, flexShrink: 0, alignSelf: 'center' }}>
+                        {website && (
+                          <a href={website.startsWith('http') ? website : `https://${website}`} target="_blank" rel="noopener noreferrer" style={{
+                            padding: '6px 10px', borderRadius: 8,
+                            background: '#3A6B4F', color: '#fff',
+                            fontSize: 12, fontWeight: 600, textDecoration: 'none',
+                          }}>Web ↗</a>
+                        )}
+                        <a href={mapsUrl} target="_blank" rel="noopener noreferrer" style={{
+                          padding: '6px 10px', borderRadius: 8,
+                          background: 'var(--bg-muted)', border: '1px solid var(--border)',
+                          fontSize: 12, fontWeight: 600, color: 'var(--text-primary)', textDecoration: 'none',
+                        }}>Maps ↗</a>
+                      </div>
+                    </div>
+                  )
+                })}
+                {filter === 'all' && allFoods.length > 6 && (
+                  <button onClick={() => handleFilterChange('food')} style={{
+                    width: '100%', padding: '9px', borderRadius: 9,
+                    border: '1px dashed var(--border)', background: 'none',
+                    fontSize: 12, color: '#6B7280', fontWeight: 500, cursor: 'pointer',
+                  }}>
+                    View all {allFoods.length} places to eat ↓
+                  </button>
+                )}
               </div>
-            )}
-          </SectionBlock>
-        )}
-
-
-        {/* Nature merged into Things to Do above */}
+            </SectionBlock>
+          )
+        })()}
 
         {/* ── Where to Stay ── */}
         {showStay && (() => {
@@ -855,16 +717,49 @@ export function ExperiencePanel({ hideTimeline = false }: { hideTimeline?: boole
         </div>
       </div>
 
-      {addModal && (
-        <AddModal
-          stopName={addModal.name}
-          onClose={() => setAddModal(null)}
-          onConfirm={(t) => {
-            d.addDiningStop({ foodId: addModal.id, stopName: addModal.name, stopLat: addModal.lat, stopLng: addModal.lng, timeOfDay: t, dayNumber: 1 })
-            setAddModal(null)
-          }}
-        />
-      )}
+    </div>
+  )
+}
+
+// ── Drink card ───────────────────────────────────────────────────────────────
+
+function DrinkCard({ name, emoji, cfg, website, mapsUrl }: {
+  name: string
+  emoji: string
+  cfg: { label: string; color: string; bg: string }
+  website?: string
+  mapsUrl: string
+}) {
+  const GREEN = '#3A6B4F'
+  return (
+    <div style={{
+      display: 'flex', alignItems: 'center', gap: 12,
+      padding: '12px 14px', borderRadius: 12,
+      border: '1px solid var(--border)', background: 'var(--bg-card)',
+    }}>
+      <span style={{ fontSize: 22, flexShrink: 0 }}>{emoji}</span>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 3 }}>{name}</div>
+        <span style={{
+          display: 'inline-block', fontSize: 10, fontWeight: 700,
+          color: cfg.color, background: cfg.bg,
+          padding: '2px 7px', borderRadius: 6, textTransform: 'uppercase', letterSpacing: '0.05em',
+        }}>{cfg.label}</span>
+      </div>
+      <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+        {website && (
+          <a href={website} target="_blank" rel="noopener noreferrer" style={{
+            padding: '6px 12px', borderRadius: 8,
+            background: GREEN, color: '#fff',
+            fontSize: 12, fontWeight: 600, textDecoration: 'none',
+          }}>Website ↗</a>
+        )}
+        <a href={mapsUrl} target="_blank" rel="noopener noreferrer" style={{
+          padding: '6px 12px', borderRadius: 8,
+          background: 'var(--bg-muted)', border: '1px solid var(--border)',
+          fontSize: 12, fontWeight: 600, color: 'var(--text-primary)', textDecoration: 'none',
+        }}>Maps ↗</a>
+      </div>
     </div>
   )
 }
@@ -899,88 +794,6 @@ function SectionBlock({ id, title, icon, count, loading, empty, children }: {
           <div className="ai-skeleton-line" style={{ height: 80, borderRadius: 12 }} />
         </div>
       ) : children}
-    </div>
-  )
-}
-
-// ── Food card (2-col grid, rich data) ────────────────────────────────────────
-
-function FoodCard({ poi, destName, highlighted, onMapPin, isLocalFav }: {
-  poi: LivePOI; destName: string; highlighted?: boolean; onMapPin?: () => void; isLocalFav?: boolean
-}) {
-  const tag = POI_TAG[poi.type] ?? { emoji: '🍽', label: poi.type, color: '#B45309', bg: '#FEF3C7' }
-  const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(poi.name + ' ' + destName)}`
-  const openStatus = poi.openingHours ? { isOpen: null, text: poi.openingHours } : null
-
-  return (
-    <div data-poi-id={poi.id} onClick={onMapPin} style={{
-      display: 'flex', flexDirection: 'column', gap: 8,
-      background: highlighted ? '#F0F9FF' : isLocalFav ? '#F0FDF4' : '#fff', borderRadius: 14,
-      border: `1.5px solid ${highlighted ? '#3B82F6' : isLocalFav ? 'rgba(58,107,79,0.25)' : 'var(--border)'}`,
-      padding: '14px',
-      boxShadow: highlighted ? '0 0 0 3px rgba(59,130,246,0.15)' : isLocalFav ? '0 2px 8px rgba(58,107,79,0.1)' : '0 1px 4px rgba(0,0,0,0.05)',
-      transition: 'all 0.15s', cursor: onMapPin ? 'pointer' : 'default',
-    }}>
-      {/* Type chip + local fav or map pin */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-        <span style={{ fontSize: 18 }}>{tag.emoji}</span>
-        <span style={{ fontSize: 9.5, fontWeight: 700, color: tag.color, background: tag.bg, padding: '2px 7px', borderRadius: 5, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-          {tag.label}
-        </span>
-        {isLocalFav
-          ? <span style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 4, background: '#E8F5EE', border: '1px solid rgba(58,107,79,0.2)', borderRadius: 20, padding: '2px 8px' }}>
-              <span style={{ fontSize: 11, color: GREEN }}>◆</span>
-              <span style={{ fontSize: 10, fontWeight: 700, color: GREEN, letterSpacing: '0.02em' }}>Local gem</span>
-            </span>
-          : onMapPin && <span style={{ marginLeft: 'auto', fontSize: 12, color: highlighted ? '#3B82F6' : '#9CA3AF' }} title="Show on map">📍</span>
-        }
-      </div>
-
-      {/* Name */}
-      <div style={{ fontSize: 13.5, fontWeight: 800, color: '#1C1B1F', lineHeight: 1.3 }}>
-        {poi.name}
-      </div>
-
-      {/* Description */}
-      {poi.description && (
-        <div style={{ fontSize: 11.5, color: '#49454F', lineHeight: 1.55 }}>
-          {poi.description}
-        </div>
-      )}
-
-      {/* Cuisine tag */}
-      {poi.cuisine && (
-        <span style={{ fontSize: 11, color: '#6B7280' }}>{poi.cuisine}</span>
-      )}
-
-      {/* Opening hours */}
-      {openStatus && (
-        <div style={{ fontSize: 11, color: '#6B7280' }}>{openStatus.text}</div>
-      )}
-
-      {/* Action row */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4 }}>
-        {poi.website && !poi.website.includes('google.com') && (
-          <a href={poi.website} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()}
-            style={{ flex: 1, textAlign: 'center', padding: '7px 10px', borderRadius: 8, background: '#F8F7F4', border: '1px solid var(--border)', color: '#374151', fontSize: 11.5, fontWeight: 700, textDecoration: 'none', whiteSpace: 'nowrap' }}>
-            Website ↗
-          </a>
-        )}
-        <div style={{ display: 'flex', gap: 5, marginLeft: 'auto' }}>
-          {(poi as any).phone && (
-            <a href={`tel:${(poi as any).phone}`} onClick={(e) => e.stopPropagation()}
-              title={(poi as any).phone}
-              style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 32, height: 32, borderRadius: 8, background: '#F0FDF4', border: '1px solid #BBF7D0', color: '#16A34A', textDecoration: 'none', fontSize: 15 }}>
-              📞
-            </a>
-          )}
-          <a href={mapsUrl} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()}
-            title="Open in Google Maps"
-            style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 32, height: 32, borderRadius: 8, background: '#1C1B1F', color: '#fff', textDecoration: 'none', fontSize: 15 }}>
-            📍
-          </a>
-        </div>
-      </div>
     </div>
   )
 }
@@ -1105,13 +918,10 @@ function ActivityCard({ act, expanded, highlighted, onToggle, isAdded, onAdd, on
 function AccommodationGridCard({ poi, destName }: { poi: AccommodationPOI; destName: string }) {
   const cfg = ACCOM_POI_CFG[poi.type]
   const attr = (poi as unknown as { attributes?: Record<string, unknown> }).attributes ?? {}
-  const accomPlaceId = attr.google_place_id as string | undefined
-  const mapsUrl = accomPlaceId
-    ? `https://www.google.com/maps/place/?q=place_id:${accomPlaceId}`
-    : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(poi.name + ' ' + destName)}`
-  const editorialSummary = attr.editorial_summary as string | undefined
+  const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(poi.name + ' ' + destName)}`
+  const editorialSummary = undefined
   const websiteUri = attr.website_uri as string | undefined
-  const websiteUrl = websiteUri && !websiteUri.includes('google.com') ? websiteUri : null
+  const websiteUrl = websiteUri || null
   const openStatus = getOpenStatus(attr.opening_hours_periods as import('@/lib/overpass').OpenHoursPeriod[] | undefined)
 
   return (
@@ -1162,23 +972,6 @@ function AccommodationGridCard({ poi, destName }: { poi: AccommodationPOI; destN
           style={{ flex: 1, textAlign: 'center', padding: '7px 10px', borderRadius: 8, background: '#1C1B1F', color: '#fff', fontSize: 11.5, fontWeight: 700, textDecoration: 'none' }}>
           Open in Maps ↗
         </a>
-      </div>
-    </div>
-  )
-}
-
-// ── Add stop modal ────────────────────────────────────────────────────────────
-
-function AddModal({ stopName, onClose, onConfirm }: { stopName: string; onClose: () => void; onConfirm: (t: 'morning' | 'afternoon') => void }) {
-  return (
-    <div onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: 200, background: 'rgba(0,0,0,0.35)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      <div onClick={(e) => e.stopPropagation()} style={{ background: '#fff', borderRadius: 18, padding: '24px 28px', boxShadow: '0 8px 40px rgba(0,0,0,0.15)', maxWidth: 320, width: '90%' }}>
-        <div style={{ fontSize: 15, fontWeight: 800, marginBottom: 4 }}>Add Stop</div>
-        <div style={{ fontSize: 12, color: '#6B7280', marginBottom: 18 }}>When at <strong>{stopName}</strong>?</div>
-        <div style={{ display: 'flex', gap: 10 }}>
-          <button onClick={() => onConfirm('morning')} style={{ flex: 1, padding: '12px', borderRadius: 10, border: `2px solid ${GREEN}`, background: '#E8F5EE', color: GREEN, fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>🌅 Morning</button>
-          <button onClick={() => onConfirm('afternoon')} style={{ flex: 1, padding: '12px', borderRadius: 10, border: `2px solid ${WARM}`, background: '#FFF5EB', color: WARM, fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>☀️ Afternoon</button>
-        </div>
       </div>
     </div>
   )
@@ -1300,10 +1093,3 @@ function VerticalStepper({ d }: { d: ReturnType<typeof usePlannerData> }) {
   )
 }
 
-// ── Curated dining card ───────────────────────────────────────────────────────
-
-
-
-// suppress unused import warning
-void (null as unknown as AddedDiningStop)
-void (null as unknown as AddedActivity)

@@ -1,16 +1,14 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect } from 'react'
 import { useAppStore } from '@/store/useAppStore'
 import { supabase } from '@/lib/supabase'
 import {
-  fetchLivePOIs, fetchWikipediaSummary, fetchRouteFoodStops,
-  type LivePOI, type RouteFoodStop, type AccommodationPOI,
+  fetchLivePOIs, fetchWikipediaSummary,
+  type LivePOI, type AccommodationPOI,
 } from '@/lib/overpass'
 import { fetchHazardsNear, type HazardAlert } from '@/lib/vicEmergency'
 import { captureError } from '@/lib/bugLogger'
-import type { DiningPref, FuelType } from '@/types'
+import type { FuelType } from '@/types'
 import { getCurrentSeason, SEASON_META } from '@/utils/season'
-import { FOOD_DRINK, type FoodDrinkPOI } from '@/data/foodDrink'
-import { distanceBetween } from '@/utils/geo'
 
 const FUEL_PRICE_PER_L: Record<FuelType, number> = {
   Unleaded91: 1.82,
@@ -65,7 +63,8 @@ export interface DbFoodPlace {
   slug: string
   name: string
   category: string
-  description: string
+  description: string | null
+  cuisine: string | null
   lat: number
   lng: number
   address: string | null
@@ -152,13 +151,13 @@ async function fetchDestinationFromDB(
     (cLat && cLng
       ? supabase
           .from('food_places')
-          .select('food_place_id,slug,name,category,description,lat,lng,address,attributes,source')
+          .select('food_place_id,slug,name,category,description,cuisine,lat,lng,address,attributes,source')
           .gte('lat', latMin).lte('lat', latMax)
           .gte('lng', lngMin).lte('lng', lngMax)
           .limit(200)
       : supabase
           .from('food_places')
-          .select('food_place_id,slug,name,category,description,lat,lng,address,attributes,source')
+          .select('food_place_id,slug,name,category,description,cuisine,lat,lng,address,attributes,source')
           .eq('sub_dest_id', id)
           .limit(200)
     ),
@@ -197,10 +196,15 @@ async function fetchDestinationFromDB(
       .single(),
   ])
 
+  const qualitySort = <T extends { attributes: Record<string, unknown> }>(arr: T[]): T[] =>
+    [...arr].sort((a, b) =>
+      ((b.attributes?.quality_score as number) ?? 0) - ((a.attributes?.quality_score as number) ?? 0)
+    )
+
   return {
-    activities: (activitiesRes.data ?? []) as DbActivity[],
-    food: (foodRes.data ?? []) as DbFoodPlace[],
-    nature: (natureRes.data ?? []) as DbNatureSpot[],
+    activities: qualitySort((activitiesRes.data ?? []) as DbActivity[]),
+    food: qualitySort((foodRes.data ?? []) as DbFoodPlace[]),
+    nature: qualitySort((natureRes.data ?? []) as DbNatureSpot[]),
     accommodation: (accomRes.data ?? []) as DbAccommodation[],
     wikiSummary: summaryRes.data?.wiki_text ?? null,
   }
@@ -213,8 +217,6 @@ export function usePlannerData() {
   const destName = useAppStore((s) => s.destName)
   const destCoord = useAppStore((s) => s.destCoord)
   const originName = useAppStore((s) => s.originName)
-  const originCoord = useAppStore((s) => s.originCoord)
-  const diningPrefs = useAppStore((s) => s.diningPrefs)
   const activeItinerary = useAppStore((s) => s.activeItinerary)
   const vehicleProfile = useAppStore((s) => s.vehicleProfile)
   const userProfile = useAppStore((s) => s.userProfile)
@@ -228,15 +230,13 @@ export function usePlannerData() {
 
   // DB-sourced state (Supabase — primary)
   const [dbActivities, setDbActivities] = useState<DbActivity[]>([])
-  const [dbFood, setDbFood] = useState<DbFoodPlace[]>([])
   const [dbNature, setDbNature] = useState<DbNatureSpot[]>([])
   const [dbAccommodation, setDbAccommodation] = useState<DbAccommodation[]>([])
   const [dbLoading, setDbLoading] = useState(false)
 
-  // Legacy live state (Overpass fallback + route food + hazards)
+  // Legacy live state (Overpass fallback + hazards)
   const [livePOIs, setLivePOIs] = useState<LivePOI[] | null>(null)
   const [wikiSummary, setWikiSummary] = useState<string | null>(null)
-  const [routeFood, setRouteFood] = useState<RouteFoodStop[] | null>(null)
   const [hazards, setHazards] = useState<HazardAlert[]>([])
 
   useEffect(() => {
@@ -247,7 +247,6 @@ export function usePlannerData() {
 
     // Reset
     setDbActivities([])
-    setDbFood([])
     setDbNature([])
     setDbAccommodation([])
     setLivePOIs(null)
@@ -259,19 +258,16 @@ export function usePlannerData() {
       if (signal.aborted) return
       if (result) {
         setDbActivities(result.activities)
-        setDbFood(result.food)
         setDbNature(result.nature)
         setDbAccommodation(result.accommodation)
         if (result.wikiSummary) setWikiSummary(result.wikiSummary)
       }
       setDbLoading(false)
 
-      // Fallback: if DB returned nothing (new destination not yet enriched), hit Overpass
-      if (!result || result.activities.length === 0) {
-        fetchLivePOIs(destId, destCoord.lat, destCoord.lng).then((pois) => {
-          if (!signal.aborted) setLivePOIs(pois)
-        }).catch(() => { if (!signal.aborted) setLivePOIs([]) })
-      }
+      // Always fetch live POIs for drink venues (wineries/breweries) — not in Supabase enrichment
+      fetchLivePOIs(destId, destCoord.lat, destCoord.lng).then((pois) => {
+        if (!signal.aborted) setLivePOIs(pois)
+      }).catch(() => { if (!signal.aborted) setLivePOIs([]) })
 
       // Wiki summary fallback if not in DB
       if (!result?.wikiSummary) {
@@ -301,21 +297,7 @@ export function usePlannerData() {
     return () => ac.abort()
   }, [destId, destCoord?.lat, destCoord?.lng]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Route food stops (along the drive — still from Overpass, route-based not destination-based)
-  useEffect(() => {
-    if (!activeItinerary || routeFood !== null) return
-    fetchRouteFoodStops(originCoord, destCoord, diningPrefs as DiningPref[])
-      .then(setRouteFood)
-      .catch((err) => {
-        setRouteFood([])
-        captureError('usePlannerData', 'fetchRouteFoodStops', err)
-      })
-  }, [activeItinerary?.id]) // eslint-disable-line react-hooks/exhaustive-deps
-
   // Legacy POI filters (Overpass fallback path)
-  const foodPOIs = (livePOIs ?? []).filter((p) =>
-    ['cafe', 'restaurant', 'pub', 'winery', 'bakery', 'fast_food'].includes(p.type)
-  ).slice(0, 20)
   const activityPOIs = (livePOIs ?? []).filter((p) => p.type === 'attraction').slice(0, 12)
   const naturePOIs = (livePOIs ?? []).filter((p) =>
     p.type === 'hiking' || p.type === 'viewpoint'
@@ -339,62 +321,10 @@ export function usePlannerData() {
   const season = getCurrentSeason()
   const seasonMeta = SEASON_META[season]
 
-  const curatedDining = useMemo((): FoodDrinkPOI[] => {
-    if (!destCoord) return []
-    return FOOD_DRINK
-      .map((f) => ({ f, km: distanceBetween(destCoord, f.coord) }))
-      .filter(({ km }) => km <= 25)
-      .sort((a, b) => a.km - b.km)
-      .slice(0, 5)
-      .map(({ f }) => f)
-  }, [destCoord?.lat, destCoord?.lng]) // eslint-disable-line react-hooks/exhaustive-deps
-
   const dayLabel = (activeItinerary?.total_days ?? 1) > 1
     ? `${activeItinerary!.total_days}-Day Escape`
     : 'Day Escape'
 
-  // Categories that are experiences — excluded from Eat & Drink, shown in Things to Do
-  const NON_FOOD_CATS = new Set([
-    'spa', 'wellness', 'beauty_salon', 'beauty', 'gym', 'fitness',
-    'shopping_mall', 'department_store', 'supermarket',
-  ])
-
-  // Filter closed places, deduplicate by name (keep highest-rated), sort rated first
-  const openFood = (() => {
-    const byStatus = dbFood.filter((f) => {
-      const status = (f as unknown as { attributes?: { business_status?: string } }).attributes?.business_status
-      if (status && status !== 'OPERATIONAL') return false
-      if (NON_FOOD_CATS.has(f.category.toLowerCase())) return false
-      if (/\b(spa|wellness|bathhouse|hot\s*spring|retreat|ryokan|onsen)\b/i.test(f.name)) return false
-      return true
-    })
-    // Deduplicate: keep highest-rated entry per name
-    const seen = new Map<string, typeof byStatus[0]>()
-    for (const f of byStatus) {
-      const key = f.name.toLowerCase().trim()
-      const prev = seen.get(key)
-      if (!prev) { seen.set(key, f); continue }
-      const prevRating = ((prev.attributes as Record<string, unknown>)?.rating as number | undefined) ?? 0
-      const fRating = ((f.attributes as Record<string, unknown>)?.rating as number | undefined) ?? 0
-      if (fRating > prevRating) seen.set(key, f)
-    }
-    const deduped = [...seen.values()]
-    // Sort: rated (with reviews) first, descending by rating; unrated sink to bottom
-    deduped.sort((a, b) => {
-      const aAttr = (a.attributes as Record<string, unknown>) ?? {}
-      const bAttr = (b.attributes as Record<string, unknown>) ?? {}
-      const aR = (aAttr.rating as number | undefined) ?? 0
-      const bR = (bAttr.rating as number | undefined) ?? 0
-      const aCount = (aAttr.review_count as number | undefined) ?? 0
-      const bCount = (bAttr.review_count as number | undefined) ?? 0
-      // Treat as rated only if has reviews
-      const aRated = aR > 0 && aCount > 0 ? 1 : 0
-      const bRated = bR > 0 && bCount > 0 ? 1 : 0
-      if (aRated !== bRated) return bRated - aRated
-      return bR - aR
-    })
-    return deduped
-  })()
   // Coordinate-only maps URL pattern — these are OSM nodes with no real place page
   const COORD_ONLY_URL = /query=-?\d+\.\d+,-?\d+\.\d+/
 
@@ -414,12 +344,6 @@ export function usePlannerData() {
       if (!a.name || a.name.trim().length < 3) return false
       if (JUNK_ACT_PATTERN.test(a.name.trim())) return false
       if (JUNK_PHRASE_PATTERN.test(a.name)) return false
-      // If activity has rating stored in attributes, enforce minimum quality
-      const rating = attr.rating as number | undefined
-      const reviewCount = attr.review_count as number | undefined
-      if (rating !== undefined && reviewCount !== undefined) {
-        if (rating < 4.0 || reviewCount < 50) return false
-      }
       return true
     })
     const seen = new Set<string>()
@@ -448,7 +372,6 @@ export function usePlannerData() {
     })
   })()
 
-  const dbFoodCount = openFood.length
   const dbActivityCount = openActivities.length + uniqueNature.length
   const dbAccomCount = dbAccommodation.length
 
@@ -469,15 +392,14 @@ export function usePlannerData() {
     activeItinerary, vehicleProfile, userProfile, departureHour,
     addedDiningStops, removeDiningStop, addDiningStop,
     addedActivities, addActivity, removeActivity,
-    curatedDining,
     // computed
     totalKm, driveHours, fuelCost, dayLabel,
     season, seasonMeta,
     // DB data (primary — fast, comprehensive, closed places filtered)
-    dbActivities: openActivities, dbFood: openFood, dbNature: uniqueNature, dbAccommodation, accommodationPOIs,
-    dbLoading, dbFoodCount, dbActivityCount, dbAccomCount,
-    // legacy Overpass (fallback + route food)
-    livePOIs, wikiSummary, routeFood,
-    foodPOIs, activityPOIs, naturePOIs, hazards,
+    dbActivities: openActivities, dbNature: uniqueNature, dbAccommodation, accommodationPOIs,
+    dbLoading, dbActivityCount, dbAccomCount,
+    // legacy Overpass (fallback)
+    livePOIs, wikiSummary,
+    activityPOIs, naturePOIs, hazards,
   }
 }
