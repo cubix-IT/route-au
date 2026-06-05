@@ -1,4 +1,4 @@
-import { POIS } from '@/data/pois'
+import { POIS } from '@/data/pois.ts'
 import type { Route, ScoredPOI, UserProfile } from '@/types'
 import { buildRouteBoundingBox, distanceToLine, isPointInPolygon } from '@/utils/geo'
 import { scorePoiVibe } from './vibeScorer'

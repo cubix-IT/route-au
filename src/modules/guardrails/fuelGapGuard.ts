@@ -1,4 +1,4 @@
-import { FUEL_STOPS } from '@/data/fuelStops'
+import { FUEL_STOPS } from '@/data/fuelStops.ts'
 import type { GuardrailWarning, Route, VehicleProfile, Waypoint } from '@/types'
 import { distanceBetween } from '@/utils/geo'
 

@@ -1,5 +1,5 @@
-import { getActivitiesForSubDest } from '@/data/victorianActivities'
-import type { Activity } from '@/data/victorianActivities'
+import { getActivitiesForSubDest } from '@/data/victorianActivities.ts'
+import type { Activity } from '@/data/victorianActivities.ts'
 
 interface UseActivitiesResult {
   activities: Activity[]

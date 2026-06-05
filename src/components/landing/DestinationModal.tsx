@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { fetchWikipediaThumb, fetchWikipediaSummary } from '@/lib/overpass'
 import { fetchWeatherForCoord } from '@/api/weather'
-import type { Activity } from '@/data/victorianActivities'
+import type { Activity } from '@/data/victorianActivities.ts'
 import { useAppStore } from '@/store/useAppStore'
 import { supabase } from '@/lib/supabase'
 

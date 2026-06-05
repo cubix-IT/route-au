@@ -1,5 +1,5 @@
 import type { ItineraryDay, ScheduleItem, ScoredPOI } from '@/types'
-import { getActivitiesForSubDest } from '@/data/victorianActivities'
+import { getActivitiesForSubDest } from '@/data/victorianActivities.ts'
 
 let itemCounter = 0
 const nextId = () => `si-${++itemCounter}`

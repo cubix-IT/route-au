@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
-import { VICTORIAN_CLUSTERS } from '@/data/victorianClusters'
-import type { VicCluster } from '@/data/victorianClusters'
+import { VICTORIAN_CLUSTERS } from '@/data/victorianClusters.ts'
+import type { VicCluster } from '@/data/victorianClusters.ts'
 import { supabase } from '@/lib/supabase'
 
 type Status = 'loading' | 'ready' | 'error'

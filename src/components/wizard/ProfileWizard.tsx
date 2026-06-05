@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react'
 import { useAppStore } from '@/store/useAppStore'
 import { useItineraryBuilder } from '@/hooks/useItineraryBuilder'
-import { matchDestinations, getNearbySubDests, VICTORIAN_CLUSTERS } from '@/data/victorianClusters'
+import { matchDestinations, getNearbySubDests, VICTORIAN_CLUSTERS } from '@/data/victorianClusters.ts'
 import { getCurrentSeason } from '@/utils/season'
 import { fetchWeatherForCoord } from '@/api/weather'
-import type { MatchedDest, TripInterest } from '@/data/victorianClusters'
+import type { MatchedDest, TripInterest } from '@/data/victorianClusters.ts'
 import type {
   TripType, CrewType, VehicleType, FuelType,
   AccommodationPreference, VibeTag, DiningPref,

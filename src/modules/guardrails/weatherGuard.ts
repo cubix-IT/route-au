@@ -1,5 +1,5 @@
 import type { DayWeather, GuardrailWarning, Itinerary } from '@/types'
-import { CORRIDORS } from '@/data/corridors'
+import { CORRIDORS } from '@/data/corridors.ts'
 
 const DIRT_SURFACES = new Set(['Dirt', 'Gravel', '4WD_Only'])
 

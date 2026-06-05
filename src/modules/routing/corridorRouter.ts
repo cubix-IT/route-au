@@ -1,5 +1,5 @@
-import { CORRIDORS } from '@/data/corridors'
-import { FUEL_STOPS } from '@/data/fuelStops'
+import { CORRIDORS } from '@/data/corridors.ts'
+import { FUEL_STOPS } from '@/data/fuelStops.ts'
 import type { Coordinate, Route, VehicleProfile, Waypoint } from '@/types'
 import { distanceBetween } from '@/utils/geo'
 import { validateRouteConstraints } from './routeConstraintValidator'

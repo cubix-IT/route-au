@@ -5,7 +5,7 @@ import { useAppStore } from '@/store/useAppStore'
 import { useWeather } from '@/hooks/useWeather'
 import type { LivePOI } from '@/lib/overpass'
 import type { HazardAlert } from '@/lib/vicEmergency'
-import type { Activity } from '@/data/victorianActivities'
+import type { Activity } from '@/data/victorianActivities.ts'
 
 const GREEN = '#3A6B4F'
 const WARM  = '#B87333'

@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useAppStore } from '@/store/useAppStore'
 import { useActivities } from '@/hooks/useActivities'
 import { fetchLivePOIs, fetchWikipediaSummary, type LivePOI } from '@/lib/overpass'
-import type { ActivityCategory } from '@/data/victorianActivities'
+import type { ActivityCategory } from '@/data/victorianActivities.ts'
 
 const GREEN = '#3A6B4F'
 

@@ -2,7 +2,7 @@ import { useEffect, useRef, useCallback, useState } from 'react'
 import maplibregl from 'maplibre-gl'
 import { MapView } from './MapView'
 import { useAppStore } from '@/store/useAppStore'
-import { CORRIDORS } from '@/data/corridors'
+import { CORRIDORS } from '@/data/corridors.ts'
 import type { Coordinate } from '@/types'
 
 const PIN_EMOJI: Record<string, string> = {

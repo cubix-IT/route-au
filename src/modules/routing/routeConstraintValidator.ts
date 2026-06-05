@@ -1,4 +1,4 @@
-import { CORRIDORS } from '@/data/corridors'
+import { CORRIDORS } from '@/data/corridors.ts'
 import type { Route, RouteConstraintViolation, VehicleProfile } from '@/types'
 
 export function validateRouteConstraints(
