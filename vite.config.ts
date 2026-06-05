@@ -55,7 +55,7 @@ export default defineConfig({
   ],
   resolve: {
     alias: [
-      { find: /^@\//, replacement: path.resolve(__dirname, 'src') + '/' },
+      { find: /^@\//, replacement: path.join(process.cwd(), 'src') + '/' },
     ],
   },
 })
