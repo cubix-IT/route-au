@@ -1,6 +1,13 @@
 import { useState, useEffect } from 'react'
 import { Toaster } from 'react-hot-toast'
-import { useRegisterSW } from 'virtual:pwa-register/react'
+// PWA registration — only active when vite-plugin-pwa is enabled (local dev)
+let useRegisterSW: (opts?: { onNeedRefresh?: () => void }) => { updateServiceWorker: (v: boolean) => void }
+try {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  useRegisterSW = (await import('virtual:pwa-register/react' as any) as any).useRegisterSW
+} catch {
+  useRegisterSW = () => ({ updateServiceWorker: () => {} })
+}
 import { Header } from '@/components/layout/Header'
 import { MapContainer } from '@/components/map/MapContainer'
 import { ProfileWizard } from '@/components/wizard/ProfileWizard'
