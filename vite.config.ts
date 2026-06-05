@@ -56,4 +56,11 @@ export default defineConfig({
   resolve: {
     alias: { '@': path.resolve(__dirname, 'src') },
   },
+  build: {
+    rolldownOptions: {
+      resolve: {
+        extensions: ['.ts', '.tsx', '.js', '.jsx', '.json'],
+      },
+    },
+  },
 })
