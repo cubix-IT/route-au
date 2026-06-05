@@ -10,10 +10,9 @@ export default defineConfig({
   plugins: [
     react(),
     tailwindcss(),
-    VitePWA({
+    // vite-plugin-pwa@1.3.0 has a rolldown compatibility issue in Vite 8 — skip on Vercel
+    ...(process.env.VERCEL ? [] : [VitePWA({
       registerType: 'autoUpdate',
-      // Disable PWA in CI/Vercel builds — vite-plugin-pwa@1.3.0 has rolldown compatibility issues
-      disable: process.env.CI === '1' || !!process.env.VERCEL,
       includeAssets: ['icons/*.png', 'favicon.ico', 'data/*.json'],
       workbox: {
         skipWaiting: true,
@@ -52,7 +51,7 @@ export default defineConfig({
           { src: 'icons/icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any maskable' },
         ],
       },
-    }),
+    })]),
   ],
   resolve: {
     alias: { '@': path.resolve(__dirname, 'src') },
