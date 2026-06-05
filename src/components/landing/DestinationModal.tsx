@@ -237,7 +237,7 @@ export function DestinationModal({
           display: 'flex', flexDirection: 'column', justifyContent: 'flex-end',
           padding: '18px 20px',
         }}>
-          <button onClick={onClose} style={{ position: 'absolute', top: 14, right: 14, background: 'rgba(0,0,0,0.35)', border: 'none', borderRadius: 8, width: 32, height: 32, cursor: 'pointer', fontSize: 18, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>×</button>
+          <button onClick={onClose} className="mu-btn-icon" style={{ position: 'absolute', top: 14, right: 14, background: 'rgba(0,0,0,0.35)', border: 'none', borderRadius: 8, width: 32, height: 32, cursor: 'pointer', fontSize: 18, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>×</button>
           <div style={{ fontSize: 24, fontWeight: 800, color: '#fff', letterSpacing: '-0.02em', lineHeight: 1.2 }}>{sub.name}</div>
           <div style={{ fontSize: 12.5, color: 'rgba(255,255,255,0.8)', marginTop: 3, display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
             <span>{driveLabel} drive · Victoria, AU</span>
@@ -252,13 +252,15 @@ export function DestinationModal({
         {/* Tabs */}
         <div style={{ display: 'flex', borderBottom: '1px solid var(--border)', background: '#fff', flexShrink: 0 }}>
           {(['overview', 'activities', 'food'] as const).map((tab) => (
-            <button key={tab} onClick={() => setMainTab(tab)} style={{
-              flex: 1, padding: '11px 8px', border: 'none', background: 'none',
-              fontSize: 12.5, fontWeight: mainTab === tab ? 700 : 500,
-              color: mainTab === tab ? GREEN : 'var(--text-muted)',
-              borderBottom: mainTab === tab ? `2px solid ${GREEN}` : '2px solid transparent',
-              marginBottom: -1, cursor: 'pointer',
-            }}>
+            <button key={tab} onClick={() => setMainTab(tab)}
+              className={`mu-underline-tab${mainTab === tab ? ' mu-tab-active' : ''}`}
+              style={{
+                flex: 1, padding: '11px 8px', border: 'none', background: 'none',
+                fontSize: 12.5, fontWeight: mainTab === tab ? 700 : 500,
+                color: mainTab === tab ? GREEN : 'var(--text-muted)',
+                borderBottom: mainTab === tab ? `2px solid ${GREEN}` : '2px solid transparent',
+                marginBottom: -1, cursor: 'pointer',
+              }}>
               {tab === 'food' ? '🍽 Eat & Drink' : tab === 'activities' ? '🗺 Things to Do' : '📍 Overview'}
             </button>
           ))}
@@ -315,7 +317,7 @@ export function DestinationModal({
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
                     <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Top Attractions</div>
                     {moreActsCount > 0 && (
-                      <button onClick={() => setMainTab('activities')} style={{ fontSize: 11, fontWeight: 700, color: GREEN, background: 'none', border: 'none', cursor: 'pointer' }}>
+                      <button onClick={() => setMainTab('activities')} className="mu-btn-text" style={{ fontSize: 11, fontWeight: 700, color: GREEN, background: 'none', border: 'none', cursor: 'pointer' }}>
                         +{moreActsCount} more →
                       </button>
                     )}
@@ -340,7 +342,7 @@ export function DestinationModal({
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
                     <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Best Places to Eat</div>
                     {moreFoodCount > 0 && (
-                      <button onClick={() => setMainTab('food')} style={{ fontSize: 11, fontWeight: 700, color: GREEN, background: 'none', border: 'none', cursor: 'pointer' }}>
+                      <button onClick={() => setMainTab('food')} className="mu-btn-text" style={{ fontSize: 11, fontWeight: 700, color: GREEN, background: 'none', border: 'none', cursor: 'pointer' }}>
                         +{moreFoodCount} more →
                       </button>
                     )}
@@ -406,7 +408,7 @@ export function DestinationModal({
 
         {/* CTA */}
         <div style={{ padding: '14px 20px', borderTop: '1px solid var(--border)', background: '#fff', flexShrink: 0 }}>
-          <button onClick={onPlan} style={{ width: '100%', padding: '14px', borderRadius: 12, background: GREEN, border: 'none', color: '#fff', fontSize: 15, fontWeight: 700, cursor: 'pointer', letterSpacing: '-0.01em' }}>
+          <button onClick={onPlan} className="mu-btn-primary" style={{ width: '100%', padding: '14px', borderRadius: 12, background: GREEN, border: 'none', color: '#fff', fontSize: 15, fontWeight: 700, cursor: 'pointer', letterSpacing: '-0.01em' }}>
             Plan this escape →
           </button>
         </div>

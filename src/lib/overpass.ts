@@ -177,6 +177,7 @@ export interface AccommodationPOI {
   website?: string
   stars?: number
   description?: string
+  address?: string
 }
 
 const accomCache = new Map<string, AccommodationPOI[]>()

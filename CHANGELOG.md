@@ -1,5 +1,10 @@
 # Changelog
 
+## 2 June 2026 (7a49bc1)
+
+- **Restore Haiku descriptions with spend docs + CLAUDE.md spend rules**
+  - Claude Haiku back in enrichment cron (~$0.003/day, prepaid no auto-reload)
+
 ## 2 June 2026 (6252426)
 
 - **Switch weather API from Open-Meteo to MET Norway (api.met.no)**

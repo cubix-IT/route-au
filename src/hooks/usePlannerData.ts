@@ -64,12 +64,14 @@ export interface DbFoodPlace {
   name: string
   category: string
   description: string | null
-  cuisine: string | null
   lat: number
   lng: number
   address: string | null
   attributes: Record<string, unknown>
   source: string
+  website: string | null
+  phone: string | null
+  opening_hours: string | null
 }
 
 export interface DbNatureSpot {
@@ -93,6 +95,8 @@ export interface DbAccommodation {
   lat: number | null
   lng: number | null
   address: string | null
+  website: string | null
+  phone: string | null
 }
 
 // Fetch all content for a sub-destination from Supabase
@@ -152,13 +156,13 @@ async function fetchDestinationFromDB(
     (cLat && cLng
       ? supabase
           .from('food_places')
-          .select('food_place_id,slug,name,category,description,cuisine,lat,lng,address,attributes,source')
+          .select('food_place_id,slug,name,category,description,lat,lng,address,attributes,source,website,phone,opening_hours')
           .gte('lat', latMin).lte('lat', latMax)
           .gte('lng', lngMin).lte('lng', lngMax)
           .limit(200)
       : supabase
           .from('food_places')
-          .select('food_place_id,slug,name,category,description,cuisine,lat,lng,address,attributes,source')
+          .select('food_place_id,slug,name,category,description,lat,lng,address,attributes,source,website,phone,opening_hours')
           .eq('sub_dest_id', id)
           .limit(200)
     ),
@@ -180,13 +184,13 @@ async function fetchDestinationFromDB(
     (cLat && cLng
       ? supabase
           .from('accommodation')
-          .select('accommodation_id,slug,name,type,description,lat,lng,address')
+          .select('accommodation_id,slug,name,type,description,lat,lng,address,website,phone')
           .gte('lat', latMin).lte('lat', latMax)
           .gte('lng', lngMin).lte('lng', lngMax)
           .limit(100)
       : supabase
           .from('accommodation')
-          .select('accommodation_id,slug,name,type,description,lat,lng,address')
+          .select('accommodation_id,slug,name,type,description,lat,lng,address,website,phone')
           .eq('sub_dest_id', id)
           .limit(100)
     ),
@@ -258,11 +262,14 @@ export function usePlannerData() {
     fetchDestinationFromDB(destId, destCoord ?? undefined).then((result) => {
       if (signal.aborted) return
       if (result) {
+        console.log('[usePlannerData] food:', result.food.length, 'accom:', result.accommodation.length, 'activities:', result.activities.length)
         setDbActivities(result.activities)
         setDbNature(result.nature)
         setDbFood(result.food)
         setDbAccommodation(result.accommodation)
         if (result.wikiSummary) setWikiSummary(result.wikiSummary)
+      } else {
+        console.warn('[usePlannerData] fetchDestinationFromDB returned null for', destId)
       }
       setDbLoading(false)
 
@@ -347,7 +354,14 @@ export function usePlannerData() {
       return true
     })
     const seen = new Set<string>()
-    return byStatus.filter((a) => {
+    return byStatus.map((a) => {
+      // OSM place nodes named after the destination itself — relabel as "Town Centre"
+      if (a.name.toLowerCase().trim() === destName.toLowerCase().trim() ||
+          a.name.toLowerCase().trim() === destId.toLowerCase().trim()) {
+        return { ...a, name: `${destName.split(',')[0].trim()} Town Centre` }
+      }
+      return a
+    }).filter((a) => {
       const key = a.name.toLowerCase().trim()
       if (seen.has(key)) return false
       seen.add(key)
@@ -383,6 +397,8 @@ export function usePlannerData() {
       lat: a.lat ?? undefined,
       lng: a.lng ?? undefined,
       description: a.description || undefined,
+      address: a.address || undefined,
+      website: a.website || undefined,
     }))
   , [dbAccommodation]) // eslint-disable-line react-hooks/exhaustive-deps
 

@@ -1,0 +1,294 @@
+/*
+ * Material You (M3) design system — Unplanned Escapes
+ * Single source of truth for motion, elevation, state layers, and interactive polish.
+ * Easing reference:
+ *   --mu-ease-standard   cubic-bezier(0.2, 0, 0, 1)       — most transitions
+ *   --mu-ease-decelerate cubic-bezier(0.05, 0.7, 0.1, 1)  — elements entering
+ *   --mu-ease-accelerate cubic-bezier(0.3, 0, 1, 1)        — elements leaving
+ *   --mu-ease-spring     cubic-bezier(0.34, 1.4, 0.64, 1)  — expressive / playful
+ */
+
+:root {
+  --mu-green: #3A6B4F;
+  --mu-green-dark: #2d5440;
+  --mu-ease-standard:   cubic-bezier(0.2, 0, 0, 1);
+  --mu-ease-decelerate: cubic-bezier(0.05, 0.7, 0.1, 1);
+  --mu-ease-accelerate: cubic-bezier(0.3, 0, 1, 1);
+  --mu-ease-spring:     cubic-bezier(0.34, 1.4, 0.64, 1);
+  --mu-duration-short:  150ms;
+  --mu-duration-medium: 250ms;
+  --mu-duration-long:   380ms;
+}
+
+/* ── Keyframes ─────────────────────────────────────────────────────── */
+
+@keyframes mu-line-in {
+  from { transform: scaleX(0); }
+  to   { transform: scaleX(1); }
+}
+
+@keyframes mu-fade-up {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes mu-scale-in {
+  from { opacity: 0; transform: scale(0.94); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+/* ── Primary buttons (filled green) ───────────────────────────────── */
+
+.mu-btn-primary {
+  position: relative;
+  overflow: hidden;
+  transition:
+    background var(--mu-duration-medium) var(--mu-ease-standard),
+    box-shadow  var(--mu-duration-medium) var(--mu-ease-standard) !important;
+}
+.mu-btn-primary::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: rgba(255, 255, 255, 0);
+  transition: background var(--mu-duration-short) var(--mu-ease-standard);
+  pointer-events: none;
+}
+.mu-btn-primary:hover::after  { background: rgba(255, 255, 255, 0.10); }
+.mu-btn-primary:active::after { background: rgba(255, 255, 255, 0.22); }
+.mu-btn-primary:hover {
+  box-shadow: 0 4px 16px rgba(58, 107, 79, 0.38) !important;
+}
+.mu-btn-primary:active {
+  transform: scale(0.98);
+  transition-duration: 80ms !important;
+}
+
+/* ── Ghost / outline buttons ───────────────────────────────────────── */
+
+.mu-btn-ghost {
+  position: relative;
+  overflow: hidden;
+  transition:
+    background     var(--mu-duration-medium) var(--mu-ease-standard),
+    border-color   var(--mu-duration-medium) var(--mu-ease-standard) !important;
+}
+.mu-btn-ghost::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: rgba(58, 107, 79, 0);
+  transition: background var(--mu-duration-short) var(--mu-ease-standard);
+  pointer-events: none;
+}
+.mu-btn-ghost:hover::after  { background: rgba(58, 107, 79, 0.07); }
+.mu-btn-ghost:active::after { background: rgba(58, 107, 79, 0.14); }
+.mu-btn-ghost:hover { border-color: rgba(58, 107, 79, 0.5) !important; }
+.mu-btn-ghost:active { transform: scale(0.98); transition-duration: 80ms !important; }
+
+/* ── Card action ghost (What's here) ───────────────────────────────── */
+
+.mu-card-ghost {
+  position: relative;
+  overflow: hidden;
+  transition:
+    background   var(--mu-duration-medium) var(--mu-ease-standard),
+    border-color var(--mu-duration-medium) var(--mu-ease-standard) !important;
+}
+.mu-card-ghost::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: rgba(58, 107, 79, 0);
+  transition: background var(--mu-duration-short) var(--mu-ease-standard);
+  pointer-events: none;
+}
+.mu-card-ghost:hover::after  { background: rgba(58, 107, 79, 0.06); }
+.mu-card-ghost:active::after { background: rgba(58, 107, 79, 0.13); }
+.mu-card-ghost:hover { border-color: rgba(58, 107, 79, 0.45) !important; }
+
+/* ── Text / icon-only buttons (inline links) ───────────────────────── */
+
+.mu-btn-text {
+  position: relative;
+  transition: color var(--mu-duration-short) var(--mu-ease-standard),
+              opacity var(--mu-duration-short) var(--mu-ease-standard) !important;
+}
+.mu-btn-text:hover  { color: var(--mu-green) !important; opacity: 1 !important; }
+.mu-btn-text:active { opacity: 0.7 !important; }
+
+/* ── Segmented tabs (sub-dest pills, modal tabs) ───────────────────── */
+
+.mu-tab {
+  transition:
+    background    var(--mu-duration-medium) var(--mu-ease-standard),
+    color         var(--mu-duration-medium) var(--mu-ease-standard),
+    border-color  var(--mu-duration-medium) var(--mu-ease-standard),
+    transform     200ms var(--mu-ease-spring) !important;
+}
+.mu-tab:hover:not(.mu-tab-active) {
+  background:   rgba(58, 107, 79, 0.07) !important;
+  border-color: rgba(58, 107, 79, 0.4)  !important;
+  transform: translateY(-1px);
+}
+.mu-tab-active {
+  transform: translateY(-1px);
+}
+.mu-tab:active { transform: scale(0.97) !important; }
+
+/* ── Underline tabs (modal header style) ───────────────────────────── */
+
+.mu-underline-tab {
+  position: relative;
+  transition:
+    color var(--mu-duration-medium) var(--mu-ease-standard) !important;
+}
+.mu-underline-tab::after {
+  content: '';
+  position: absolute;
+  bottom: -1px; left: 0; right: 0;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--mu-green);
+  transform: scaleX(0);
+  transform-origin: center;
+  transition: transform var(--mu-duration-medium) var(--mu-ease-decelerate);
+}
+.mu-underline-tab.mu-tab-active::after,
+.mu-underline-tab:hover::after {
+  transform: scaleX(1);
+}
+.mu-underline-tab:hover { color: var(--mu-green) !important; }
+
+/* ── Input focus underline ─────────────────────────────────────────── */
+
+.mu-input-wrap {
+  position: relative;
+}
+.mu-input-wrap::after {
+  content: '';
+  position: absolute;
+  bottom: 0; left: 14px; right: 14px;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--mu-green);
+  transform: scaleX(0);
+  transform-origin: center;
+  transition:
+    transform var(--mu-duration-medium) var(--mu-ease-decelerate),
+    opacity   var(--mu-duration-short)  ease;
+  opacity: 0;
+}
+.mu-input-wrap:focus-within::after {
+  transform: scaleX(1);
+  opacity: 1;
+  animation: mu-line-in var(--mu-duration-medium) var(--mu-ease-decelerate);
+}
+.mu-input-wrap.mu-error::after {
+  background: #C0622A;
+  transform: scaleX(1);
+  opacity: 1;
+}
+
+/* ── Dropdown rows ─────────────────────────────────────────────────── */
+
+.mu-dropdown-row {
+  transition: background var(--mu-duration-short) var(--mu-ease-standard) !important;
+}
+.mu-dropdown-row:hover  { background: #F2F7F4 !important; }
+.mu-dropdown-row:active { background: #E8F2EC !important; }
+
+/* ── Nav button ────────────────────────────────────────────────────── */
+
+.mu-nav-btn {
+  transition:
+    background  var(--mu-duration-medium) var(--mu-ease-standard),
+    box-shadow  var(--mu-duration-medium) var(--mu-ease-standard) !important;
+}
+.mu-nav-btn:hover {
+  background:  var(--mu-green-dark) !important;
+  box-shadow:  0 4px 14px rgba(58, 107, 79, 0.35) !important;
+}
+.mu-nav-btn:active { transform: scale(0.97); }
+
+/* ── Browse / footer links ─────────────────────────────────────────── */
+
+.mu-browse-link {
+  transition: color var(--mu-duration-medium) var(--mu-ease-standard),
+              opacity var(--mu-duration-medium) ease !important;
+  opacity: 0.72;
+}
+.mu-browse-link:hover { color: var(--mu-green) !important; opacity: 1 !important; }
+
+.mu-footer-link {
+  transition: opacity var(--mu-duration-medium) ease !important;
+  opacity: 0.75;
+}
+.mu-footer-link:hover { opacity: 1 !important; }
+
+/* ── Close / icon buttons ──────────────────────────────────────────── */
+
+.mu-btn-icon {
+  transition:
+    background  var(--mu-duration-short) var(--mu-ease-standard),
+    transform   150ms var(--mu-ease-spring) !important;
+}
+.mu-btn-icon:hover   { background: rgba(255,255,255,0.2) !important; }
+.mu-btn-icon:active  { transform: scale(0.88); }
+
+/* ── Surface cards (hover lift) ────────────────────────────────────── */
+
+.mu-card {
+  transition:
+    box-shadow var(--mu-duration-medium) var(--mu-ease-standard),
+    transform  var(--mu-duration-medium) var(--mu-ease-standard) !important;
+}
+.mu-card:hover {
+  box-shadow: 0 6px 24px rgba(0,0,0,0.10) !important;
+  transform: translateY(-2px);
+}
+
+/* ── Hero toggle pill ──────────────────────────────────────────────── */
+
+.htoggle-indicator {
+  position: absolute;
+  top: 4px; bottom: 4px;
+  border-radius: 999px;
+  background: var(--mu-green);
+  box-shadow: 0 1px 6px rgba(58, 107, 79, 0.35);
+  pointer-events: none;
+  /* left + right set by JS — no width needed */
+}
+.htoggle-btn {
+  position: relative;
+  z-index: 1;
+  flex: 1;
+  padding: 9px 16px;
+  border-radius: 999px;
+  border: none;
+  background: transparent;
+  font-family: inherit;
+  font-size: 13px;
+  cursor: pointer;
+  white-space: nowrap;
+  letter-spacing: -0.01em;
+  text-align: center;
+  transition: color var(--mu-duration-medium) var(--mu-ease-standard);
+}
+
+/* ── Chip / pill items ─────────────────────────────────────────────── */
+
+.mu-chip {
+  transition:
+    background   var(--mu-duration-short) var(--mu-ease-standard),
+    border-color var(--mu-duration-short) var(--mu-ease-standard),
+    transform    150ms var(--mu-ease-spring) !important;
+}
+.mu-chip:hover {
+  background: rgba(58,107,79,0.08) !important;
+  border-color: rgba(58,107,79,0.3) !important;
+  transform: translateY(-1px);
+}

@@ -1421,6 +1421,7 @@ export type TripInterest =
   | 'Beach'
   | 'Wine'
   | 'Hiking'
+  | 'Cycling'
   | 'HotSprings'
   | 'History'
   | 'Food'
@@ -1434,6 +1435,7 @@ const INTEREST_THEMES: Record<TripInterest, string[]> = {
   Beach:       ['Beach', 'Coastal', 'Surf', 'Swimming', 'Beaches'],
   Wine:        ['Wine', 'Cellar doors', 'Wineries'],
   Hiking:      ['Hiking', 'Walking', 'Trails', 'Nature', 'Remote'],
+  Cycling:     ['Cycling', 'Rail trails', 'Mountain bike', 'Trails'],
   HotSprings:  ['Hot springs', 'Wellness', 'Spa', 'Relaxation'],
   History:     ['History', 'Heritage', 'Historic', 'Immersive', 'Indigenous', 'Culture'],
   Food:        ['Food', 'Cafes', 'Bakeries', 'Dining', 'Markets', 'Gateway'],

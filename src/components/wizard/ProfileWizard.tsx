@@ -83,6 +83,7 @@ const INTEREST_GRAD: Record<string, string> = {
   Beach:      'linear-gradient(145deg, #0c4a6e 0%, #0284c7 100%)',
   Wine:       'linear-gradient(145deg, #581c87 0%, #9333ea 100%)',
   Hiking:     'linear-gradient(145deg, #1e3a5f 0%, #3b82f6 100%)',
+  Cycling:    'linear-gradient(145deg, #064e3b 0%, #10b981 100%)',
   HotSprings: 'linear-gradient(145deg, #9f1239 0%, #f97316 100%)',
   History:    'linear-gradient(145deg, #78350f 0%, #c97c2f 100%)',
   Food:       'linear-gradient(145deg, #92400e 0%, #f59e0b 100%)',
@@ -97,6 +98,7 @@ const INTERESTS: { id: TripInterest; emoji: string; label: string }[] = [
   { id: 'Beach',      emoji: '🌊', label: 'Beach' },
   { id: 'Wine',       emoji: '🍷', label: 'Wine & cellar doors' },
   { id: 'Hiking',     emoji: '🥾', label: 'Hiking & trails' },
+  { id: 'Cycling',    emoji: '🚴', label: 'Cycling & rail trails' },
   { id: 'HotSprings', emoji: '♨️', label: 'Hot springs' },
   { id: 'History',    emoji: '🏛️', label: 'History' },
   { id: 'Food',       emoji: '☕', label: 'Cafes & food' },
@@ -218,9 +220,9 @@ export function ProfileWizard() {
     const vibes: VibeTag[] = interests
       .map((i) => ({
         Wildlife: 'Wildlife', Beach: 'Beach', Hiking: 'Hiking',
-        HotSprings: 'HotSprings', History: 'History', FamilyFun: 'FamilyAttractions',
-        Adventure: 'Cycling', Scenic: 'Lookouts', Wine: 'Wineries',
-        Food: 'Chilling', Relaxation: 'Chilling',
+        Cycling: 'Cycling', HotSprings: 'HotSprings', History: 'History',
+        FamilyFun: 'FamilyAttractions', Adventure: 'Cycling', Scenic: 'Lookouts',
+        Wine: 'Wineries', Food: 'Chilling', Relaxation: 'Chilling',
       } as Record<TripInterest, VibeTag>)[i])
       .filter(Boolean)
 
@@ -388,6 +390,7 @@ export function ProfileWizard() {
                   kidsAge={kidsAge} setKidsAge={setKidsAge}
                   startDate={startDate} setStartDate={setStartDate}
                   endDate={endDate} setEndDate={setEndDate}
+                  departureHour={departureHour} setDepartureHour={setDepartureHour}
                 />
               )}
               {step === 1 && (
@@ -407,11 +410,11 @@ export function ProfileWizard() {
                 <StepPreferences
                   hasKids={hasKids} kidsAge={kidsAge}
                   tripType={tripType}
-
                   accommodation={accommodation} setAccommodation={setAccommodation}
                   dailyDriveHours={dailyDriveHours} setDailyDriveHours={setDailyDriveHours}
                   departureHour={departureHour} setDepartureHour={setDepartureHour}
                   destCoord={pickedDest?.sub.coord ?? undefined}
+                  hideDepartureTime
                 />
               )}
               {step === 4 && (
@@ -472,6 +475,7 @@ function StepHowFarAndWho({
   maxDriveHours, setMaxDriveHours, tripType, setTripType,
   crewType, setCrewType, hasKids, setHasKids, kidsAge, setKidsAge,
   startDate, setStartDate, endDate, setEndDate,
+  departureHour, setDepartureHour,
 }: {
   maxDriveHours: number; setMaxDriveHours: (n: number) => void
   tripType: TripType; setTripType: (t: TripType) => void
@@ -480,6 +484,7 @@ function StepHowFarAndWho({
   kidsAge: KidsAge | null; setKidsAge: (a: KidsAge) => void
   startDate: string; setStartDate: (d: string) => void
   endDate: string; setEndDate: (d: string) => void
+  departureHour?: number; setDepartureHour?: (h: number) => void
 }) {
   const showKids = crewType === 'family' || crewType === 'group'
 
@@ -627,6 +632,11 @@ function StepHowFarAndWho({
           />
         </div>
       </div>
+
+      {/* Departure time — collected here so it's not repeated later */}
+      {departureHour !== undefined && setDepartureHour && (
+        <DepartureTimePicker departureHour={departureHour} setDepartureHour={setDepartureHour} tripDate={startDate} />
+      )}
     </div>
   )
 }
@@ -753,10 +763,10 @@ function DestCard({ match, idx, isPicked, onPick, isHovered, onHover }: {
             }}>TOP PICK</span>
           )}
         </div>
-        <div style={{ fontSize: 12.5, fontWeight: 700, color: '#1C1B1F', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+        <div style={{ fontSize: 12.5, fontWeight: 700, color: '#1C1B1F', lineHeight: 1.3 }}>
           {match.sub.name}
         </div>
-        <div style={{ fontSize: 10.5, color: '#6B7280', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: 1 }}>
+        <div style={{ fontSize: 10.5, color: '#6B7280', marginTop: 1 }}>
           {match.cluster.name} · {driveLabel}
         </div>
       </div>
@@ -804,16 +814,20 @@ function StepPickDest({ suggestions, picked, onPick }: {
     ? `${Math.round(previewHrs * 60)} min drive`
     : `${previewHrs.toFixed(previewHrs === Math.floor(previewHrs) ? 0 : 1)} hrs drive`
 
+  const isMobile = typeof window !== 'undefined' && window.innerWidth < 600
+
   return (
-    <div style={{ display: 'flex', gap: 0, height: '100%', minHeight: 480 }}>
+    <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: 0, height: '100%', minHeight: isMobile ? 'auto' : 480 }}>
 
       {/* LEFT: Scrollable list */}
       <div style={{
-        width: 240,
+        width: isMobile ? '100%' : 240,
+        maxHeight: isMobile ? 260 : undefined,
         flexShrink: 0,
         display: 'flex',
         flexDirection: 'column',
-        borderRight: '1px solid var(--border)',
+        borderRight: isMobile ? 'none' : '1px solid var(--border)',
+        borderBottom: isMobile ? '1px solid var(--border)' : 'none',
         overflow: 'hidden',
         background: '#FAFAF9',
       }}>
@@ -842,7 +856,7 @@ function StepPickDest({ suggestions, picked, onPick }: {
       </div>
 
       {/* RIGHT: Preview panel — image top, info bottom */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, overflow: 'hidden' }}>
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, overflow: isMobile ? 'visible' : 'hidden' }}>
         {preview ? (
           <>
             {/* Top: hero image */}
@@ -1093,9 +1107,9 @@ function StepPreferences({
     <div style={{ display: 'flex', flexDirection: 'column', gap: 22 }}>
       <div>
         <h2 style={{ fontSize: 20, fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-0.5px', marginBottom: 4 }}>
-          When are you leaving?
+          Finishing touches
         </h2>
-        <p style={{ fontSize: 13, color: 'var(--text-muted)' }}>Pick your date and departure time.</p>
+        <p style={{ fontSize: 13, color: 'var(--text-muted)' }}>Almost there — just your departure time and a couple of preferences.</p>
       </div>
 
       {/* Dates — shown here for discovery flow */}
@@ -1187,32 +1201,26 @@ function StepVehicle({
       </div>
 
       {vehicleType !== 'Electric' && !skipFuel && (
-        <>
-          {/* Fuel type */}
-          <div>
-            <Label>Fuel type</Label>
-            <div style={{ display: 'flex', gap: 6, marginTop: 10, flexWrap: 'wrap' }}>
-              {([
-                { type: 'Unleaded91' as FuelType, emoji: '⛽', label: 'U91' },
-                { type: 'E10'        as FuelType, emoji: '🌿', label: 'E10' },
-                { type: 'Unleaded95' as FuelType, emoji: '⛽', label: 'U95' },
-                { type: 'Unleaded98' as FuelType, emoji: '🔵', label: 'U98' },
-                { type: 'Diesel'     as FuelType, emoji: '🛢️', label: 'Diesel' },
-              ] as { type: FuelType; emoji: string; label: string }[]).map((f) => (
-                <div key={f.type} className={`option-card ${fuelType === f.type ? 'selected' : ''}`}
-                  onClick={() => setFuelType(f.type)}
-                  style={{ flexDirection: 'row', padding: '10px 14px', gap: 8, flexShrink: 0 }}>
-                  <span style={{ fontSize: 20 }}>{f.emoji}</span>
-                  <span style={{ fontSize: 13, fontWeight: 600 }}>{f.label}</span>
-                </div>
-              ))}
-            </div>
+        <div>
+          <Label>Fuel type</Label>
+          <div style={{ display: 'flex', gap: 6, marginTop: 10, flexWrap: 'wrap' }}>
+            {([
+              { type: 'Unleaded91' as FuelType, label: 'U91' },
+              { type: 'E10'        as FuelType, label: 'E10' },
+              { type: 'Unleaded95' as FuelType, label: 'U95' },
+              { type: 'Unleaded98' as FuelType, label: 'U98' },
+              { type: 'Diesel'     as FuelType, label: 'Diesel' },
+            ]).map((f) => (
+              <div key={f.type} className={`option-card ${fuelType === f.type ? 'selected' : ''}`}
+                onClick={() => setFuelType(f.type)}
+                style={{ flexDirection: 'row', padding: '10px 16px', gap: 0, flexShrink: 0 }}>
+                <span style={{ fontSize: 13, fontWeight: 600 }}>{f.label}</span>
+              </div>
+            ))}
           </div>
-
-        </>
+        </div>
       )}
 
-      {/* Skip fuel option */}
       {vehicleType !== 'Electric' && (
         <button
           onClick={() => setSkipFuel(!skipFuel)}

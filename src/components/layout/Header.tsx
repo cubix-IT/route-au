@@ -38,7 +38,7 @@ function Avatar({ name, avatarUrl }: { name: string; avatarUrl: string | null })
 export function Header() {
   const {
     isOffline, setWizardOpen, clearItinerary, userProfile,
-    authUser, activeItinerary, setAuthModalOpen,
+    authUser, activeItinerary,
     savedTrips, setSavedTrips,
   } = useAppStore()
 
@@ -210,21 +210,7 @@ export function Header() {
                 </div>
               )}
             </div>
-          ) : (
-            <button
-              onClick={() => setAuthModalOpen(true)}
-              style={{
-                padding: '7px 14px', borderRadius: 9,
-                background: 'none',
-                border: '1.5px solid var(--border)',
-                color: 'var(--text-primary)',
-                fontSize: 13, fontWeight: 600, cursor: 'pointer',
-                transition: 'all 0.15s',
-              }}
-            >
-              Sign in
-            </button>
-          )}
+          ) : null /* Sign in hidden until auth is fully enabled */}
         </div>
       </header>
 

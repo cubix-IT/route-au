@@ -218,18 +218,215 @@ const VICTORIA_HIGHLIGHTS: Record<string, string[]> = {
   ],
 }
 
-// ── Simple From / To search (hero) ────────────────────────────────────
+// ── Hero search toggle (I know where I'm going / Surprise me) ─────────
 
-function FromToSearch({ onSearch }: {
+type HeroMode = 'know' | 'surprise'
+
+function HeroSearchToggle({ onSearch }: {
+  onSearch: (origin: { name: string; coord: { lat: number; lng: number } | null }, dest: SubDestResult | null) => void
+}) {
+  const [mode, setMode] = useState<HeroMode>('know')
+  const [displayed, setDisplayed] = useState<HeroMode>('know')
+  const [cardPhase, setCardPhase] = useState<'idle' | 'out' | 'in'>('idle')
+  const btn0 = useRef<HTMLButtonElement>(null)
+  const btn1 = useRef<HTMLButtonElement>(null)
+  const [ind, setInd] = useState({ left: 0, width: 0, ready: false })
+
+  // Measure whichever button is active and position the indicator there
+  useEffect(() => {
+    const btn = mode === 'know' ? btn0.current : btn1.current
+    if (!btn) return
+    setInd({ left: btn.offsetLeft, width: btn.offsetWidth, ready: true })
+  }, [mode])
+
+  const switchMode = (next: HeroMode) => {
+    if (next === mode || cardPhase !== 'idle') return
+    setMode(next)
+    setCardPhase('out')
+    setTimeout(() => { setDisplayed(next); setCardPhase('in') }, 180)
+    setTimeout(() => setCardPhase('idle'), 420)
+  }
+
+  const MU = 'cubic-bezier(0.05,0.7,0.1,1)'
+  const cardStyle: React.CSSProperties =
+    cardPhase === 'out'
+      ? { transition: 'transform 0.18s cubic-bezier(0.4,0,1,1), opacity 0.18s ease, filter 0.18s ease',
+          transform: 'scaleY(0.97) scaleX(0.985)', opacity: 0.55, filter: 'blur(3px)' }
+      : cardPhase === 'in'
+      ? { transition: `transform 0.32s ${MU}, opacity 0.26s ${MU}, filter 0.26s ease`,
+          transform: 'scaleY(1) scaleX(1)', opacity: 1, filter: 'blur(0px)' }
+      : { transform: 'scaleY(1) scaleX(1)', opacity: 1, filter: 'blur(0px)' }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14, width: '100%', maxWidth: 680, margin: '0 auto' }}>
+
+      <div style={{
+        display: 'inline-flex', position: 'relative',
+        background: 'rgba(255,255,255,0.9)',
+        backdropFilter: 'blur(12px)',
+        border: '1px solid rgba(0,0,0,0.08)',
+        borderRadius: 999, padding: 4,
+        boxShadow: '0 4px 20px rgba(0,0,0,0.10)',
+      }}>
+        {/* Sliding pill — no overflow:hidden so text is never clipped */}
+        {ind.ready && (
+          <div style={{
+            position: 'absolute',
+            top: 4, bottom: 4,
+            left: ind.left,
+            width: ind.width,
+            borderRadius: 999,
+            background: GREEN,
+            boxShadow: '0 1px 8px rgba(58,107,79,0.35)',
+            transition: 'left 0.32s cubic-bezier(0.05,0.7,0.1,1), width 0.32s cubic-bezier(0.05,0.7,0.1,1)',
+            pointerEvents: 'none',
+            zIndex: 0,
+          }} />
+        )}
+
+        <button ref={btn0} className="htoggle-btn"
+          onClick={() => switchMode('know')}
+          style={{ position: 'relative', zIndex: 1, color: mode === 'know' ? '#fff' : '#5C5A57', fontWeight: mode === 'know' ? 600 : 400, transition: 'color 0.25s ease' }}
+        >
+          I know where I'm going
+        </button>
+        <button ref={btn1} className="htoggle-btn"
+          onClick={() => switchMode('surprise')}
+          style={{ position: 'relative', zIndex: 1, color: mode === 'surprise' ? '#fff' : '#5C5A57', fontWeight: mode === 'surprise' ? 600 : 400, transition: 'color 0.25s ease' }}
+        >
+          Surprise me
+        </button>
+      </div>
+
+      <div style={{ width: '100%', transformOrigin: 'center center', ...cardStyle }}>
+        {displayed === 'know'
+          ? <FromToSearch onSearch={onSearch} onSwitchToSurprise={() => switchMode('surprise')} />
+          : <SurpriseMeSearch onSearch={onSearch} />
+        }
+      </div>
+    </div>
+  )
+}
+
+// ── Surprise me search ────────────────────────────────────────────────
+
+function SurpriseMeSearch({ onSearch }: {
   onSearch: (origin: { name: string; coord: { lat: number; lng: number } | null }, dest: SubDestResult | null) => void
 }) {
   const storedOrigin = useAppStore((s) => s.originName)
+  const storedOriginCoord = useAppStore((s) => s.originCoord)
+  const [fromQuery, setFromQuery] = useState('')
+  const [fromSuggestions, setFromSuggestions] = useState<PhotonFeature[]>([])
+  const [fromChosen, setFromChosen] = useState<{ name: string; coord: { lat: number; lng: number } } | null>(null)
+  const [showNoFrom, setShowNoFrom] = useState(false)
+  const fromDebounce = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const fromRef = useRef<HTMLDivElement>(null)
+
+  const isMobile = typeof window !== 'undefined' && window.innerWidth < 640
+
+  useEffect(() => {
+    if (storedOrigin && storedOriginCoord && !fromChosen) {
+      setFromQuery(storedOrigin)
+      setFromChosen({ name: storedOrigin, coord: storedOriginCoord })
+    }
+  }, [storedOrigin]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (fromRef.current && !fromRef.current.contains(e.target as Node)) setFromSuggestions([])
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [])
+
+  const onFromChange = (val: string) => {
+    setFromQuery(val); setFromChosen(null)
+    if (fromDebounce.current) clearTimeout(fromDebounce.current)
+    fromDebounce.current = setTimeout(() => searchOrigin(val).then(setFromSuggestions), 280)
+  }
+
+  const inp: React.CSSProperties = { width: '100%', padding: '14px 14px', border: 'none', outline: 'none', fontSize: 15, color: '#1C1B1F', background: 'transparent', fontFamily: 'inherit', boxSizing: 'border-box' }
+  const lbl: React.CSSProperties = { fontSize: 9.5, fontWeight: 800, color: GREEN, textTransform: 'uppercase', letterSpacing: '0.1em', padding: '10px 14px 0' }
+  const drop: React.CSSProperties = { position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: 0, background: '#fff', borderRadius: 12, border: '1px solid var(--border)', boxShadow: '0 12px 40px rgba(0,0,0,0.14)', zIndex: 200, overflow: 'hidden' }
+
+  return (
+    <div style={{ width: '100%' }}>
+    <div style={{
+      background: '#fff', borderRadius: 18,
+      boxShadow: showNoFrom ? '0 8px 40px rgba(0,0,0,0.13), 0 0 0 2px #E8A87C' : '0 8px 40px rgba(0,0,0,0.13)',
+      border: showNoFrom ? '1px solid #E8A87C' : '1px solid rgba(0,0,0,0.06)', width: '100%',
+      display: 'flex', flexDirection: isMobile ? 'column' : 'row', overflow: 'visible',
+      transition: 'border-color 0.2s ease, box-shadow 0.2s ease',
+    }}>
+      {/* FROM */}
+      <div ref={fromRef} style={{ flex: 1, position: 'relative', display: 'flex', flexDirection: 'column', minWidth: 0, borderBottom: isMobile ? '1px solid var(--border)' : 'none' }}>
+        <div style={{ ...lbl, color: showNoFrom ? '#C0622A' : GREEN, transition: 'color 0.2s ease' }}>
+          Starting from {showNoFrom && <span style={{ fontWeight: 500, fontSize: 9, textTransform: 'none', letterSpacing: 0, color: '#C0622A' }}>— required</span>}
+        </div>
+        <div className={`mu-input-wrap${showNoFrom ? ' mu-error' : ''}`} style={{ position: 'relative' }}>
+          <input style={inp} placeholder="Your suburb or city"
+            value={fromQuery}
+            onChange={(e) => { setShowNoFrom(false); onFromChange(e.target.value) }}
+            onFocus={() => { if (fromQuery.length >= 2 && !fromChosen) searchOrigin(fromQuery).then(setFromSuggestions) }}
+          />
+          {fromSuggestions.length > 0 && (
+            <div style={drop}>
+              {fromSuggestions.map((f, i) => (
+                <button key={i} onClick={() => { const label = featureLabel(f); const [lng, lat] = f.geometry.coordinates; setFromQuery(label); setFromChosen({ name: label, coord: { lat, lng } }); setFromSuggestions([]); setShowNoFrom(false) }}
+                  className="mu-dropdown-row"
+                  style={{ width: '100%', padding: '11px 16px', background: 'none', border: 'none', textAlign: 'left', fontSize: 13.5, cursor: 'pointer', color: '#1C1B1F', display: 'block' }}>
+                  📍 {featureLabel(f)}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Button */}
+      <button
+        onClick={() => { if (!fromChosen) { setShowNoFrom(true); return } onSearch({ name: fromChosen.name, coord: fromChosen.coord }, null) }}
+        className="mu-btn-primary"
+        style={{
+          flexShrink: 0,
+          padding: isMobile ? '14px 24px' : '0 28px',
+          background: GREEN, border: 'none', color: '#fff',
+          fontSize: 14, fontWeight: 700, cursor: 'pointer',
+          borderRadius: isMobile ? '0 0 18px 18px' : '0 18px 18px 0',
+          letterSpacing: '-0.01em', whiteSpace: 'nowrap',
+        }}
+      >
+        Surprise me →
+      </button>
+    </div>
+
+    {/* No-from prompt */}
+    <div style={{ overflow: 'hidden', maxHeight: showNoFrom ? 80 : 0, opacity: showNoFrom ? 1 : 0, transition: 'max-height 0.32s cubic-bezier(0.05,0.7,0.1,1), opacity 0.25s ease' }}>
+      <div style={{ marginTop: 10, background: 'rgba(255,255,255,0.92)', backdropFilter: 'blur(8px)', border: '1px solid rgba(232,168,124,0.5)', borderRadius: 12, padding: '12px 16px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, textAlign: 'center' }}>
+        <span style={{ fontSize: 13, color: '#5C3A1E' }}>We need your starting suburb to calculate drive times.</span>
+        <button onClick={() => setShowNoFrom(false)} style={{ padding: '6px 24px', borderRadius: 8, border: 'none', background: GREEN, fontSize: 12, fontWeight: 700, cursor: 'pointer', color: '#fff' }}>Got it</button>
+      </div>
+    </div>
+    </div>
+  )
+}
+
+// ── Simple From / To search (hero) ────────────────────────────────────
+
+function FromToSearch({ onSearch, onSwitchToSurprise }: {
+  onSearch: (origin: { name: string; coord: { lat: number; lng: number } | null }, dest: SubDestResult | null) => void
+  onSwitchToSurprise?: () => void
+}) {
+  const storedOrigin = useAppStore((s) => s.originName)
+  const storedOriginCoord = useAppStore((s) => s.originCoord)
   const [fromQuery, setFromQuery] = useState('')
   const [fromSuggestions, setFromSuggestions] = useState<PhotonFeature[]>([])
   const [fromChosen, setFromChosen] = useState<{ name: string; coord: { lat: number; lng: number } } | null>(null)
   const [toQuery, setToQuery] = useState('')
   const [toSuggestions, setToSuggestions] = useState<SubDestResult[]>([])
   const [toChosen, setToChosen] = useState<SubDestResult | null>(null)
+  const [showNoFrom, setShowNoFrom] = useState(false)
+  const [showNoDest, setShowNoDest] = useState(false)
   const fromDebounce = useRef<ReturnType<typeof setTimeout> | null>(null)
   const fromRef = useRef<HTMLDivElement>(null)
   const toRef = useRef<HTMLDivElement>(null)
@@ -237,7 +434,10 @@ function FromToSearch({ onSearch }: {
   useEffect(() => { preloadDestinations() }, [])
 
   useEffect(() => {
-    if (storedOrigin && !fromChosen) setFromQuery(storedOrigin)
+    if (storedOrigin && storedOriginCoord && !fromChosen) {
+      setFromQuery(storedOrigin)
+      setFromChosen({ name: storedOrigin, coord: storedOriginCoord })
+    }
   }, [storedOrigin]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
@@ -264,28 +464,38 @@ function FromToSearch({ onSearch }: {
   const lbl: React.CSSProperties = { fontSize: 9.5, fontWeight: 800, color: GREEN, textTransform: 'uppercase', letterSpacing: '0.1em', padding: '10px 14px 0' }
   const drop: React.CSSProperties = { position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: 0, background: '#fff', borderRadius: 12, border: '1px solid var(--border)', boxShadow: '0 12px 40px rgba(0,0,0,0.14)', zIndex: 200, overflow: 'hidden' }
 
+  const handleGoClick = () => {
+    if (!fromChosen) { setShowNoFrom(true); return }
+    if (!toChosen)   { setShowNoFrom(false); setShowNoDest(true); return }
+    setShowNoFrom(false); setShowNoDest(false)
+    onSearch({ name: fromChosen.name, coord: fromChosen.coord }, toChosen)
+  }
+
   return (
+    <div style={{ width: '100%' }}>
     <div style={{
-      background: '#fff', borderRadius: 18, boxShadow: '0 8px 40px rgba(0,0,0,0.13)',
-      border: '1px solid rgba(0,0,0,0.06)', maxWidth: 680, width: '100%', margin: '0 auto',
+      background: '#fff', borderRadius: 18, boxShadow: (showNoFrom || showNoDest) ? `0 8px 40px rgba(0,0,0,0.13), 0 0 0 2px #E8A87C` : '0 8px 40px rgba(0,0,0,0.13)',
+      border: (showNoFrom || showNoDest) ? '1px solid #E8A87C' : '1px solid rgba(0,0,0,0.06)', maxWidth: 680, width: '100%', margin: '0 auto',
       display: 'flex', flexDirection: isMobile ? 'column' : 'row', overflow: 'visible',
+      transition: 'border-color 0.2s ease, box-shadow 0.2s ease',
     }}>
 
       {/* FROM */}
       <div ref={fromRef} style={{ flex: 1, position: 'relative', display: 'flex', flexDirection: 'column', minWidth: 0, borderBottom: isMobile ? '1px solid var(--border)' : 'none' }}>
-        <div style={lbl}>From</div>
-        <div style={{ position: 'relative' }}>
+        <div style={{ ...lbl, color: showNoFrom ? '#C0622A' : GREEN, transition: 'color 0.2s ease' }}>
+          From {showNoFrom && <span style={{ fontWeight: 500, fontSize: 9, textTransform: 'none', letterSpacing: 0, color: '#C0622A' }}>— required</span>}
+        </div>
+        <div className={`mu-input-wrap${showNoFrom ? ' mu-error' : ''}`} style={{ position: 'relative' }}>
           <input style={inp} placeholder="Your suburb or city" value={fromQuery}
-            onChange={(e) => onFromChange(e.target.value)}
+            onChange={(e) => { setShowNoFrom(false); onFromChange(e.target.value) }}
             onFocus={() => { if (fromQuery.length >= 2 && !fromChosen) searchOrigin(fromQuery).then(setFromSuggestions) }}
           />
           {fromSuggestions.length > 0 && (
             <div style={drop}>
               {fromSuggestions.map((f, i) => (
-                <button key={i} onClick={() => { const label = featureLabel(f); const [lng, lat] = f.geometry.coordinates; setFromQuery(label); setFromChosen({ name: label, coord: { lat, lng } }); setFromSuggestions([]) }}
-                  style={{ width: '100%', padding: '11px 16px', background: 'none', border: 'none', textAlign: 'left', fontSize: 13.5, cursor: 'pointer', color: '#1C1B1F', display: 'block' }}
-                  onMouseEnter={(e) => (e.currentTarget.style.background = '#F5F4F1')}
-                  onMouseLeave={(e) => (e.currentTarget.style.background = 'none')}>
+                <button key={i} onClick={() => { const label = featureLabel(f); const [lng, lat] = f.geometry.coordinates; setFromQuery(label); setFromChosen({ name: label, coord: { lat, lng } }); setFromSuggestions([]); setShowNoFrom(false) }}
+                  className="mu-dropdown-row"
+                  style={{ width: '100%', padding: '11px 16px', background: 'none', border: 'none', textAlign: 'left', fontSize: 13.5, cursor: 'pointer', color: '#1C1B1F', display: 'block' }}>
                   📍 {featureLabel(f)}
                 </button>
               ))}
@@ -294,15 +504,17 @@ function FromToSearch({ onSearch }: {
         </div>
       </div>
 
-      {!isMobile && <div style={{ width: 1, background: 'var(--border)', alignSelf: 'stretch', margin: '10px 0' }} />}
+      {!isMobile && <div style={{ width: 1, background: (showNoFrom || showNoDest) ? '#E8A87C' : 'var(--border)', alignSelf: 'stretch', margin: '10px 0', transition: 'background 0.2s ease' }} />}
 
       {/* TO */}
       <div ref={toRef} style={{ flex: 1, position: 'relative', display: 'flex', flexDirection: 'column', minWidth: 0, borderBottom: isMobile ? '1px solid var(--border)' : 'none' }}>
-        <div style={lbl}>To <span style={{ fontWeight: 400, fontSize: 9, color: '#9CA3AF', textTransform: 'none', letterSpacing: 0 }}>optional</span></div>
-        <div style={{ position: 'relative' }}>
-          <input style={{ ...inp, paddingRight: toChosen ? 36 : undefined }} placeholder="Anywhere in Victoria…"
+        <div style={{ ...lbl, color: showNoDest ? '#C0622A' : GREEN, transition: 'color 0.2s ease' }}>
+          Where to? {showNoDest && <span style={{ fontWeight: 500, fontSize: 9, textTransform: 'none', letterSpacing: 0, color: '#C0622A' }}>— required</span>}
+        </div>
+        <div className={`mu-input-wrap${showNoDest ? ' mu-error' : ''}`} style={{ position: 'relative' }}>
+          <input style={{ ...inp, paddingRight: toChosen ? 36 : undefined }} placeholder="Search a destination…"
             value={toChosen ? toChosen.name : toQuery}
-            onChange={(e) => { setToChosen(null); onToChange(e.target.value) }}
+            onChange={(e) => { setToChosen(null); setShowNoDest(false); onToChange(e.target.value) }}
             onFocus={() => { if (toQuery.length >= 2 && !toChosen) setToSuggestions(searchDestinations(toQuery)) }}
           />
           {toChosen && (
@@ -311,10 +523,9 @@ function FromToSearch({ onSearch }: {
           {toSuggestions.length > 0 && !toChosen && (
             <div style={drop}>
               {toSuggestions.map((s) => (
-                <button key={s.id} onClick={() => { setToChosen(s); setToQuery(s.name); setToSuggestions([]) }}
-                  style={{ width: '100%', padding: '11px 16px', background: 'none', border: 'none', textAlign: 'left', fontSize: 13.5, cursor: 'pointer', color: '#1C1B1F', display: 'block' }}
-                  onMouseEnter={(e) => (e.currentTarget.style.background = '#F5F4F1')}
-                  onMouseLeave={(e) => (e.currentTarget.style.background = 'none')}>
+                <button key={s.id} onClick={() => { setToChosen(s); setToQuery(s.name); setToSuggestions([]); setShowNoDest(false) }}
+                  className="mu-dropdown-row"
+                  style={{ width: '100%', padding: '11px 16px', background: 'none', border: 'none', textAlign: 'left', fontSize: 13.5, cursor: 'pointer', color: '#1C1B1F', display: 'block' }}>
                   📍 {s.name}
                 </button>
               ))}
@@ -325,7 +536,7 @@ function FromToSearch({ onSearch }: {
 
       {/* Button */}
       <button
-        onClick={() => onSearch({ name: fromChosen?.name ?? fromQuery, coord: fromChosen?.coord ?? null }, toChosen)}
+        onClick={handleGoClick}
         style={{
           flexShrink: 0,
           padding: isMobile ? '14px 24px' : '0 24px',
@@ -334,11 +545,60 @@ function FromToSearch({ onSearch }: {
           borderRadius: isMobile ? '0 0 18px 18px' : '0 18px 18px 0',
           letterSpacing: '-0.01em', whiteSpace: 'nowrap',
         }}
-        onMouseEnter={(e) => (e.currentTarget.style.background = '#2d5440')}
-        onMouseLeave={(e) => (e.currentTarget.style.background = GREEN)}
+        className="mu-btn-primary"
       >
         {toChosen ? 'Plan this →' : "Let's go →"}
       </button>
+    </div>
+
+    {/* No-destination prompt — slides down when they try to go without a To */}
+    <div style={{
+      overflow: 'hidden',
+      maxHeight: (showNoDest || showNoFrom) ? 120 : 0,
+      opacity: (showNoDest || showNoFrom) ? 1 : 0,
+      transition: 'max-height 0.32s cubic-bezier(0.05,0.7,0.1,1), opacity 0.25s ease',
+    }}>
+      <div style={{
+        marginTop: 10,
+        background: 'rgba(255,255,255,0.92)',
+        backdropFilter: 'blur(8px)',
+        border: '1px solid rgba(232,168,124,0.5)',
+        borderRadius: 12,
+        padding: '10px 16px',
+        display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, textAlign: 'center',
+      }}>
+        <span style={{ fontSize: 13, color: '#5C3A1E' }}>
+          {showNoFrom
+            ? 'Where are you starting from? We need this to calculate drive times.'
+            : 'Not sure where to go? We can pick somewhere for you.'}
+        </span>
+        <div style={{ display: 'flex', gap: 8, justifyContent: 'center' }}>
+          {showNoFrom ? (
+            <button
+              onClick={() => setShowNoFrom(false)}
+              style={{ padding: '6px 24px', borderRadius: 8, border: 'none', background: GREEN, fontSize: 12, fontWeight: 700, cursor: 'pointer', color: '#fff' }}
+            >
+              Got it
+            </button>
+          ) : (
+            <>
+              <button
+                onClick={() => setShowNoDest(false)}
+                style={{ padding: '5px 14px', borderRadius: 8, border: '1px solid rgba(0,0,0,0.12)', background: 'none', fontSize: 12, fontWeight: 500, cursor: 'pointer', color: '#6B6966' }}
+              >
+                I'll choose
+              </button>
+              <button
+                onClick={() => { setShowNoDest(false); onSwitchToSurprise?.() }}
+                style={{ padding: '5px 14px', borderRadius: 8, border: 'none', background: GREEN, fontSize: 12, fontWeight: 700, cursor: 'pointer', color: '#fff' }}
+              >
+                Surprise me →
+              </button>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
     </div>
   )
 }
@@ -408,6 +668,13 @@ function SeasonalWatercolour({ season }: { season: string }) {
     <div aria-hidden style={{ position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 0, overflow: 'hidden' }}>
       {renderWash(topLeft)}
       {renderWash(bottomRight)}
+      {/* Frost layer — heavier top-left (cold), fades away toward bottom-right fire corner */}
+      <div style={{
+        position: 'absolute', inset: 0,
+        background: 'linear-gradient(135deg, rgba(235,242,248,0.52) 0%, rgba(240,245,248,0.30) 45%, rgba(255,255,255,0.06) 100%)',
+        backdropFilter: 'blur(8px) saturate(0.9)',
+        WebkitBackdropFilter: 'blur(8px) saturate(0.9)',
+      }} />
     </div>
   )
 }
@@ -476,6 +743,7 @@ export function LandingPage() {
       overflowX: 'hidden',
       position: 'relative',
     }}>
+    {/* ── Material You global styles ── */}
 
       {/* ── Nav ─────────────────────────── */}
       <nav style={{
@@ -492,7 +760,7 @@ export function LandingPage() {
           Unplanned<span style={{ color: GREEN }}> Escapes</span>
           <span style={{ color: '#8C8A87', fontWeight: 400, fontSize: 13 }}> Victoria</span>
         </div>
-        <button onClick={openWizard} style={{
+        <button onClick={openWizard} className="mu-nav-btn" style={{
           padding: '7px 16px', borderRadius: 9,
           background: GREEN, border: 'none',
           color: '#fff', fontSize: 13, fontWeight: 600,
@@ -511,14 +779,17 @@ export function LandingPage() {
         background: 'var(--bg-base)',
       }}>
         <SeasonalWatercolour season={season} />
-        <div style={{ position: 'relative', zIndex: 1 }}>
+        <div style={{ position: 'relative', zIndex: 10 }}>
         <h1 style={{
           fontFamily: "'Fraunces', Georgia, serif",
           fontSize: 'clamp(24px, 4vw, 46px)',
           fontWeight: 700, letterSpacing: '-0.03em', lineHeight: 1.3,
           color: '#1C1C1A', maxWidth: 800, margin: '0 auto 28px',
         }}>
-          <span style={{ color: GREEN }}>Have you seen...</span>{' '}{highlight}
+          <span style={{
+            color: GREEN,
+            textShadow: '0 0 20px rgba(255,255,255,1), 0 0 40px rgba(255,255,255,0.9), 0 0 60px rgba(255,255,255,0.7)',
+          }}>Have you seen...</span>{' '}{highlight}
         </h1>
 
         <p style={{
@@ -530,9 +801,12 @@ export function LandingPage() {
         </p>
 
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12, width: '100%' }}>
-          <FromToSearch onSearch={handleSearch} />
+          <div style={{ width: '100%', position: 'relative', zIndex: 20 }}>
+            <HeroSearchToggle onSearch={handleSearch} />
+          </div>
           <button
             onClick={() => document.getElementById('clusters')?.scrollIntoView({ behavior: 'smooth' })}
+            className="mu-browse-link"
             style={{
               background: 'none', border: 'none',
               color: '#8C8A87', fontSize: 13, cursor: 'pointer',
@@ -619,14 +893,15 @@ export function LandingPage() {
           {/* Attribution row */}
           <div style={{ marginBottom: 16, fontSize: 11.5, color: 'rgba(255,255,255,0.5)', lineHeight: 1.7 }}>
             Map data ©{' '}
-            <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer" style={{ color: 'rgba(255,255,255,0.75)' }}>OpenStreetMap contributors</a>
+            <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer" className="mu-footer-link" style={{ color: 'rgba(255,255,255,0.75)' }}>OpenStreetMap contributors</a>
             {' '}(ODbL) · Map tiles ©{' '}
-            <a href="https://carto.com/attributions" target="_blank" rel="noopener noreferrer" style={{ color: 'rgba(255,255,255,0.75)' }}>CARTO</a>
+            <a href="https://carto.com/attributions" target="_blank" rel="noopener noreferrer" className="mu-footer-link" style={{ color: 'rgba(255,255,255,0.75)' }}>CARTO</a>
             {' '}· Destination content ©{' '}
-            <a href="https://en.wikipedia.org" target="_blank" rel="noopener noreferrer" style={{ color: 'rgba(255,255,255,0.75)' }}>Wikipedia contributors</a>
-            {' '}(CC BY-SA) · Heritage data © <a href="https://vhd.heritagecouncil.vic.gov.au" target="_blank" rel="noopener noreferrer" style={{ color: 'rgba(255,255,255,0.75)' }}>Heritage Council Victoria</a>
+            <a href="https://en.wikipedia.org" target="_blank" rel="noopener noreferrer" className="mu-footer-link" style={{ color: 'rgba(255,255,255,0.75)' }}>Wikipedia contributors</a>
+            {' '}(CC BY-SA) · Trail data © <a href="https://www.data.vic.gov.au" target="_blank" rel="noopener noreferrer" className="mu-footer-link" style={{ color: 'rgba(255,255,255,0.75)' }}>DataVic</a>
+            {' '}(CC BY 4.0) · Heritage data © <a href="https://vhd.heritagecouncil.vic.gov.au" target="_blank" rel="noopener noreferrer" className="mu-footer-link" style={{ color: 'rgba(255,255,255,0.75)' }}>Heritage Council Victoria</a>
             {' '}(CC BY 4.0) · Fuel data © State of Victoria · Weather by{' '}
-            <a href="https://api.met.no" target="_blank" rel="noopener noreferrer" style={{ color: 'rgba(255,255,255,0.75)' }}>MET Norway</a>
+            <a href="https://api.met.no" target="_blank" rel="noopener noreferrer" className="mu-footer-link" style={{ color: 'rgba(255,255,255,0.75)' }}>MET Norway</a>
           </div>
           {/* Bottom row */}
           <div style={{ borderTop: '1px solid rgba(255,255,255,0.12)', paddingTop: 14, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
@@ -736,14 +1011,13 @@ function FromWhereModal({
                 <button
                   key={i}
                   onClick={() => pick(f)}
+                  className="mu-dropdown-row"
                   style={{
                     width: '100%', padding: '10px 16px',
                     background: 'none', border: 'none', textAlign: 'left',
                     cursor: 'pointer', fontSize: 14, color: '#1C1C1A',
                     borderBottom: i < suggestions.length - 1 ? '1px solid var(--border)' : 'none',
                   }}
-                  onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--bg-muted)')}
-                  onMouseLeave={(e) => (e.currentTarget.style.background = 'none')}
                 >
                   <span style={{ fontWeight: 600 }}>{f.properties.name}</span>
                   {f.properties.city && (
@@ -766,10 +1040,9 @@ function FromWhereModal({
             color: chosen ? '#fff' : '#C8C4BD',
             fontSize: 15, fontWeight: 700,
             cursor: chosen ? 'pointer' : 'not-allowed',
-            transition: 'all 0.15s', letterSpacing: '-0.01em',
+            letterSpacing: '-0.01em',
           }}
-          onMouseEnter={(e) => { if (chosen) e.currentTarget.style.background = '#2d5440' }}
-          onMouseLeave={(e) => { if (chosen) e.currentTarget.style.background = GREEN }}
+          className={chosen ? 'mu-btn-primary' : ''}
         >
           Continue to trip planner →
         </button>
@@ -900,13 +1173,14 @@ function ClusterCard({
           <button
             key={sub.id}
             onClick={() => setSelectedSubIdx(i)}
+            className={`mu-tab${i === selectedSubIdx ? ' mu-tab-active' : ''}`}
             style={{
               padding: '6px 13px', borderRadius: 8,
               background: i === selectedSubIdx ? GREEN : 'var(--bg-base)',
               color: i === selectedSubIdx ? '#fff' : '#4A4948',
               border: `1.5px solid ${i === selectedSubIdx ? GREEN : 'var(--border)'}`,
               fontSize: 12, fontWeight: i === selectedSubIdx ? 700 : 500,
-              cursor: 'pointer', transition: 'all 0.15s',
+              cursor: 'pointer',
             }}
           >
             {sub.name}
@@ -1039,31 +1313,29 @@ function SubDestDetail({ sub, onPlan }: { sub: SubDest; onPlan: () => void }) {
       }}>
         <button
           onClick={() => setShowModal(true)}
+          className="mu-card-ghost"
           style={{
             flex: 1,
             padding: '9px 0', borderRadius: 9,
             background: 'transparent',
             border: '1.5px solid var(--border)',
             color: '#4A4948', fontSize: 13, fontWeight: 600,
-            cursor: 'pointer', transition: 'background 0.15s',
+            cursor: 'pointer',
           }}
-          onMouseEnter={(e) => (e.currentTarget.style.background = 'rgba(0,0,0,0.04)')}
-          onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
         >
           What's here
         </button>
         <button
           onClick={handlePlanClick}
+          className="mu-btn-primary"
           style={{
             flex: 2,
             padding: '10px 0', borderRadius: 9,
             background: GREEN, border: 'none',
             color: '#fff', fontSize: 13, fontWeight: 700,
-            cursor: 'pointer', transition: 'background 0.15s',
+            cursor: 'pointer',
             letterSpacing: '-0.01em',
           }}
-          onMouseEnter={(e) => (e.currentTarget.style.background = '#2d5440')}
-          onMouseLeave={(e) => (e.currentTarget.style.background = GREEN)}
         >
           Plan this escape →
         </button>

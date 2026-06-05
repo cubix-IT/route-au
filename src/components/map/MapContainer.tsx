@@ -2,6 +2,8 @@ import { useEffect, useRef, useCallback, useState } from 'react'
 import maplibregl from 'maplibre-gl'
 import { MapView } from './MapView'
 import { useAppStore } from '@/store/useAppStore'
+import { CORRIDORS } from '@/data/corridors'
+import type { Coordinate } from '@/types'
 
 const PIN_EMOJI: Record<string, string> = {
   cafe: '☕', restaurant: '🍽', pub: '🍺', winery: '🍷',
@@ -143,12 +145,21 @@ export function MapContainer() {
 
     const origin = waypoints[0].coord
     const dest = waypoints[waypoints.length - 1].coord
-    const mid = { lat: (origin.lat + dest.lat) / 2, lng: (origin.lng + dest.lng) / 2 }
+
+    // Use corridor path_coordinates for accurate road-based fuel sampling
+    const corridorIds = activeItinerary.route?.corridor_ids ?? []
+    const roadPath: Coordinate[] = corridorIds.flatMap(id =>
+      CORRIDORS.find(c => c.id === id)?.path_coordinates ?? []
+    )
+    // Fallback to straight line if no corridor data
+    const pathToSample = roadPath.length >= 3 ? roadPath : [origin, dest]
+    const q1 = pathToSample[Math.floor(pathToSample.length * 0.33)]
+    const q2 = pathToSample[Math.floor(pathToSample.length * 0.67)]
 
     const SPOTS = [
-      { coord: origin, label: 'near start' },
-      { coord: mid,    label: 'en route' },
-      { coord: dest,   label: 'near destination' },
+      { coord: q1,   label: 'early on route' },
+      { coord: q2,   label: 'later on route' },
+      { coord: dest, label: 'near destination' },
     ]
 
     SPOTS.forEach(({ coord, label }) => {

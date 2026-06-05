@@ -1,6 +1,9 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { usePlannerData } from '@/hooks/usePlannerData'
 import { useAppStore } from '@/store/useAppStore'
+import { useTrails } from '@/hooks/useTrails'
+import { CORRIDORS } from '@/data/corridors'
+import type { Coordinate } from '@/types'
 import type { LivePOI, AccommodationPOI } from '@/lib/overpass'
 import type { HazardAlert } from '@/lib/vicEmergency'
 import type { Activity } from '@/data/victorianActivities'
@@ -9,11 +12,17 @@ import type { GuardrailWarning } from '@/types'
 const GREEN = '#3A6B4F'
 const WARM  = '#B87333'
 
-// Sanitize maps_url: old DB records may have broken formats (coordinate-only, cid=, etc.)
-// Prefer the stored URL if it looks like the current query+place_id format; otherwise
-// fall back to a name-based search which always works.
-function safeMapsUrl(mapsUrl: string | undefined | null, name: string): string {
-  if (mapsUrl && (mapsUrl.includes('query_place_id=') || mapsUrl.includes('api=1'))) return mapsUrl
+// Build a Google Maps URL that opens pinned to exact coordinates when available.
+// Coordinate-based URLs open the right location on the map immediately.
+// Coordinate pin link — always opens at the exact location, no Google Place ID needed
+function safeMapsUrl(mapsUrl: string | undefined | null, name: string, lat?: number | null, lng?: number | null): string {
+  if (lat && lng) return `https://maps.google.com/?q=${lat},${lng}`
+  if (mapsUrl && mapsUrl.includes('query_place_id=')) return mapsUrl
+  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(name + ' Victoria')}`
+}
+
+function coordMapsUrl(name: string, lat?: number | null, lng?: number | null): string {
+  if (lat && lng) return `https://maps.google.com/?q=${lat},${lng}`
   return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(name + ' Victoria')}`
 }
 
@@ -53,7 +62,7 @@ const ACCOM_POI_CFG: Record<AccommodationPOI['type'], { emoji: string; label: st
   guest_house:  { emoji: '🏡', label: 'Guest House', color: '#059669', bg: '#ECFDF5' },
 }
 
-type FilterMode = 'all' | 'activities' | 'food' | 'stay' | 'fuel'
+type FilterMode = 'all' | 'activities' | 'food' | 'stay' | 'fuel' | 'trails'
 
 interface FuelStop {
   coord: { lat: number; lng: number }
@@ -155,6 +164,10 @@ function StarRating({ rating, count }: { rating: number; count?: number }) {
 
 export function ExperiencePanel({ hideTimeline = false }: { hideTimeline?: boolean }) {
   const d = usePlannerData()
+  const destCoord = useAppStore((s) => s.destCoord)
+  const vibes = d.userProfile?.preferred_vibe ?? []
+  const { trails } = useTrails(destCoord, vibes)
+  const hikingSelected = vibes.includes('Hiking') || vibes.includes('Cycling')
   const setDisplayedMapPins = useAppStore((s) => s.setDisplayedMapPins)
   const setActivePOIFilter = useAppStore((s) => s.setActivePOIFilter)
   const placesLimitedMode = false // Google Places removed — always Overpass/Supabase
@@ -173,7 +186,7 @@ export function ExperiencePanel({ hideTimeline = false }: { hideTimeline?: boole
 
   const RESULT_LIMIT = 10
 
-  const isOneDayTrip = (d.activeItinerary?.total_days ?? 0) === 1
+
 
   const syncMapPins = useCallback((_f: FilterMode, pois: LivePOI[], stops?: FuelStop[]) => {
     if (_f === 'fuel') {
@@ -184,21 +197,38 @@ export function ExperiencePanel({ hideTimeline = false }: { hideTimeline?: boole
       })))
       return
     }
-    if (d.dbActivities.length > 0) {
-      const actPins = d.dbNature.filter((n) => n.lat && n.lng).slice(0, 8)
-      setDisplayedMapPins([
-        ...actPins.map((n) => ({
-          id: `nature-${n.nature_spot_id}`, lat: n.lat!, lng: n.lng!,
-          type: (n.type === 'viewpoint' ? 'viewpoint' : 'attraction') as LivePOI['type'],
-          name: n.name,
-        })),
-      ])
+    if (_f === 'food') {
+      const pins = (d.dbFood ?? []).filter(f => f.lat && f.lng).slice(0, 20)
+      setDisplayedMapPins(pins.map(f => ({
+        id: `food-${f.food_place_id}`, lat: f.lat!, lng: f.lng!,
+        type: 'attraction' as LivePOI['type'], name: f.name,
+      })))
       return
     }
+    if (_f === 'stay') {
+      const pins = (d.accommodationPOIs ?? []).filter(a => a.lat && a.lng).slice(0, 20)
+      setDisplayedMapPins(pins.map(a => ({
+        id: `accom-${a.id}`, lat: a.lat!, lng: a.lng!,
+        type: 'attraction' as LivePOI['type'], name: a.name,
+      })))
+      return
+    }
+    // activities / all / trails — show activities + nature pins
+    const actPins = [
+      ...d.dbActivities.filter(a => a.lat && a.lng).slice(0, 12).map(a => ({
+        id: String(a.activity_id), lat: a.lat!, lng: a.lng!,
+        type: 'attraction' as LivePOI['type'], name: a.name,
+      })),
+      ...d.dbNature.filter(n => n.lat && n.lng).slice(0, 8).map(n => ({
+        id: `nature-${n.nature_spot_id}`, lat: n.lat!, lng: n.lng!,
+        type: (n.type === 'viewpoint' ? 'viewpoint' : 'attraction') as LivePOI['type'], name: n.name,
+      })),
+    ]
+    if (actPins.length > 0) { setDisplayedMapPins(actPins); return }
     const ACT_TYPES: LivePOI['type'][] = ['hiking', 'viewpoint', 'attraction', 'winery', 'brewery', 'distillery', 'pub']
     const ap = pois.filter((p) => ACT_TYPES.includes(p.type) && p.lat && p.lng).slice(0, 10)
     setDisplayedMapPins(ap.map((p) => ({ id: p.id, lat: p.lat!, lng: p.lng!, type: p.type, name: p.name })))
-  }, [d.dbActivities.length, d.dbNature.length]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [d.dbActivities, d.dbNature, d.dbFood, d.accommodationPOIs]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const fetchFuelStops = useCallback(async () => {
     if (!d.activeItinerary || !d.vehicleProfile) return
@@ -209,14 +239,19 @@ export function ExperiencePanel({ hideTimeline = false }: { hideTimeline?: boole
 
     const origin = waypoints[0].coord
     const dest = waypoints[waypoints.length - 1].coord
-    // Use route waypoints for accurate along-route points, not straight-line midpoint
-    const allWaypoints = waypoints.map(w => w.coord)
-    const quarter = allWaypoints[Math.floor(allWaypoints.length * 0.25)] ?? { lat: (origin.lat * 3 + dest.lat) / 4, lng: (origin.lng * 3 + dest.lng) / 4 }
-    const threeQuarter = allWaypoints[Math.floor(allWaypoints.length * 0.75)] ?? { lat: (origin.lat + dest.lat * 3) / 4, lng: (origin.lng + dest.lng * 3) / 4 }
+
+    // Use corridor path_coordinates — actual road geometry, not straight-line guesses
+    const corridorIds = d.activeItinerary.route?.corridor_ids ?? []
+    const roadPath: Coordinate[] = corridorIds.flatMap(id =>
+      CORRIDORS.find(c => c.id === id)?.path_coordinates ?? []
+    )
+    const pathToSample = roadPath.length >= 3 ? roadPath : [origin, dest]
+    const q1 = pathToSample[Math.floor(pathToSample.length * 0.33)]
+    const q2 = pathToSample[Math.floor(pathToSample.length * 0.67)]
     const spots = [
-      { coord: quarter,      label: 'Early on route' },
-      { coord: threeQuarter, label: 'Later on route' },
-      { coord: dest,         label: 'Near destination' },
+      { coord: q1,   label: 'Early on route' },
+      { coord: q2,   label: 'Later on route' },
+      { coord: dest, label: 'Near destination' },
     ]
 
     setFuelLoading(true)
@@ -252,19 +287,8 @@ export function ExperiencePanel({ hideTimeline = false }: { hideTimeline?: boole
   }
 
   useEffect(() => {
-    const ACT_TYPES: LivePOI['type'][] = ['hiking', 'viewpoint', 'attraction', 'winery', 'brewery', 'distillery', 'pub']
-    if (d.dbActivities.length > 0) {
-      const actPins = d.dbNature.filter((n) => n.lat && n.lng).slice(0, 8)
-      setDisplayedMapPins(actPins.map((n) => ({
-        id: `nature-${n.nature_spot_id}`, lat: n.lat!, lng: n.lng!,
-        type: (n.type === 'viewpoint' ? 'viewpoint' : 'attraction') as LivePOI['type'],
-        name: n.name,
-      })))
-    } else if (d.livePOIs) {
-      const ap = d.livePOIs.filter((p) => ACT_TYPES.includes(p.type) && p.lat && p.lng).slice(0, 10)
-      setDisplayedMapPins(ap.map((p) => ({ id: p.id, lat: p.lat!, lng: p.lng!, type: p.type, name: p.name })))
-    }
-  }, [d.dbActivities.length, d.dbNature.length, d.livePOIs]) // eslint-disable-line react-hooks/exhaustive-deps
+    syncMapPins(filter, d.livePOIs ?? [])
+  }, [d.dbActivities.length, d.dbNature.length, d.dbFood?.length, d.accommodationPOIs?.length, d.livePOIs]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Scroll to and highlight a POI card when selected via map pin click
   useEffect(() => {
@@ -282,7 +306,7 @@ export function ExperiencePanel({ hideTimeline = false }: { hideTimeline?: boole
   if (!d.activeItinerary) return null
 
   const addedActIds = new Set(d.addedActivities.map((a) => a.actId))
-  const showStay  = !isOneDayTrip && (filter === 'all' || filter === 'stay')
+  const showStay  = (filter === 'all' || filter === 'stay')
 
   return (
     <div ref={panelRef} style={{ flex: 1, overflowY: 'auto', background: '#F5F4F1', display: 'flex', flexDirection: 'column' }}>
@@ -299,8 +323,9 @@ export function ExperiencePanel({ hideTimeline = false }: { hideTimeline?: boole
         {(([
           ['all',        'All'],
           ['activities', '🗺 Things to Do'],
-          ...((d.dbFood?.length ?? 0) > 0 ? [['food', '🍽 Eat & Drink']] : []),
-          ...(!isOneDayTrip ? [['stay', '🏨 Stay']] : []),
+          ...((d.dbFood?.length ?? 0) > 0 ? [['food', '🍽 Food & Drinks']] : []),
+          ...(trails.length > 0 ? [['trails', '🥾 Trails']] : []),
+          ['stay', '🏨 Stay'],
           ...(d.vehicleProfile && d.vehicleProfile.fuel_type !== 'Electric' && !(d.vehicleProfile as unknown as { skip_fuel?: boolean }).skip_fuel ? [['fuel', '⛽ Fuel']] : []),
         ]) as [string, string][]).map(([f, label]) => (
           <button key={f} onClick={() => handleFilterChange(f as FilterMode)} style={{
@@ -367,7 +392,7 @@ export function ExperiencePanel({ hideTimeline = false }: { hideTimeline?: boole
               cost: (a.cost as Activity['cost']) || 'free',
               kidsOk: a.kids_ok,
               isHiddenGem: a.is_hidden_gem,
-              mapsUrl: safeMapsUrl(a.maps_url, a.name),
+              mapsUrl: safeMapsUrl(a.maps_url, a.name, a.lat, a.lng),
               tags: a.tags ?? [],
               websiteUri: aAttr.website_uri as string | undefined,
               phone: (a as any).phone as string | undefined,
@@ -385,7 +410,7 @@ export function ExperiencePanel({ hideTimeline = false }: { hideTimeline?: boole
             cost: 'free' as Activity['cost'],
             kidsOk: true,
             isHiddenGem: false,
-            mapsUrl: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(n.name + ' Victoria')}`,
+            mapsUrl: coordMapsUrl(n.name, n.lat, n.lng),
             tags: [n.type],
           }))
 
@@ -493,10 +518,10 @@ export function ExperiencePanel({ hideTimeline = false }: { hideTimeline?: boole
           )
         })()}
 
-        {/* ── Pour & Explore ── */}
+        {/* ── Drink venues from activities (wineries/breweries/distilleries tagged in OSM) ── */}
         {(filter === 'all' || filter === 'activities') && (() => {
           const DRINK_TYPES: LivePOI['type'][] = ['winery', 'brewery', 'distillery', 'pub']
-          const DRINK_CATS = new Set(['winery', 'brewery', 'distillery', 'pub', 'bar', 'wine', 'wine_cellar'])
+          const DRINK_CATS = new Set(['winery', 'brewery', 'distillery', 'pub', 'bar', 'wine', 'wine_cellar', 'drink'])
           // Merge from Supabase activities (primary) + Overpass livePOIs (fallback)
           const fromDB = d.dbActivities.filter((a) => DRINK_CATS.has(a.category.toLowerCase()))
           const fromLive = (d.livePOIs ?? []).filter((p) => DRINK_TYPES.includes(p.type))
@@ -506,7 +531,7 @@ export function ExperiencePanel({ hideTimeline = false }: { hideTimeline?: boole
           return (
             <SectionBlock
               id="section-drinks"
-              title="Pour & Explore"
+              title="Wineries & Breweries"
               icon="🍷"
               count={hasDB ? fromDB.length : fromLive.length}
               loading={d.dbLoading}
@@ -518,14 +543,14 @@ export function ExperiencePanel({ hideTimeline = false }: { hideTimeline?: boole
                   const cfg = CAT_TAG[cat] ?? CAT_TAG['winery']
                   const emoji = cat === 'brewery' ? '🍺' : cat === 'distillery' ? '🥃' : cat === 'pub' ? '🍺' : '🍷'
                   const website = (a.attributes as Record<string,unknown>)?.website as string | undefined
-                  const mapsUrl = a.maps_url || `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(a.name + ' Victoria')}`
+                  const mapsUrl = safeMapsUrl(a.maps_url, a.name, (a as any).lat, (a as any).lng)
                   return (
                     <DrinkCard key={a.activity_id} name={a.name} emoji={emoji} cfg={cfg} website={website} mapsUrl={mapsUrl} />
                   )
                 }) : fromLive.map((poi) => {
                   const cfg = CAT_TAG[poi.type] ?? CAT_TAG['winery']
                   const emoji = poi.type === 'brewery' ? '🍺' : poi.type === 'distillery' ? '🥃' : poi.type === 'pub' ? '🍺' : '🍷'
-                  const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(poi.name + ' Victoria')}`
+                  const mapsUrl = coordMapsUrl(poi.name, poi.lat, poi.lng)
                   return (
                     <DrinkCard key={poi.id} name={poi.name} emoji={emoji} cfg={cfg} website={poi.website} mapsUrl={mapsUrl} />
                   )
@@ -535,76 +560,231 @@ export function ExperiencePanel({ hideTimeline = false }: { hideTimeline?: boole
           )
         })()}
 
-        {/* ── Eat & Drink ── */}
+        {/* ── Food & Drinks ── */}
         {(filter === 'all' || filter === 'food') && (() => {
           const allFoods = d.dbFood ?? []
           if (allFoods.length === 0) return null
-          // In 'all' mode show top 6; 'food' tab shows everything
-          const foods = filter === 'food' ? allFoods : allFoods.slice(0, 6)
+
+          const DRINK_CATS = new Set(['Winery', 'Brewery', 'Distillery'])
           const FOOD_CAT_EMOJI: Record<string, string> = {
-            Cafe: '☕', Restaurant: '🍽', Pub: '🍺', Bakery: '🥐',
             Winery: '🍷', Brewery: '🍺', Distillery: '🥃',
+            Pub: '🍻', Restaurant: '🍽️', Cafe: '☕', Bakery: '🥐',
           }
+          const FOOD_CAT_COLOR: Record<string, { color: string; bg: string }> = {
+            Winery:     { color: '#7E22CE', bg: '#FAF5FF' },
+            Brewery:    { color: '#92400E', bg: '#FEF3C7' },
+            Distillery: { color: '#374151', bg: '#F3F4F6' },
+            Pub:        { color: '#1D4ED8', bg: '#EFF6FF' },
+            Restaurant: { color: '#B45309', bg: '#FFFBEB' },
+            Cafe:       { color: '#0369A1', bg: '#E0F2FE' },
+            Bakery:     { color: '#047857', bg: '#ECFDF5' },
+          }
+
+          // Category filter state — use actCategoryFilter reused for food when in food mode
+          const [foodCatFilter, setFoodCatFilter] = [
+            filter === 'food' ? actCategoryFilter : 'all',
+            filter === 'food' ? setActCategoryFilter : (_: string) => {},
+          ]
+
+          // Available categories in this destination
+          const availCats = [...new Set(allFoods.map(f => f.category))].sort((a, b) => {
+            const order = ['Winery','Brewery','Distillery','Pub','Restaurant','Cafe','Bakery']
+            return (order.indexOf(a) ?? 99) - (order.indexOf(b) ?? 99)
+          })
+
+          const filtered = foodCatFilter === 'all' ? allFoods : allFoods.filter(f => f.category === foodCatFilter)
+
+          // Split: drink venues first, then food
+          const drinkVenues = filtered.filter(f => DRINK_CATS.has(f.category))
+          const foodVenues  = filtered.filter(f => !DRINK_CATS.has(f.category))
+
+          // In 'all' overview: show top 4 drink + 3 food
+          const showDrinks = filter === 'food' ? drinkVenues : drinkVenues.slice(0, 4)
+          const showFood   = filter === 'food' ? foodVenues  : foodVenues.slice(0, 3)
+          const totalShown = showDrinks.length + showFood.length
+
+          const renderFoodCard = (f: import('@/hooks/usePlannerData').DbFoodPlace) => {
+            const attr = f.attributes as { website_uri?: string; opening_hours_text?: string }
+            const emoji = FOOD_CAT_EMOJI[f.category] ?? '🍽️'
+            const cfg = FOOD_CAT_COLOR[f.category] ?? { color: '#374151', bg: '#F9FAFB' }
+            const website = attr.website_uri ?? f.website ?? undefined
+            const mapsUrl = coordMapsUrl(f.name, f.lat, f.lng)
+            return (
+              <div key={f.food_place_id} style={{
+                display: 'flex', alignItems: 'flex-start', gap: 12,
+                padding: '12px 14px', borderRadius: 12,
+                border: '1px solid var(--border)', background: 'var(--bg-card)',
+              }}>
+                <div style={{
+                  width: 40, height: 40, borderRadius: 10, flexShrink: 0,
+                  background: cfg.bg, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: 20,
+                }}>{emoji}</div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 3 }}>{f.name}</div>
+                  <span style={{
+                    display: 'inline-block', fontSize: 10, fontWeight: 700,
+                    color: cfg.color, background: cfg.bg,
+                    padding: '2px 8px', borderRadius: 20, marginBottom: f.description ? 5 : 0,
+                    textTransform: 'uppercase', letterSpacing: '0.05em',
+                  }}>{f.category}</span>
+                  {f.description && <div style={{ fontSize: 12, color: '#374151', lineHeight: 1.5, marginTop: 2 }}>{f.description}</div>}
+                  {attr.opening_hours_text && <div style={{ fontSize: 11, color: '#6B7280', marginTop: 4 }}>{attr.opening_hours_text}</div>}
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 5, flexShrink: 0, alignSelf: 'center' }}>
+                  {website && (
+                    <a href={website.startsWith('http') ? website : `https://${website}`} target="_blank" rel="noopener noreferrer" style={{
+                      padding: '5px 10px', borderRadius: 7, background: '#3A6B4F', color: '#fff',
+                      fontSize: 11, fontWeight: 600, textDecoration: 'none',
+                    }}>Web ↗</a>
+                  )}
+                  <a href={mapsUrl} target="_blank" rel="noopener noreferrer" style={{
+                    padding: '5px 10px', borderRadius: 7,
+                    background: 'var(--bg-muted)', border: '1px solid var(--border)',
+                    fontSize: 11, fontWeight: 600, color: 'var(--text-primary)', textDecoration: 'none',
+                  }}>Maps ↗</a>
+                </div>
+              </div>
+            )
+          }
+
           return (
             <SectionBlock
               id="section-food"
-              title="Eat & Drink"
-              icon="🍽"
-              count={foods.length}
+              title="Food & Drinks"
+              icon="🍽️"
+              count={allFoods.length}
               loading={d.dbLoading}
-              empty={!d.dbLoading && foods.length === 0}
+              empty={!d.dbLoading && allFoods.length === 0}
             >
+              {/* Category filter chips — only shown in food tab */}
+              {filter === 'food' && availCats.length > 1 && (
+                <div style={{ display: 'flex', gap: 6, padding: '0 16px 12px', overflowX: 'auto', flexShrink: 0 }}>
+                  <button onClick={() => setFoodCatFilter('all')} style={{
+                    padding: '4px 12px', borderRadius: 16, flexShrink: 0, fontSize: 11, fontWeight: 600, cursor: 'pointer',
+                    background: foodCatFilter === 'all' ? '#1C1B1F' : '#fff',
+                    color: foodCatFilter === 'all' ? '#fff' : '#6B7280',
+                    border: `1.5px solid ${foodCatFilter === 'all' ? '#1C1B1F' : 'var(--border)'}`,
+                  }}>All</button>
+                  {availCats.map(cat => (
+                    <button key={cat} onClick={() => setFoodCatFilter(cat)} style={{
+                      padding: '4px 12px', borderRadius: 16, flexShrink: 0, fontSize: 11, fontWeight: 600, cursor: 'pointer',
+                      background: foodCatFilter === cat ? '#1C1B1F' : '#fff',
+                      color: foodCatFilter === cat ? '#fff' : '#6B7280',
+                      border: `1.5px solid ${foodCatFilter === cat ? '#1C1B1F' : 'var(--border)'}`,
+                    }}>{FOOD_CAT_EMOJI[cat]} {cat}s</button>
+                  ))}
+                </div>
+              )}
+
               <div style={{ padding: '0 16px', display: 'flex', flexDirection: 'column', gap: 8 }}>
-                {foods.map((f: import('@/hooks/usePlannerData').DbFoodPlace) => {
-                  const attr = f.attributes as { website_uri?: string; opening_hours_text?: string }
-                  const emoji = FOOD_CAT_EMOJI[f.category] ?? '🍽'
-                  const website = attr.website_uri
-                  const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(f.name + ' Victoria')}`
-                  return (
-                    <div key={f.food_place_id} style={{
-                      display: 'flex', alignItems: 'flex-start', gap: 12,
-                      padding: '12px 14px', borderRadius: 12,
-                      border: '1px solid var(--border)', background: 'var(--bg-card)',
-                    }}>
-                      <span style={{ fontSize: 22, flexShrink: 0, lineHeight: 1.3 }}>{emoji}</span>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 2 }}>{f.name}</div>
-                        <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: f.description ? 4 : 0 }}>
-                          {f.category}{f.cuisine ? ` · ${f.cuisine}` : ''}
-                        </div>
-                        {f.description && <div style={{ fontSize: 12, color: '#374151', lineHeight: 1.5, marginBottom: 2 }}>{f.description}</div>}
-                        {attr.opening_hours_text && <div style={{ fontSize: 11, color: '#6B7280', marginTop: 2 }}>{attr.opening_hours_text}</div>}
+                {/* Drink venues: Wineries, Breweries, Distilleries — shown first */}
+                {showDrinks.length > 0 && (
+                  <>
+                    {filter === 'food' && foodCatFilter === 'all' && (
+                      <div style={{ fontSize: 11, fontWeight: 700, color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 2, marginTop: 4 }}>
+                        🍷 Cellar Doors & Craft Drinks
                       </div>
-                      <div style={{ display: 'flex', gap: 6, flexShrink: 0, alignSelf: 'center' }}>
-                        {website && (
-                          <a href={website.startsWith('http') ? website : `https://${website}`} target="_blank" rel="noopener noreferrer" style={{
-                            padding: '6px 10px', borderRadius: 8,
-                            background: '#3A6B4F', color: '#fff',
-                            fontSize: 12, fontWeight: 600, textDecoration: 'none',
-                          }}>Web ↗</a>
-                        )}
-                        <a href={mapsUrl} target="_blank" rel="noopener noreferrer" style={{
-                          padding: '6px 10px', borderRadius: 8,
-                          background: 'var(--bg-muted)', border: '1px solid var(--border)',
-                          fontSize: 12, fontWeight: 600, color: 'var(--text-primary)', textDecoration: 'none',
-                        }}>Maps ↗</a>
+                    )}
+                    {showDrinks.map(renderFoodCard)}
+                  </>
+                )}
+
+                {/* Food venues: Pubs, Restaurants, Cafes — shown after drink venues */}
+                {showFood.length > 0 && (
+                  <>
+                    {filter === 'food' && foodCatFilter === 'all' && drinkVenues.length > 0 && (
+                      <div style={{ fontSize: 11, fontWeight: 700, color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.07em', marginTop: 8, marginBottom: 2 }}>
+                        🍽️ Places to Eat
                       </div>
-                    </div>
-                  )
-                })}
-                {filter === 'all' && allFoods.length > 6 && (
+                    )}
+                    {showFood.map(renderFoodCard)}
+                  </>
+                )}
+
+                {filter === 'all' && allFoods.length > totalShown && (
                   <button onClick={() => handleFilterChange('food')} style={{
                     width: '100%', padding: '9px', borderRadius: 9,
                     border: '1px dashed var(--border)', background: 'none',
                     fontSize: 12, color: '#6B7280', fontWeight: 500, cursor: 'pointer',
                   }}>
-                    View all {allFoods.length} places to eat ↓
+                    View all {allFoods.length} food & drink spots ↓
                   </button>
                 )}
               </div>
             </SectionBlock>
           )
         })()}
+
+        {/* ── Trails ── */}
+        {trails.length > 0 && (filter === 'all' || filter === 'trails' || (hikingSelected && filter === 'activities')) && (
+          <SectionBlock id="section-trails" title="Trails" icon="🥾" count={trails.length} loading={false} empty={false}>
+            <div style={{ padding: '0 16px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {trails.map((trail) => {
+                const typeLabel = trail.type === 'walk' ? 'Walking' : trail.type === 'cycle' ? 'Cycling' : 'Mountain Bike'
+                const typeColor = trail.type === 'walk' ? '#2563EB' : trail.type === 'cycle' ? GREEN : '#7C3AED'
+                const typeBg   = trail.type === 'walk' ? '#EFF6FF' : trail.type === 'cycle' ? '#F0FDF4' : '#F5F3FF'
+                const topWps   = (trail.waypoints ?? []).filter(w => w.description).slice(0, 2)
+                return (
+                  <div key={trail.slug} style={{
+                    background: '#fff', borderRadius: 12,
+                    border: '1px solid var(--border)',
+                    padding: '14px 16px',
+                    display: 'flex', flexDirection: 'column', gap: 10,
+                  }}>
+                    {/* Header */}
+                    <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10 }}>
+                      <div>
+                        <div style={{ fontSize: 14, fontWeight: 700, color: '#1C1C1A', letterSpacing: '-0.01em', marginBottom: 4 }}>
+                          {trail.name}
+                        </div>
+                        <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+                          <span style={{ fontSize: 11, fontWeight: 600, color: typeColor, background: typeBg, padding: '2px 8px', borderRadius: 6 }}>
+                            {typeLabel}
+                          </span>
+                          <span style={{ fontSize: 12, color: '#6B7280' }}>
+                            {trail.distance_km} km · {trail.region}
+                          </span>
+                        </div>
+                      </div>
+                      <a
+                        href={coordMapsUrl(trail.name, trail.waypoints?.[0]?.lat, trail.waypoints?.[0]?.lng)}
+                        target="_blank" rel="noopener noreferrer"
+                        style={{ flexShrink: 0, fontSize: 12, fontWeight: 600, color: GREEN, textDecoration: 'none', padding: '4px 10px', border: `1px solid ${GREEN}`, borderRadius: 8 }}
+                      >
+                        Maps →
+                      </a>
+                    </div>
+
+                    {/* Top waypoints */}
+                    {topWps.length > 0 && (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                        {topWps.map((wp) => (
+                          <div key={wp.name} style={{ fontSize: 12, color: '#4A4948', lineHeight: 1.5 }}>
+                            <span style={{ fontWeight: 600, color: '#1C1C1A' }}>{wp.name}</span>
+                            {wp.description && <span style={{ color: '#6B7280' }}> — {wp.description.slice(0, 120)}{wp.description.length > 120 ? '…' : ''}</span>}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Parks Victoria link */}
+                    <a
+                      href={`https://www.parks.vic.gov.au/search#stq=${encodeURIComponent(trail.name)}`}
+                      target="_blank" rel="noopener noreferrer"
+                      style={{ fontSize: 11, color: '#6B7280', textDecoration: 'underline' }}
+                    >
+                      Check closures & conditions at Parks Victoria →
+                    </a>
+                  </div>
+                )
+              })}
+              <p style={{ fontSize: 11, color: '#9CA3AF', margin: '4px 0 8px', lineHeight: 1.6 }}>
+                Trail data © <a href="https://www.data.vic.gov.au" target="_blank" rel="noopener noreferrer" style={{ color: '#9CA3AF' }}>data.vic.gov.au</a> (CC BY 4.0)
+              </p>
+            </div>
+          </SectionBlock>
+        )}
 
         {/* ── Where to Stay ── */}
         {showStay && (() => {
@@ -635,13 +815,6 @@ export function ExperiencePanel({ hideTimeline = false }: { hideTimeline?: boole
                     View all {allAccom.length} options near {d.shortDest} ↓
                   </button>
                 )}
-                <a
-                  href={`https://www.booking.com/searchresults.html?ss=${encodeURIComponent(d.shortDest + ' Victoria')}`}
-                  target="_blank" rel="noopener noreferrer"
-                  style={{ textAlign: 'center', fontSize: 12, color: '#1D4ED8', fontWeight: 600, textDecoration: 'none' }}
-                >
-                  Search Booking.com for {d.shortDest} ↗
-                </a>
               </div>
             </SectionBlock>
           )
@@ -687,7 +860,7 @@ export function ExperiencePanel({ hideTimeline = false }: { hideTimeline?: boole
                           <div style={{ fontSize: 11, color: '#9CA3AF', marginTop: 2 }}>{stop.station.distanceKm} km from your route</div>
                         </div>
                         <a
-                          href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(stop.station.brand + ' ' + stop.station.address)}`}
+                          href={coordMapsUrl(stop.station.brand + ' ' + stop.station.address, stop.station.lat, stop.station.lng)}
                           target="_blank" rel="noopener noreferrer"
                           style={{ fontSize: 11, fontWeight: 700, color: '#fff', background: '#16A34A', padding: '7px 11px', borderRadius: 9, textDecoration: 'none', flexShrink: 0 }}
                         >Maps ↗</a>
@@ -805,7 +978,7 @@ function ActivityCard({ act, expanded, highlighted, onToggle, isAdded, onAdd, on
   isAdded?: boolean; onAdd?: () => void; onRemove?: () => void; onMapPin?: () => void
 }) {
   const tag = CAT_TAG[act.category] ?? { label: act.category, color: '#374151', bg: '#F3F4F6' }
-  const mapsUrl = act.mapsUrl || `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(act.name + ' Victoria AU')}`
+  const mapsUrl = act.mapsUrl || coordMapsUrl(act.name, (act as any).lat, (act as any).lng)
   const websiteUrl = act.websiteUri && !act.websiteUri.includes('google.com') ? act.websiteUri : null
   const openStatus = getOpenStatus(act.openingHoursPeriods)
 
@@ -915,14 +1088,12 @@ function ActivityCard({ act, expanded, highlighted, onToggle, isAdded, onAdd, on
 
 // ── Accommodation grid card ───────────────────────────────────────────────────
 
-function AccommodationGridCard({ poi, destName }: { poi: AccommodationPOI; destName: string }) {
+function AccommodationGridCard({ poi }: { poi: AccommodationPOI; destName?: string }) {
   const cfg = ACCOM_POI_CFG[poi.type]
   const attr = (poi as unknown as { attributes?: Record<string, unknown> }).attributes ?? {}
-  const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(poi.name + ' ' + destName)}`
-  const editorialSummary = undefined
+  const mapsUrl = coordMapsUrl(poi.name, poi.lat, poi.lng)
   const websiteUri = attr.website_uri as string | undefined
-  const websiteUrl = websiteUri || null
-  const openStatus = getOpenStatus(attr.opening_hours_periods as import('@/lib/overpass').OpenHoursPeriod[] | undefined)
+  const websiteUrl = websiteUri || poi.website || null
 
   return (
     <div style={{
@@ -943,34 +1114,33 @@ function AccommodationGridCard({ poi, destName }: { poi: AccommodationPOI; destN
         {poi.name}
       </div>
 
-      {/* Hotel stars */}
-      {poi.stars && (
-        <div style={{ fontSize: 12, color: '#F59E0B' }}>{'★'.repeat(poi.stars)}{'☆'.repeat(Math.max(0, 5 - poi.stars))}</div>
+      {/* Description */}
+      {poi.description && (
+        <div style={{ fontSize: 11.5, color: '#49454F', lineHeight: 1.55 }}>{poi.description}</div>
       )}
 
-      {/* Editorial summary */}
-      {editorialSummary && (
-        <div style={{ fontSize: 11.5, color: '#49454F', lineHeight: 1.55 }}>{editorialSummary}</div>
-      )}
-
-      {/* Open/closed */}
-      {openStatus && (
-        <div style={{ fontSize: 11, fontWeight: 600, color: openStatus.isOpen ? '#16A34A' : '#DC2626' }}>
-          {openStatus.isOpen ? 'Open now' : `Closed${openStatus.nextOpen ? ` — opens ${openStatus.nextOpen}` : ''}`}
-        </div>
+      {/* Address */}
+      {poi.address && (
+        <div style={{ fontSize: 11, color: '#6B7280' }}>📍 {poi.address}</div>
       )}
 
       {/* Buttons */}
       <div style={{ display: 'flex', gap: 6, marginTop: 2 }}>
-        {websiteUrl && (
+        {websiteUrl ? (
           <a href={websiteUrl} target="_blank" rel="noopener noreferrer"
-            style={{ flex: 1, textAlign: 'center', padding: '7px 10px', borderRadius: 8, background: '#F8F7F4', border: '1px solid var(--border)', color: '#374151', fontSize: 11.5, fontWeight: 700, textDecoration: 'none' }}>
+            style={{ flex: 1, textAlign: 'center', padding: '7px 10px', borderRadius: 8, background: '#3A6B4F', color: '#fff', fontSize: 11.5, fontWeight: 700, textDecoration: 'none' }}>
             Website ↗
+          </a>
+        ) : (
+          <a href={`https://www.google.com/search?q=${encodeURIComponent(poi.name + ' ' + (poi.address ?? 'Victoria Australia'))}`}
+            target="_blank" rel="noopener noreferrer"
+            style={{ flex: 1, textAlign: 'center', padding: '7px 10px', borderRadius: 8, background: '#F8F7F4', border: '1px solid var(--border)', color: '#374151', fontSize: 11.5, fontWeight: 700, textDecoration: 'none' }}>
+            Search ↗
           </a>
         )}
         <a href={mapsUrl} target="_blank" rel="noopener noreferrer"
           style={{ flex: 1, textAlign: 'center', padding: '7px 10px', borderRadius: 8, background: '#1C1B1F', color: '#fff', fontSize: 11.5, fontWeight: 700, textDecoration: 'none' }}>
-          Open in Maps ↗
+          Maps ↗
         </a>
       </div>
     </div>

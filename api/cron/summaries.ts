@@ -1,11 +1,10 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { adminSupabase } from '../_lib/supabase.js'
+import { loadTrails } from '../../scripts/load-trails.js'
 
 // Called weekly Sunday 2am AEST (vercel.json: "0 16 * * 0")
-// Refreshes Wikipedia + Claude AI summaries for destinations that:
-//   (a) have no summary yet, or
-//   (b) haven't been updated in 7+ days
-// Rate-limited to 10 destinations per run to stay within free tier.
+// - Every week: refreshes Wikipedia + Claude AI summaries (10 destinations/run)
+// - 1st of month: also refreshes Great Trails Victoria data from data.vic.gov.au
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST' && req.method !== 'GET') {
     return res.status(405).json({ error: 'Method not allowed' })
@@ -29,6 +28,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const BATCH_LIMIT = 10
   let processed = 0
   let errors = 0
+
+  // Monthly: refresh Great Trails Victoria KML data on the 1st of each month
+  const isFirstOfMonth = new Date().getDate() === 1
+  if (isFirstOfMonth) {
+    console.log('[summaries] 1st of month — refreshing Great Trails Victoria data')
+    await loadTrails(false)
+  }
 
   try {
     const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()

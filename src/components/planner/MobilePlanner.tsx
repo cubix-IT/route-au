@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
 import { MapContainer } from '@/components/map/MapContainer'
 import { usePlannerData } from '@/hooks/usePlannerData'
 import { useAppStore } from '@/store/useAppStore'
@@ -70,13 +70,14 @@ function formatDrive(hours: number): string {
   return m === 0 ? `${h}h` : `${h}h ${m}m`
 }
 
-type FilterTab = 'explore' | 'plan' | 'fuel'
+type FilterTab = 'explore' | 'food' | 'stay' | 'plan' | 'fuel'
 
 const CAT_LABEL: Record<string, string> = {
   nature: '🌿 Nature', viewpoint: '🌄 Views', history: '🏛️ History',
   art: '🎨 Art', active: '🏄 Active', wildlife: '🦘 Wildlife',
   relaxation: '🧖 Relax', wellness: '♨️ Wellness', beach: '🏖️ Beach',
   entertainment: '🎵 Music', markets: '🛒 Markets', family: '👨‍👩‍👧 Family',
+  drink: '🍷 Drink', food: '🍽️ Food',
 }
 
 const NATURE_EMOJI: Record<string, string> = {
@@ -328,7 +329,9 @@ export function MobilePlanner() {
         display: 'flex', gap: 7, overflowX: 'auto',
       }}>
         {([
-          ['explore', 'Things to Do'],
+          ['explore', '🗺 Explore'],
+          ...((d.dbFood?.length ?? 0) > 0 ? [['food', '🍽 Food & Drinks']] : []),
+          ['stay', '🏨 Stay'],
           ...(scheduledPlan.items.length > 0 ? [['plan', `Your Plan (${scheduledPlan.items.length})`]] : []),
           ...(hasFuel ? [['fuel', '⛽ Fuel']] : []),
         ] as [FilterTab, string][]).map(([t, label]) => (
@@ -493,6 +496,96 @@ export function MobilePlanner() {
                 <div style={{ height: 32 }} />
               </div>
             )}
+          </div>
+        )}
+
+        {/* ── FOOD & DRINKS tab ── */}
+        {tab === 'food' && (() => {
+          const FOOD_EMOJI: Record<string, string> = { Winery: '🍷', Brewery: '🍺', Distillery: '🥃', Pub: '🍻', Cafe: '☕', Bakery: '🥐', Restaurant: '🍽️' }
+          const FOOD_COLOR: Record<string, { color: string; bg: string }> = {
+            Winery: { color: '#7E22CE', bg: '#FAF5FF' }, Brewery: { color: '#92400E', bg: '#FEF3C7' },
+            Distillery: { color: '#374151', bg: '#F3F4F6' }, Pub: { color: '#1D4ED8', bg: '#EFF6FF' },
+            Restaurant: { color: '#B45309', bg: '#FFFBEB' }, Cafe: { color: '#0369A1', bg: '#E0F2FE' },
+            Bakery: { color: '#047857', bg: '#ECFDF5' },
+          }
+          const allFoods = d.dbFood ?? []
+          const [foodFilter, setFoodFilter] = React.useState('all')
+          const availCats = [...new Set(allFoods.map(f => f.category))].sort((a, b) => {
+            const order = ['Winery','Brewery','Distillery','Pub','Restaurant','Cafe','Bakery']
+            return (order.indexOf(a) ?? 99) - (order.indexOf(b) ?? 99)
+          })
+          const filtered = foodFilter === 'all' ? allFoods : allFoods.filter(f => f.category === foodFilter)
+          const DRINK_CATS = new Set(['Winery','Brewery','Distillery'])
+          const drinks = filtered.filter(f => DRINK_CATS.has(f.category))
+          const foods  = filtered.filter(f => !DRINK_CATS.has(f.category))
+
+          return (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+              {/* Filter chips */}
+              {availCats.length > 1 && (
+                <div style={{ display: 'flex', gap: 6, padding: '12px 12px 8px', overflowX: 'auto', flexShrink: 0 }}>
+                  <button onClick={() => setFoodFilter('all')} style={{
+                    padding: '6px 14px', borderRadius: 20, flexShrink: 0, fontSize: 12, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap',
+                    background: foodFilter === 'all' ? '#1C1B1F' : '#fff', color: foodFilter === 'all' ? '#fff' : '#6B7280',
+                    border: `1.5px solid ${foodFilter === 'all' ? '#1C1B1F' : 'rgba(0,0,0,0.1)'}`,
+                  }}>All</button>
+                  {availCats.map(cat => (
+                    <button key={cat} onClick={() => setFoodFilter(cat)} style={{
+                      padding: '6px 14px', borderRadius: 20, flexShrink: 0, fontSize: 12, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap',
+                      background: foodFilter === cat ? '#1C1B1F' : '#fff', color: foodFilter === cat ? '#fff' : '#6B7280',
+                      border: `1.5px solid ${foodFilter === cat ? '#1C1B1F' : 'rgba(0,0,0,0.1)'}`,
+                    }}>{FOOD_EMOJI[cat]} {cat}s</button>
+                  ))}
+                </div>
+              )}
+
+              <div style={{ padding: '0 12px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {allFoods.length === 0 && <div style={{ fontSize: 13, color: '#9CA3AF', padding: '20px 0', textAlign: 'center' }}>No food & drink spots found nearby.</div>}
+
+                {drinks.length > 0 && (
+                  <>
+                    {foodFilter === 'all' && <div style={{ fontSize: 10, fontWeight: 700, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.08em', marginTop: 4 }}>🍷 Cellar Doors & Craft Drinks</div>}
+                    {drinks.map(f => <MFoodCard key={f.food_place_id} f={f} emoji={FOOD_EMOJI[f.category] ?? '🍽️'} cfg={FOOD_COLOR[f.category] ?? { color: '#374151', bg: '#F9FAFB' }} />)}
+                  </>
+                )}
+                {foods.length > 0 && (
+                  <>
+                    {foodFilter === 'all' && drinks.length > 0 && <div style={{ fontSize: 10, fontWeight: 700, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.08em', marginTop: 6 }}>🍽️ Places to Eat</div>}
+                    {foods.map(f => <MFoodCard key={f.food_place_id} f={f} emoji={FOOD_EMOJI[f.category] ?? '🍽️'} cfg={FOOD_COLOR[f.category] ?? { color: '#374151', bg: '#F9FAFB' }} />)}
+                  </>
+                )}
+                <div style={{ height: 32 }} />
+              </div>
+            </div>
+          )
+        })()}
+
+        {/* ── STAY tab ── */}
+        {tab === 'stay' && (
+          <div style={{ padding: '12px 12px 0', display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {(d.accommodationPOIs?.length ?? 0) === 0 ? (
+              <div style={{ fontSize: 13, color: '#9CA3AF', padding: '20px 0', textAlign: 'center' }}>No accommodation found nearby.</div>
+            ) : (d.accommodationPOIs ?? []).slice(0, 20).map((a) => {
+              const ACCOM_EMOJI: Record<string, string> = { hotel: '🏨', motel: '🏩', campsite: '⛺', caravan_park: '🚐', hostel: '🛏️', cabin: '🛖', guest_house: '🏡' }
+              const ACCOM_LABEL: Record<string, string> = { hotel: 'Hotel', motel: 'Motel', campsite: 'Campsite', caravan_park: 'Caravan Park', hostel: 'Hostel', cabin: 'Cabin', guest_house: 'Guest House' }
+              const emoji = ACCOM_EMOJI[a.type] ?? '🏨'
+              const label = ACCOM_LABEL[a.type] ?? a.type
+              const mapsUrl = a.lat && a.lng ? `https://maps.google.com/?q=${a.lat},${a.lng}` : undefined
+              return (
+                <div key={a.id} style={{ background: '#fff', borderRadius: 16, border: '1px solid rgba(0,0,0,0.07)', padding: '14px 16px', boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
+                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+                    <span style={{ fontSize: 24, lineHeight: 1.2, flexShrink: 0 }}>{emoji}</span>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 14, fontWeight: 700, color: '#1C1C1A', marginBottom: 2 }}>{a.name}</div>
+                      <div style={{ fontSize: 11, color: '#9CA3AF', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{label}</div>
+                      {a.description && <div style={{ fontSize: 12, color: '#374151', lineHeight: 1.5, marginTop: 4 }}>{a.description}</div>}
+                    </div>
+                    {mapsUrl && <a href={mapsUrl} target="_blank" rel="noopener noreferrer" style={{ fontSize: 11, fontWeight: 700, color: '#fff', background: '#3A6B4F', padding: '6px 10px', borderRadius: 8, textDecoration: 'none', flexShrink: 0, alignSelf: 'center' }}>Maps ↗</a>}
+                  </div>
+                </div>
+              )
+            })}
+            <div style={{ height: 32 }} />
           </div>
         )}
 
@@ -663,7 +756,6 @@ function MActivityCard({ act, isAdded, onAdd, onRemove }: {
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8, marginBottom: 10 }}>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
           <MPill label={tag.label} color={tag.color} bg={tag.bg} />
-          {act.cost === 'free' && <MPill label="Free" color={GREEN} bg="#E8F5EE" />}
           {isAdded && <MPill label="In your plan" color={GREEN} bg="#E8F5EE" />}
         </div>
         {act.isHiddenGem && (
@@ -691,26 +783,44 @@ function MActivityCard({ act, isAdded, onAdd, onRemove }: {
           {openStatus.isOpen ? 'Open now' : `Closed${openStatus.nextOpen ? ` — opens ${openStatus.nextOpen}` : ''}`}
         </div>
       )}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-        <span style={{ fontSize: 12, color: '#9CA3AF', fontWeight: 500 }}>⏱ {act.duration}</span>
-        <div style={{ display: 'flex', gap: 8 }}>
-          {websiteUrl && (
-            <a href={websiteUrl} target="_blank" rel="noopener noreferrer" style={{ fontSize: 13, fontWeight: 700, color: '#374151', background: '#F5F4F1', border: '1px solid rgba(0,0,0,0.1)', padding: '9px 14px', borderRadius: 100, textDecoration: 'none' }}>Website ↗</a>
-          )}
-          <a href={mapsUrl} target="_blank" rel="noopener noreferrer" style={{ fontSize: 13, fontWeight: 700, color: '#fff', background: '#1C1B1F', padding: '9px 16px', borderRadius: 100, textDecoration: 'none' }}>Open in Maps ↗</a>
-          {onAdd && !isAdded && (
-            <button onClick={onAdd} style={{ fontSize: 13, fontWeight: 700, color: GREEN, background: '#E8F5EE', border: `1.5px solid rgba(58,107,79,0.4)`, padding: '9px 16px', borderRadius: 100, cursor: 'pointer' }}>+ Plan it</button>
-          )}
-          {onRemove && isAdded && (
-            <button onClick={onRemove} style={{ fontSize: 13, fontWeight: 700, color: '#B91C1C', background: '#FEF2F2', border: '1.5px solid rgba(220,38,38,0.25)', padding: '9px 14px', borderRadius: 100, cursor: 'pointer' }}>Remove</button>
-          )}
-        </div>
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'nowrap' }}>
+        {websiteUrl && (
+          <a href={websiteUrl} target="_blank" rel="noopener noreferrer" style={{ fontSize: 12, fontWeight: 700, color: '#374151', background: '#F5F4F1', border: '1px solid rgba(0,0,0,0.1)', padding: '9px 14px', borderRadius: 100, textDecoration: 'none', whiteSpace: 'nowrap' }}>Website</a>
+        )}
+        <a href={mapsUrl} target="_blank" rel="noopener noreferrer" style={{ fontSize: 12, fontWeight: 700, color: '#fff', background: '#1C1B1F', padding: '9px 16px', borderRadius: 100, textDecoration: 'none', whiteSpace: 'nowrap' }}>Open in Maps</a>
+        {onAdd && !isAdded && (
+          <button onClick={onAdd} style={{ fontSize: 12, fontWeight: 700, color: GREEN, background: '#E8F5EE', border: `1.5px solid rgba(58,107,79,0.4)`, padding: '9px 14px', borderRadius: 100, cursor: 'pointer', whiteSpace: 'nowrap' }}>+ Plan it</button>
+        )}
+        {onRemove && isAdded && (
+          <button onClick={onRemove} style={{ fontSize: 12, fontWeight: 700, color: '#B91C1C', background: '#FEF2F2', border: '1.5px solid rgba(220,38,38,0.25)', padding: '9px 14px', borderRadius: 100, cursor: 'pointer', whiteSpace: 'nowrap' }}>Remove</button>
+        )}
       </div>
     </div>
   )
 }
 
 // ── POI card ──────────────────────────────────────────────────────────────────
+
+function MFoodCard({ f, emoji, cfg }: { f: import('@/hooks/usePlannerData').DbFoodPlace; emoji: string; cfg: { color: string; bg: string } }) {
+  const website = (f.attributes as Record<string,unknown>)?.website_uri as string | undefined ?? f.website ?? undefined
+  const mapsUrl = f.lat && f.lng ? `https://maps.google.com/?q=${f.lat},${f.lng}` : undefined
+  return (
+    <div style={{ background: '#fff', borderRadius: 16, border: '1px solid rgba(0,0,0,0.07)', padding: '14px', boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
+      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+        <div style={{ width: 40, height: 40, borderRadius: 10, flexShrink: 0, background: cfg.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20 }}>{emoji}</div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 14, fontWeight: 700, color: '#1C1C1A', marginBottom: 3 }}>{f.name}</div>
+          <span style={{ display: 'inline-block', fontSize: 10, fontWeight: 700, color: cfg.color, background: cfg.bg, padding: '2px 8px', borderRadius: 20, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: f.description ? 5 : 0 }}>{f.category}</span>
+          {f.description && <div style={{ fontSize: 12, color: '#374151', lineHeight: 1.5, marginTop: 2 }}>{f.description}</div>}
+        </div>
+      </div>
+      <div style={{ display: 'flex', gap: 7, marginTop: 12 }}>
+        {mapsUrl && <a href={mapsUrl} target="_blank" rel="noopener noreferrer" style={{ fontSize: 12, fontWeight: 700, color: '#fff', background: '#1C1B1F', padding: '8px 14px', borderRadius: 100, textDecoration: 'none', whiteSpace: 'nowrap' }}>Open in Maps</a>}
+        {website && <a href={website.startsWith('http') ? website : `https://${website}`} target="_blank" rel="noopener noreferrer" style={{ fontSize: 12, fontWeight: 700, color: '#374151', background: '#F5F4F1', border: '1px solid rgba(0,0,0,0.1)', padding: '8px 14px', borderRadius: 100, textDecoration: 'none', whiteSpace: 'nowrap' }}>Website</a>}
+      </div>
+    </div>
+  )
+}
 
 function MPoiCard({ poi }: { poi: LivePOI }) {
   const tag = POI_TAG[poi.type]

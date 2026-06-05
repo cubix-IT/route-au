@@ -28,7 +28,7 @@ const REFRESH_DAYS = 28    // re-enrich each destination once a month
 
 // ── Usage hard limits ────────────────────────────────────────────────────────
 const OVERPASS_DAILY_LIMIT  = 9_000   // stop run if daily total hits this
-const OVERPASS_TIMEOUT_MS   = 10_000  // stop run if a query takes longer (node-only queries ~5s)
+const OVERPASS_TIMEOUT_MS   = 7_000   // 7s per mirror × 5 mirrors = 35s worst case, fits in 60s limit
 const WIKIPEDIA_SLEEP_MS    = 350     // min gap between Wikipedia calls
 const USER_AGENT = 'UnplannedEscapes/1.0 (unplanned-escapes.vercel.app; contact@unplannedescapes.com.au)'
 
@@ -111,6 +111,10 @@ function activityCategory(tags: Record<string,string>, name: string): string {
   if (/winery|cellar door|vineyard|wine tasting/.test(n))                 return 'winery'
   if (/brewery|brewpub|brew house|craft beer/.test(n))                    return 'brewery'
   if (/distillery|\bgin\b|whisky|whiskey|spirits/.test(n))                return 'distillery'
+  // Accommodation / food that slipped through — don't tag as nature
+  if (/hotel|motel|lodge|resort|inn\b|b&b|bed.and.breakfast|caravan park|campground|glamping/.test(n)) return 'relaxation'
+  if (/restaurant|cafe|bistro|eatery|dining|kitchen|pizza|burger|bbq|food/.test(n)) return 'food'
+  // Default to nature only for genuinely unclassified outdoor things
   return 'nature'
 }
 
@@ -167,11 +171,13 @@ interface UsageState {
 }
 
 const OVERPASS_ENDPOINT = 'https://overpass-api.de/api/interpreter'
-// Fallback mirrors tried in order when primary is slow/down
+// Mirrors tried in order — sourced from different operators/regions for resilience
 const OVERPASS_MIRRORS = [
-  'https://overpass-api.de/api/interpreter',
-  'https://overpass.kumi.systems/api/interpreter',
-  'https://overpass.private.coffee/api/interpreter',
+  'https://overpass-api.de/api/interpreter',          // main (Germany)
+  'https://overpass.kumi.systems/api/interpreter',    // kumi.systems (EU)
+  'https://overpass.private.coffee/api/interpreter',  // private.coffee (Austria)
+  'https://maps.mail.ru/osm/tools/overpass/api/interpreter', // mail.ru (Russia)
+  'https://overpass.openstreetmap.ru/api/interpreter', // OSM Russia
 ]
 
 async function getDailyOverpassCount(): Promise<number> {
@@ -204,8 +210,11 @@ async function fetchOverpass(
     try {
       const res = await fetch(endpoint, {
         method: 'POST',
-        body: query,
-        headers: { 'User-Agent': USER_AGENT },
+        body: `data=${encodeURIComponent(query)}`,
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'User-Agent': USER_AGENT,
+        },
         signal: AbortSignal.timeout(OVERPASS_TIMEOUT_MS),
       })
 
@@ -249,9 +258,8 @@ async function fetchOverpass(
     }
   }
 
-  // All mirrors failed for this query
   usage.overpassSlowCount++
-  if (usage.overpassSlowCount >= 3) {
+  if (usage.overpassSlowCount >= 2) {
     usage.stopped = true
     usage.stopReason = 'All Overpass mirrors failed — server outage, stopping run'
   }
@@ -681,14 +689,16 @@ out center tags ${limit};`
   if (!adminSupabase) return 0
   let upserted = 0
 
-  // Upsert activities
-  if (activities.length > 0) {
+  // Only store activities that have a description — no description = not notable enough
+  const qualityActivities = activities.filter(a => a.description && a.description.trim().length > 20)
+  if (qualityActivities.length > 0) {
     const { error } = await adminSupabase
       .from('activities')
-      .upsert(activities, { onConflict: 'slug', ignoreDuplicates: false })
-    if (!error) upserted += activities.length
+      .upsert(qualityActivities, { onConflict: 'slug', ignoreDuplicates: false })
+    if (!error) upserted += qualityActivities.length
     else console.error('[enrich] activities upsert error:', error.message)
   }
+  console.log(`[enrich] activities: ${activities.length} found, ${qualityActivities.length} had descriptions, ${activities.length - qualityActivities.length} skipped`)
 
   // Upsert food_places
   if (foods.length > 0) {

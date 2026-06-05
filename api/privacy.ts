@@ -70,7 +70,7 @@ export default function handler(_req: VercelRequest, res: VercelResponse) {
     <div class="prose">
       <p>We collect zero personal information. There are no accounts, no email sign-ups, and we have no way to identify who you are.</p>
       <p><strong>Your preferences</strong> (departure town, trip type, activity preferences) are stored only on your device using your browser's local storage. This data never leaves your device and is cleared when you start a new trip.</p>
-      <p><strong>No ads or tracking cookies.</strong> There are no advertising networks or tracking pixels on this site. We use <a href="https://vercel.com/analytics" target="_blank" rel="noopener noreferrer">Vercel Web Analytics</a> to understand how many people visit — this collects only anonymous page view counts with no personal data, no cookies, and no cross-site tracking. You cannot be identified from this data.</p>
+      <p><strong>No ads or tracking cookies.</strong> There are no advertising networks or tracking pixels on this site. We collect only anonymous page view counts to understand how many people visit — no personal data, no cookies, and no cross-site tracking. You cannot be identified from this data.</p>
     </div>
   </section>
 
@@ -96,6 +96,14 @@ export default function handler(_req: VercelRequest, res: VercelResponse) {
       <div class="source-group-label">Heritage &amp; History</div>
       <div class="source-entry">
         <div class="source-entry-header">
+          <a href="https://www.data.vic.gov.au" target="_blank" rel="noopener noreferrer">DataVic — Great Trails Victoria ↗</a>
+          <a href="https://creativecommons.org/licenses/by/4.0/" class="licence-badge" target="_blank" rel="noopener noreferrer">CC BY 4.0</a>
+        </div>
+        <p class="source-desc">Official trail geometry, waypoints, and facility data for 15 Great Trails Victoria — walking, cycling, and mountain bike trails. Published by the Department of Jobs, Skills, Industry and Regions.</p>
+        <p class="source-attr">© State of Victoria (Department of Jobs, Skills, Industry and Regions)</p>
+      </div>
+      <div class="source-entry">
+        <div class="source-entry-header">
           <a href="https://vhd.heritagecouncil.vic.gov.au" target="_blank" rel="noopener noreferrer">Victorian Heritage Database ↗</a>
           <a href="https://creativecommons.org/licenses/by/4.0/" class="licence-badge" target="_blank" rel="noopener noreferrer">CC BY 4.0</a>
         </div>
@@ -106,13 +114,6 @@ export default function handler(_req: VercelRequest, res: VercelResponse) {
 
     <div class="source-group">
       <div class="source-group-label">Maps &amp; Navigation</div>
-      <div class="source-entry">
-        <div class="source-entry-header">
-          <a href="https://maplibre.org" target="_blank" rel="noopener noreferrer">MapLibre GL JS ↗</a>
-          <a href="https://github.com/maplibre/maplibre-gl-js/blob/main/LICENSE.txt" class="licence-badge" target="_blank" rel="noopener noreferrer">BSD 3-Clause</a>
-        </div>
-        <p class="source-desc">Open-source map rendering engine used to display the interactive route map.</p>
-      </div>
       <div class="source-entry">
         <div class="source-entry-header">
           <a href="https://carto.com/basemaps" target="_blank" rel="noopener noreferrer">CARTO (Positron tiles) ↗</a>
@@ -185,59 +186,48 @@ export default function handler(_req: VercelRequest, res: VercelResponse) {
     </div>
 
     <div class="source-group">
-      <div class="source-group-label">Infrastructure</div>
+      <div class="source-group-label">Open Source — with thanks</div>
       <div class="source-entry">
         <div class="source-entry-header">
-          <a href="https://supabase.com" target="_blank" rel="noopener noreferrer">Supabase ↗</a>
-          <a href="https://supabase.com/privacy" class="licence-badge" target="_blank" rel="noopener noreferrer">Commercial — free tier</a>
-        </div>
-        <p class="source-desc">Database hosting our curated destination data, activities, food places, and nature spots. Hosted in Australia (Sydney region).</p>
-      </div>
-      <div class="source-entry">
-        <div class="source-entry-header">
-          <a href="https://vercel.com" target="_blank" rel="noopener noreferrer">Vercel ↗</a>
-          <a href="https://vercel.com/legal/privacy-policy" class="licence-badge" target="_blank" rel="noopener noreferrer">Commercial — free hobby tier</a>
-        </div>
-        <p class="source-desc">Hosts and serves this web application globally.</p>
-      </div>
-      <div class="source-entry">
-        <div class="source-entry-header">
-          <a href="https://vercel.com/analytics" target="_blank" rel="noopener noreferrer">Vercel Web Analytics ↗</a>
-          <a href="https://vercel.com/legal/privacy-policy" class="licence-badge" target="_blank" rel="noopener noreferrer">Commercial — free tier</a>
-        </div>
-        <p class="source-desc">Privacy-friendly page view analytics. Collects anonymous visit counts only — no cookies, no personal data, no cross-site tracking, and no way to identify individual users.</p>
-      </div>
-      <div class="source-entry">
-        <div class="source-entry-header">
-          <a href="https://www.anthropic.com" target="_blank" rel="noopener noreferrer">Anthropic Claude ↗</a>
-          <a href="https://www.anthropic.com/legal/privacy" class="licence-badge" target="_blank" rel="noopener noreferrer">Commercial — API</a>
-        </div>
-        <p class="source-desc">AI-generated destination summaries for some locations where no Wikipedia article exists. Used server-side only — your trip details are never sent to Claude.</p>
-      </div>
-    </div>
-
-    <div class="source-group">
-      <div class="source-group-label">Open Source Libraries</div>
-      <div class="source-entry">
-        <div class="source-entry-header">
-          <a href="https://react.dev" target="_blank" rel="noopener noreferrer">React, Vite, TypeScript ↗</a>
+          <a href="https://react.dev" target="_blank" rel="noopener noreferrer">React ↗</a>
           <a href="https://github.com/facebook/react/blob/main/LICENSE" class="licence-badge" target="_blank" rel="noopener noreferrer">MIT</a>
         </div>
-        <p class="source-desc">Frontend framework and build tooling.</p>
+        <p class="source-desc">UI framework powering the entire app.</p>
+      </div>
+      <div class="source-entry">
+        <div class="source-entry-header">
+          <a href="https://vitejs.dev" target="_blank" rel="noopener noreferrer">Vite ↗</a>
+          <a href="https://github.com/vitejs/vite/blob/main/LICENSE" class="licence-badge" target="_blank" rel="noopener noreferrer">MIT</a>
+        </div>
+        <p class="source-desc">Build tooling and development server.</p>
+      </div>
+      <div class="source-entry">
+        <div class="source-entry-header">
+          <a href="https://maplibre.org" target="_blank" rel="noopener noreferrer">MapLibre GL JS ↗</a>
+          <a href="https://github.com/maplibre/maplibre-gl-js/blob/main/LICENSE.txt" class="licence-badge" target="_blank" rel="noopener noreferrer">BSD 3-Clause</a>
+        </div>
+        <p class="source-desc">Open-source map rendering engine for the interactive route map.</p>
       </div>
       <div class="source-entry">
         <div class="source-entry-header">
           <a href="https://github.com/pmndrs/zustand" target="_blank" rel="noopener noreferrer">Zustand ↗</a>
           <a href="https://github.com/pmndrs/zustand/blob/main/LICENSE" class="licence-badge" target="_blank" rel="noopener noreferrer">MIT</a>
         </div>
-        <p class="source-desc">Lightweight state management for your trip preferences.</p>
+        <p class="source-desc">Lightweight state management.</p>
       </div>
       <div class="source-entry">
         <div class="source-entry-header">
           <a href="https://tailwindcss.com" target="_blank" rel="noopener noreferrer">Tailwind CSS ↗</a>
           <a href="https://github.com/tailwindlabs/tailwindcss/blob/master/LICENSE" class="licence-badge" target="_blank" rel="noopener noreferrer">MIT</a>
         </div>
-        <p class="source-desc">Utility-first CSS framework used for styling.</p>
+        <p class="source-desc">Utility-first CSS framework.</p>
+      </div>
+      <div class="source-entry">
+        <div class="source-entry-header">
+          <a href="https://project-osrm.org" target="_blank" rel="noopener noreferrer">OSRM ↗</a>
+          <a href="https://github.com/Project-OSRM/osrm-backend/blob/master/LICENSE" class="licence-badge" target="_blank" rel="noopener noreferrer">BSD 2-Clause</a>
+        </div>
+        <p class="source-desc">Road routing engine for drive time calculations and route geometry.</p>
       </div>
     </div>
   </section>

@@ -1,6 +1,6 @@
 # Logs
-logs
 *.log
+!logs/enrich-runs.jsonl
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
@@ -35,3 +35,4 @@ CODEBASE_AUDIT.txt
 PRODUCT_BRIEF.txt
 SESSION_PLAN.md
 .claudecode/
+data/*.pbf
