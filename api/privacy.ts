@@ -55,7 +55,7 @@ export default function handler(_req: VercelRequest, res: VercelResponse) {
 
 <main>
   <h1>About &amp; Privacy</h1>
-  <p class="updated">Last updated: June 2026</p>
+  <p class="updated">Last updated: June 2026 (v2 — Geofabrik enrichment, Food & Drinks tab, Stay tab)</p>
 
   <section>
     <h2>Why Unplanned Escapes Exists</h2>
@@ -87,8 +87,16 @@ export default function handler(_req: VercelRequest, res: VercelResponse) {
           <a href="https://www.openstreetmap.org" target="_blank" rel="noopener noreferrer">OpenStreetMap ↗</a>
           <a href="https://opendatacommons.org/licenses/odbl/" class="licence-badge" target="_blank" rel="noopener noreferrer">Open Database Licence (ODbL)</a>
         </div>
-        <p class="source-desc">The primary source for activities, food places, nature spots, and accommodation. OSM is a collaborative, community-built map of the world.</p>
+        <p class="source-desc">The primary source for activities, food & drink venues, nature spots, and accommodation. OSM is a collaborative, community-built map of the world.</p>
         <p class="source-attr">© OpenStreetMap contributors</p>
+      </div>
+      <div class="source-entry">
+        <div class="source-entry-header">
+          <a href="https://download.geofabrik.de/australia-oceania/australia/victoria.html" target="_blank" rel="noopener noreferrer">Geofabrik — Victoria Extract ↗</a>
+          <a href="https://opendatacommons.org/licenses/odbl/" class="licence-badge" target="_blank" rel="noopener noreferrer">Open Database Licence (ODbL)</a>
+        </div>
+        <p class="source-desc">We download and process the Victoria OpenStreetMap extract published by Geofabrik. This is used to enrich destination listings with local activities, wineries, breweries, restaurants, and natural features. No queries are sent to external APIs — all processing happens locally.</p>
+        <p class="source-attr">© Geofabrik GmbH · Data © OpenStreetMap contributors</p>
       </div>
     </div>
 
@@ -154,6 +162,13 @@ export default function handler(_req: VercelRequest, res: VercelResponse) {
           <a href="https://creativecommons.org/publicdomain/zero/1.0/" class="licence-badge" target="_blank" rel="noopener noreferrer">CC0 (public domain)</a>
         </div>
         <p class="source-desc">Structured data about tourist attractions — used to supplement activity listings.</p>
+      </div>
+      <div class="source-entry">
+        <div class="source-entry-header">
+          <a href="https://www.anthropic.com" target="_blank" rel="noopener noreferrer">Anthropic Claude Haiku ↗</a>
+          <span class="licence-badge">AI-generated · human-reviewed</span>
+        </div>
+        <p class="source-desc">Where Wikipedia does not have a description for a local place, we use Claude Haiku (Anthropic's AI) to generate a short, one-sentence description based on the place name, type, and location. No personal data is ever sent to Anthropic — only place names and categories.</p>
       </div>
     </div>
 
