@@ -12,6 +12,8 @@ export default defineConfig({
     tailwindcss(),
     VitePWA({
       registerType: 'autoUpdate',
+      // Disable PWA in CI/Vercel builds — vite-plugin-pwa@1.3.0 has rolldown compatibility issues
+      disable: process.env.CI === '1' || !!process.env.VERCEL,
       includeAssets: ['icons/*.png', 'favicon.ico', 'data/*.json'],
       workbox: {
         skipWaiting: true,
