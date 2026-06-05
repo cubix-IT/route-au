@@ -10,6 +10,12 @@ export default defineConfig({
   plugins: [
     react(),
     tailwindcss(),
+    // On Vercel: stub out virtual:pwa-register/react so App.tsx import doesn't break
+    ...(process.env.VERCEL ? [{
+      name: 'pwa-stub',
+      resolveId(id: string) { if (id === 'virtual:pwa-register/react') return id },
+      load(id: string) { if (id === 'virtual:pwa-register/react') return 'export const useRegisterSW = () => ({ updateServiceWorker: () => {} })' },
+    }] : []),
     // vite-plugin-pwa@1.3.0 has a rolldown compatibility issue in Vite 8 — skip on Vercel
     ...(process.env.VERCEL ? [] : [VitePWA({
       registerType: 'autoUpdate',
