@@ -590,18 +590,19 @@ async function enrichSubDest(
   await db.from('food_places').delete().eq('sub_dest_id', subDestId)
   await db.from('nature_spots').delete().eq('sub_dest_id', subDestId)
 
+  // Upsert (not insert) — POIs near destination boundaries share slugs across sub_dest_ids
   if (qualityActivities.length > 0) {
-    const { error } = await db.from('activities').insert(qualityActivities)
+    const { error } = await db.from('activities').upsert(qualityActivities, { onConflict: 'slug', ignoreDuplicates: false })
     if (!error) upserted += qualityActivities.length
     else console.error('  [err] activities:', error.message)
   }
   if (foods.length > 0) {
-    const { error } = await db.from('food_places').insert(foods)
+    const { error } = await db.from('food_places').upsert(foods, { onConflict: 'slug', ignoreDuplicates: false })
     if (!error) upserted += foods.length
     else console.error('  [err] food:', error.message)
   }
   if (nature.length > 0) {
-    const { error } = await db.from('nature_spots').insert(nature)
+    const { error } = await db.from('nature_spots').upsert(nature, { onConflict: 'slug', ignoreDuplicates: false })
     if (!error) upserted += nature.length
     else console.error('  [err] nature:', error.message)
   }
