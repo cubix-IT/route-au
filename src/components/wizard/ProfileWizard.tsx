@@ -754,7 +754,7 @@ function DestCard({ match, idx, isPicked, onPick, isHovered, onHover }: {
 
       {/* Name + region */}
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: 1 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: 2 }}>
           {idx === 0 && (
             <span style={{
               fontSize: 7.5, fontWeight: 800, color: '#B87333',
@@ -769,6 +769,11 @@ function DestCard({ match, idx, isPicked, onPick, isHovered, onHover }: {
         <div style={{ fontSize: 10.5, color: '#6B7280', marginTop: 1 }}>
           {match.cluster.name} · {driveLabel}
         </div>
+        {match.matchReasons.length > 0 && (
+          <div style={{ fontSize: 9.5, color: '#3A6B4F', marginTop: 3, lineHeight: 1.4 }}>
+            {match.matchReasons.slice(0, 2).join(' · ')}
+          </div>
+        )}
       </div>
 
       {/* Check */}
@@ -791,7 +796,38 @@ function StepPickDest({ suggestions, picked, onPick }: {
   onPick: (d: MatchedDest) => void
 }) {
   const [hoveredId, setHoveredId] = useState<string | null>(null)
-  const preview = picked ?? (hoveredId ? suggestions.find((s) => s.sub.id === hoveredId) ?? null : suggestions[0] ?? null)
+  const [search, setSearch] = useState('')
+  const [regionFilter, setRegionFilter] = useState<string | null>(null)
+
+  // All destinations across every cluster — used when searching or filtering by region
+  const allDests: MatchedDest[] = VICTORIAN_CLUSTERS.flatMap((cluster) =>
+    cluster.subDests.map((sub) => {
+      const existing = suggestions.find((s) => s.sub.id === sub.id)
+      return existing ?? { sub, cluster, score: 0, matchReasons: [] }
+    })
+  )
+
+  // All regions (always show all of Victoria)
+  const regions = VICTORIAN_CLUSTERS.map((c) => ({ id: c.id, name: c.name }))
+
+  const isSearching = search.trim().length > 0 || regionFilter !== null
+
+  // When searching/filtering: draw from allDests — matched suggestions first, then the rest
+  const matchedIds = new Set(suggestions.map((s) => s.sub.id))
+  const filtered = (isSearching ? allDests : suggestions).filter((s) => {
+    if (regionFilter && s.cluster.id !== regionFilter) return false
+    if (search.trim()) {
+      const q = search.toLowerCase()
+      return s.sub.name.toLowerCase().includes(q) || s.cluster.name.toLowerCase().includes(q)
+    }
+    return true
+  })
+  // Matched results first when browsing all
+  const sortedFiltered = isSearching
+    ? [...filtered].sort((a, b) => (matchedIds.has(b.sub.id) ? 1 : 0) - (matchedIds.has(a.sub.id) ? 1 : 0))
+    : filtered
+
+  const preview = picked ?? (hoveredId ? sortedFiltered.find((s) => s.sub.id === hoveredId) ?? null : sortedFiltered[0] ?? null)
 
   if (suggestions.length === 0) {
     return (
@@ -822,7 +858,7 @@ function StepPickDest({ suggestions, picked, onPick }: {
       {/* LEFT: Scrollable list */}
       <div style={{
         width: isMobile ? '100%' : 240,
-        maxHeight: isMobile ? 260 : undefined,
+        maxHeight: isMobile ? 320 : undefined,
         flexShrink: 0,
         display: 'flex',
         flexDirection: 'column',
@@ -831,27 +867,98 @@ function StepPickDest({ suggestions, picked, onPick }: {
         overflow: 'hidden',
         background: '#FAFAF9',
       }}>
-        <div style={{ padding: '16px 14px 10px' }}>
-          <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-0.2px' }}>
+        <div style={{ padding: '14px 14px 8px' }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-0.2px', marginBottom: 8 }}>
             Here's where you should go
           </div>
-          <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
-            {season.charAt(0).toUpperCase() + season.slice(1)} picks · hover to preview
-          </div>
+          {/* Search input */}
+          <input
+            type="search"
+            placeholder="Search destinations…"
+            value={search}
+            onChange={(e) => { setSearch(e.target.value); setRegionFilter(null) }}
+            style={{
+              width: '100%', boxSizing: 'border-box',
+              padding: '7px 10px', borderRadius: 8,
+              border: '1.5px solid var(--border)', background: '#fff',
+              fontSize: 12, color: 'var(--text-primary)', outline: 'none',
+            }}
+          />
         </div>
 
+        {/* Region filter chips */}
+        {!search && regions.length > 1 && (
+          <div style={{ display: 'flex', gap: 5, padding: '0 10px 8px', overflowX: 'auto', flexShrink: 0 }}>
+            <button
+              onClick={() => setRegionFilter(null)}
+              style={{
+                padding: '3px 10px', borderRadius: 12, flexShrink: 0,
+                fontSize: 10, fontWeight: 600, cursor: 'pointer',
+                background: regionFilter === null ? '#1C1B1F' : '#fff',
+                color: regionFilter === null ? '#fff' : '#6B7280',
+                border: `1.5px solid ${regionFilter === null ? '#1C1B1F' : 'var(--border)'}`,
+              }}
+            >All</button>
+            {regions.map((r) => (
+              <button
+                key={r.id}
+                onClick={() => setRegionFilter(r.id)}
+                style={{
+                  padding: '3px 10px', borderRadius: 12, flexShrink: 0,
+                  fontSize: 10, fontWeight: 600, cursor: 'pointer',
+                  background: regionFilter === r.id ? '#1C1B1F' : '#fff',
+                  color: regionFilter === r.id ? '#fff' : '#6B7280',
+                  border: `1.5px solid ${regionFilter === r.id ? '#1C1B1F' : 'var(--border)'}`,
+                }}
+              >{r.name}</button>
+            ))}
+          </div>
+        )}
+
+        {/* "We recommend" banner — shown when no search/filter active and top pick has reasons */}
+        {!search && !regionFilter && suggestions[0]?.matchReasons.length > 0 && (
+          <div style={{
+            margin: '0 10px 8px', padding: '8px 10px', borderRadius: 8,
+            background: 'linear-gradient(135deg, #F0FDF4, #ECFDF5)',
+            border: '1px solid rgba(58,107,79,0.2)',
+          }}>
+            <div style={{ fontSize: 9.5, fontWeight: 800, color: '#3A6B4F', letterSpacing: '0.06em', marginBottom: 2 }}>
+              WE RECOMMEND
+            </div>
+            <div style={{ fontSize: 12, fontWeight: 700, color: '#1C1B1F' }}>{suggestions[0].sub.name}</div>
+            <div style={{ fontSize: 10.5, color: '#6B7280', marginTop: 1 }}>
+              {suggestions[0].matchReasons.join(' · ')}
+            </div>
+          </div>
+        )}
+
         <div style={{ flex: 1, overflowY: 'auto', padding: '0 10px 14px', display: 'flex', flexDirection: 'column', gap: 7 }}>
-          {suggestions.map((match, idx) => (
-            <DestCard
-              key={match.sub.id}
-              match={match}
-              idx={idx}
-              isPicked={picked?.sub.id === match.sub.id}
-              onPick={() => onPick(match)}
-              isHovered={hoveredId === match.sub.id}
-              onHover={(hov) => setHoveredId(hov ? match.sub.id : null)}
-            />
-          ))}
+          {sortedFiltered.length === 0 ? (
+            <div style={{ padding: '20px 0', textAlign: 'center', fontSize: 12, color: 'var(--text-muted)' }}>
+              No destinations match "{search}"
+            </div>
+          ) : sortedFiltered.map((match, idx) => {
+            const isFirstUnmatched = isSearching && idx > 0
+              && !matchedIds.has(match.sub.id)
+              && matchedIds.has(sortedFiltered[idx - 1].sub.id)
+            return (
+              <div key={match.sub.id}>
+                {isFirstUnmatched && (
+                  <div style={{ fontSize: 9.5, fontWeight: 700, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.07em', margin: '8px 2px 4px' }}>
+                    Other destinations
+                  </div>
+                )}
+                <DestCard
+                  match={match}
+                  idx={matchedIds.has(match.sub.id) ? suggestions.findIndex((s) => s.sub.id === match.sub.id) : 999}
+                  isPicked={picked?.sub.id === match.sub.id}
+                  onPick={() => onPick(match)}
+                  isHovered={hoveredId === match.sub.id}
+                  onHover={(hov) => setHoveredId(hov ? match.sub.id : null)}
+                />
+              </div>
+            )
+          })}
         </div>
       </div>
 

@@ -36,6 +36,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     await loadTrails(false)
   }
 
+  // ?force=true — skip 7-day freshness check, target destinations with empty/missing summaries
+  const force = req.query.force === 'true' || req.query.force === '1'
+
   try {
     const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
 
@@ -45,16 +48,29 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       .limit(200)
     if (destErr) throw destErr
 
-    const { data: freshSummaries, error: sumErr } = await adminSupabase
-      .from('destination_summaries')
-      .select('sub_dest_id, updated_at')
-      .gt('updated_at', sevenDaysAgo)
-    if (sumErr) throw sumErr
-
-    const freshIds = new Set((freshSummaries ?? []).map((s) => s.sub_dest_id))
-    const toProcess = (allDests ?? [])
-      .filter((d) => !freshIds.has(d.sub_dest_id))
-      .slice(0, BATCH_LIMIT)
+    let toProcess: typeof allDests
+    if (force) {
+      // Target destinations with no summary row, or empty summary text
+      const { data: emptySummaries, error: emptyErr } = await adminSupabase
+        .from('destination_summaries')
+        .select('sub_dest_id, summary')
+      if (emptyErr) throw emptyErr
+      const goodIds = new Set(
+        (emptySummaries ?? [])
+          .filter((s) => s.summary && s.summary.trim().length > 50)
+          .map((s) => s.sub_dest_id)
+      )
+      toProcess = (allDests ?? []).filter((d) => !goodIds.has(d.sub_dest_id)).slice(0, BATCH_LIMIT)
+      console.log(`[summaries] force mode — ${toProcess?.length ?? 0} destinations need summaries`)
+    } else {
+      const { data: freshSummaries, error: sumErr } = await adminSupabase
+        .from('destination_summaries')
+        .select('sub_dest_id, updated_at')
+        .gt('updated_at', sevenDaysAgo)
+      if (sumErr) throw sumErr
+      const freshIds = new Set((freshSummaries ?? []).map((s) => s.sub_dest_id))
+      toProcess = (allDests ?? []).filter((d) => !freshIds.has(d.sub_dest_id)).slice(0, BATCH_LIMIT)
+    }
 
     for (const dest of toProcess) {
       try {

@@ -6,6 +6,7 @@ import { useWeather } from '@/hooks/useWeather'
 import type { LivePOI } from '@/lib/overpass'
 import type { HazardAlert } from '@/lib/vicEmergency'
 import type { Activity } from '@/data/victorianActivities.ts'
+import { ResultCard } from './ResultCard'
 
 const GREEN = '#3A6B4F'
 const WARM  = '#B87333'
@@ -140,6 +141,7 @@ export function MobilePlanner() {
   interface MFuelStop { label: string; station: { name: string; brand: string; address: string; lat: number; lng: number; pricePerLitre: number; distanceKm: number } | null; brandNotFound?: boolean }
   const [fuelStops, setFuelStops] = useState<MFuelStop[]>([])
   const [fuelLoading, setFuelLoading] = useState(false)
+  const [foodFilter, setFoodFilter] = useState('all')
 
   const hasFuel = !!(d.vehicleProfile && d.vehicleProfile.fuel_type !== 'Electric' && !(d.vehicleProfile as unknown as { skip_fuel?: boolean }).skip_fuel)
 
@@ -397,13 +399,35 @@ export function MobilePlanner() {
                       const rated = filteredActivities.filter(a => a.rating)
                       const unrated = filteredActivities.filter(a => !a.rating)
                       const primary = rated.length > 0 ? rated : filteredActivities
-                      const renderCard = (act: typeof filteredActivities[0]) => (
-                        <MActivityCard key={act.id} act={act}
-                          isAdded={d.addedActivities.some((a) => a.actId === act.id)}
-                          onAdd={() => d.addActivity({ actId: act.id, actName: act.name, emoji: act.emoji, dayNumber: 1 })}
-                          onRemove={() => d.removeActivity(act.id)}
-                        />
-                      )
+                      const renderCard = (act: typeof filteredActivities[0]) => {
+                        const tag = CAT_TAG[act.category] ?? { label: act.category, color: '#374151', bg: '#F3F4F6' }
+                        const driveMin = d.driveMinutes.get(
+                          act.id.startsWith('nature-')
+                            ? (d.dbNature.find(n => `nature-${n.nature_spot_id}` === act.id)?.slug ?? '')
+                            : (d.dbActivities.find(a => String(a.activity_id) === act.id)?.slug ?? '')
+                        ) ?? null
+                        return (
+                          <ResultCard
+                            key={act.id}
+                            name={act.name}
+                            categoryLabel={tag.label}
+                            categoryColor={tag.color}
+                            categoryBg={tag.bg}
+                            emoji={act.emoji}
+                            description={act.description}
+                            rating={act.rating}
+                            reviewCount={act.reviewCount}
+                            duration={act.duration}
+                            isHiddenGem={act.isHiddenGem}
+                            isAdded={d.addedActivities.some((a) => a.actId === act.id)}
+                            driveMinutes={driveMin}
+                            mapsUrl={act.mapsUrl}
+                            website={act.websiteUri && !act.websiteUri.includes('google.com') ? act.websiteUri : undefined}
+                            onAdd={() => d.addActivity({ actId: act.id, actName: act.name, emoji: act.emoji, dayNumber: 1 })}
+                            onRemove={() => d.removeActivity(act.id)}
+                          />
+                        )
+                      }
                       return (
                         <>
                           {primary.map(renderCard)}
@@ -509,7 +533,7 @@ export function MobilePlanner() {
             Bakery: { color: '#047857', bg: '#ECFDF5' },
           }
           const allFoods = d.dbFood ?? []
-          const [foodFilter, setFoodFilter] = React.useState('all')
+
           const availCats = [...new Set(allFoods.map(f => f.category))].sort((a, b) => {
             const order = ['Winery','Brewery','Distillery','Pub','Restaurant','Cafe','Bakery']
             return (order.indexOf(a) ?? 99) - (order.indexOf(b) ?? 99)
@@ -545,13 +569,21 @@ export function MobilePlanner() {
                 {drinks.length > 0 && (
                   <>
                     {foodFilter === 'all' && <div style={{ fontSize: 10, fontWeight: 700, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.08em', marginTop: 4 }}>🍷 Cellar Doors & Craft Drinks</div>}
-                    {drinks.map(f => <MFoodCard key={f.food_place_id} f={f} emoji={FOOD_EMOJI[f.category] ?? '🍽️'} cfg={FOOD_COLOR[f.category] ?? { color: '#374151', bg: '#F9FAFB' }} />)}
+                    {drinks.map(f => {
+                      const emoji = FOOD_EMOJI[f.category] ?? '🍽️'
+                      const cfg = FOOD_COLOR[f.category] ?? { color: '#374151', bg: '#F9FAFB' }
+                      return <ResultCard key={f.food_place_id} name={f.name} categoryLabel={f.category} categoryColor={cfg.color} categoryBg={cfg.bg} emoji={emoji} description={f.description ?? undefined} website={(f.attributes as any)?.website_uri ?? f.website ?? undefined} mapsUrl={`https://maps.google.com/?q=${f.lat},${f.lng}`} phone={f.phone ?? undefined} driveMinutes={d.driveMinutes.get(f.slug) ?? null} />
+                    })}
                   </>
                 )}
                 {foods.length > 0 && (
                   <>
                     {foodFilter === 'all' && drinks.length > 0 && <div style={{ fontSize: 10, fontWeight: 700, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.08em', marginTop: 6 }}>🍽️ Places to Eat</div>}
-                    {foods.map(f => <MFoodCard key={f.food_place_id} f={f} emoji={FOOD_EMOJI[f.category] ?? '🍽️'} cfg={FOOD_COLOR[f.category] ?? { color: '#374151', bg: '#F9FAFB' }} />)}
+                    {foods.map(f => {
+                      const emoji = FOOD_EMOJI[f.category] ?? '🍽️'
+                      const cfg = FOOD_COLOR[f.category] ?? { color: '#374151', bg: '#F9FAFB' }
+                      return <ResultCard key={f.food_place_id} name={f.name} categoryLabel={f.category} categoryColor={cfg.color} categoryBg={cfg.bg} emoji={emoji} description={f.description ?? undefined} website={(f.attributes as any)?.website_uri ?? f.website ?? undefined} mapsUrl={`https://maps.google.com/?q=${f.lat},${f.lng}`} phone={f.phone ?? undefined} driveMinutes={d.driveMinutes.get(f.slug) ?? null} />
+                    })}
                   </>
                 )}
                 <div style={{ height: 32 }} />

@@ -1,112 +1,113 @@
-import { useEffect, useRef, useCallback, useState } from 'react'
+import { useEffect, useRef, useCallback } from 'react'
 import maplibregl from 'maplibre-gl'
 import { MapView } from './MapView'
 import { useAppStore } from '@/store/useAppStore'
 import { CORRIDORS } from '@/data/corridors.ts'
 import type { Coordinate } from '@/types'
 
-const PIN_EMOJI: Record<string, string> = {
-  cafe: '☕', restaurant: '🍽', pub: '🍺', winery: '🍷',
-  bakery: '🥐', fast_food: '🥡', hiking: '🥾',
-  viewpoint: '👁', attraction: '🏛', campsite: '⛺', hotel: '🏨',
-}
-
-const PIN_COLOR: Record<string, string> = {
-  cafe: '#92400E', restaurant: '#B45309', pub: '#B87333', winery: '#7E22CE',
-  bakery: '#92400E', fast_food: '#9A3412', hiking: '#2563EB',
-  viewpoint: '#4338CA', attraction: '#7C3AED', campsite: '#047857', hotel: '#1D4ED8',
-}
-
 interface FuelStation {
-  id: string
-  name: string
-  brand: string
-  address: string
-  lat: number
-  lng: number
-  priceCents: number
-  pricePerLitre: number
-  distanceKm: number
+  id: string; name: string; brand: string; address: string
+  lat: number; lng: number; priceCents: number; pricePerLitre: number; distanceKm: number
 }
+
+// Stable ref to avoid re-creating markers on every render
+type MarkerEntry = { marker: maplibregl.Marker; el: HTMLElement; id: string }
 
 export function MapContainer() {
-  const [map, setMap] = useState<maplibregl.Map | null>(null)
-  const markersRef = useRef<maplibregl.Marker[]>([])
-  const pinMarkersRef = useRef<maplibregl.Marker[]>([])
-  const poiMarkersRef = useRef<maplibregl.Marker[]>([])
+  const mapRef = useRef<maplibregl.Map | null>(null)
+  const destMarkerRef = useRef<maplibregl.Marker | null>(null)
+  const poiMarkersRef = useRef<MarkerEntry[]>([])
   const fuelMarkersRef = useRef<maplibregl.Marker[]>([])
-  const { activeItinerary, nearbyPOIs, displayedMapPins, vehicleProfile, setSelectedPOI, setSelectedPinId } = useAppStore()
+  const legacyMarkersRef = useRef<maplibregl.Marker[]>([])
+
+  const {
+    activeItinerary, nearbyPOIs, displayedMapPins,
+    vehicleProfile, setSelectedPOI, selectedPinId, setSelectedPinId,
+  } = useAppStore()
 
   const handleMapReady = useCallback((m: maplibregl.Map) => {
-    setMap(m)
+    mapRef.current = m
   }, [])
 
-  // Focus map on destination when itinerary changes
+  // ── Destination pin + initial centering ──────────────────────────────────
   useEffect(() => {
+    const map = mapRef.current
     if (!map) return
 
-    pinMarkersRef.current.forEach((m) => m.remove())
-    pinMarkersRef.current = []
+    destMarkerRef.current?.remove()
+    destMarkerRef.current = null
 
     const destCoord = activeItinerary?.route?.waypoints.at(-1)?.coord
     if (!destCoord) return
 
-    // Destination marker — amber pin
-    const destEl = document.createElement('div')
-    destEl.innerHTML = `<div style="width:20px;height:26px;display:flex;align-items:center;justify-content:center">
+    const el = document.createElement('div')
+    el.innerHTML = `<div style="width:20px;height:26px;display:flex;align-items:center;justify-content:center">
       <svg viewBox="0 0 18 24" width="20" height="26" fill="none">
         <path d="M9 0C4 0 0 4 0 9c0 6.6 9 15 9 15s9-8.4 9-15c0-5-4-9-9-9z" fill="#B87333"/>
         <circle cx="9" cy="9" r="3.5" fill="#fff"/>
       </svg></div>`
-    const destLabel = activeItinerary?.route?.waypoints.at(-1)?.label ?? ''
-    pinMarkersRef.current.push(
-      new maplibregl.Marker({ element: destEl })
-        .setLngLat([destCoord.lng, destCoord.lat])
-        .setPopup(new maplibregl.Popup({ offset: 28, closeButton: false }).setText(destLabel))
-        .addTo(map)
-    )
 
-    // Zoom to destination area (~8km radius to show local pins)
-    const KM_PER_DEG = 111
-    const bufferDeg = 8 / KM_PER_DEG
+    const label = activeItinerary?.route?.waypoints.at(-1)?.label ?? ''
+    destMarkerRef.current = new maplibregl.Marker({ element: el })
+      .setLngLat([destCoord.lng, destCoord.lat])
+      .setPopup(new maplibregl.Popup({ offset: 28, closeButton: false }).setText(label))
+      .addTo(map)
+
+    // Centre on destination — no POI pins yet
+    const buf = 8 / 111
     map.fitBounds(
-      [[destCoord.lng - bufferDeg, destCoord.lat - bufferDeg], [destCoord.lng + bufferDeg, destCoord.lat + bufferDeg]],
+      [[destCoord.lng - buf, destCoord.lat - buf], [destCoord.lng + buf, destCoord.lat + buf]],
       { padding: { top: 55, bottom: 55, left: 35, right: 35 }, maxZoom: 14, duration: 900 }
     )
-  }, [map, activeItinerary])
+  }, [activeItinerary]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Reactive POI markers — updates when filter changes
+  // ── POI markers — rebuilt when pins change ────────────────────────────────
   useEffect(() => {
+    const map = mapRef.current
     if (!map) return
 
-    poiMarkersRef.current.forEach((m) => m.remove())
+    poiMarkersRef.current.forEach(({ marker }) => marker.remove())
     poiMarkersRef.current = []
 
+    if (displayedMapPins.length === 0) {
+      // No tab selected — re-centre on destination
+      const destCoord = activeItinerary?.route?.waypoints.at(-1)?.coord
+      if (destCoord) {
+        const buf = 8 / 111
+        map.fitBounds(
+          [[destCoord.lng - buf, destCoord.lat - buf], [destCoord.lng + buf, destCoord.lat + buf]],
+          { padding: { top: 55, bottom: 55, left: 35, right: 35 }, maxZoom: 14, duration: 700 }
+        )
+      }
+      return
+    }
+
+    const bounds = new maplibregl.LngLatBounds()
+    const destCoord = activeItinerary?.route?.waypoints.at(-1)?.coord
+    if (destCoord) bounds.extend([destCoord.lng, destCoord.lat])
+
     for (const pin of displayedMapPins) {
-      const emoji = PIN_EMOJI[pin.type] ?? '📍'
-      const color = PIN_COLOR[pin.type] ?? '#374151'
+      const emoji = pin.emoji ?? '📍'
 
       const el = document.createElement('div')
       el.style.cssText = `
-        width: 30px; height: 30px; border-radius: 50%;
-        background: white; border: 2.5px solid ${color};
-        display: flex; align-items: center; justify-content: center;
+        min-width: 30px; height: 30px; padding: 0 6px;
+        border-radius: 15px; background: white;
+        border: 2.5px solid #374151;
+        display: flex; align-items: center; justify-content: center; gap: 3px;
         font-size: 14px; cursor: pointer;
         box-shadow: 0 2px 8px rgba(0,0,0,0.18);
         transition: transform 0.12s, box-shadow 0.12s;
+        white-space: nowrap;
       `
       el.textContent = emoji
 
-      const typeLabel = pin.type.replace(/_/g, ' ')
-      const mapsUrl = pin.placeId
-        ? `https://www.google.com/maps/place/?q=place_id:${pin.placeId}`
-        : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(pin.name)}`
       const popup = new maplibregl.Popup({ offset: 18, closeButton: true, maxWidth: '220px', closeOnClick: false })
         .setHTML(`
           <div style="padding:4px 0;font-family:system-ui,sans-serif">
             <div style="font-size:13px;font-weight:700;color:#1C1C1A;line-height:1.3;margin-bottom:4px">${pin.name}</div>
-            <div style="font-size:11px;color:#8C8A87;margin-bottom:8px">${emoji} ${typeLabel}</div>
-            <a href="${mapsUrl}" target="_blank" rel="noopener noreferrer"
+            <div style="font-size:11px;color:#8C8A87;margin-bottom:8px">${emoji} ${pin.type}</div>
+            <a href="https://maps.google.com/?q=${pin.lat},${pin.lng}" target="_blank" rel="noopener noreferrer"
               style="display:inline-block;font-size:11px;font-weight:700;color:#fff;background:#1C1B1F;padding:5px 10px;border-radius:6px;text-decoration:none">
               Open in Maps ↗
             </a>
@@ -122,16 +123,41 @@ export function MapContainer() {
         e.stopPropagation()
         popup.addTo(map)
         setSelectedPinId(pin.id)
-        el.style.transform = 'scale(1.25)'
-        setTimeout(() => { el.style.transform = 'scale(1)' }, 200)
+        highlightMarker(el)
       })
 
-      poiMarkersRef.current.push(marker)
+      bounds.extend([pin.lng, pin.lat])
+      poiMarkersRef.current.push({ marker, el, id: pin.id })
     }
-  }, [map, displayedMapPins])
 
-  // Fuel station markers — cheapest near start, midpoint, destination
+    // Fit map to show all pins
+    if (!bounds.isEmpty()) {
+      map.fitBounds(bounds, {
+        padding: { top: 70, bottom: 70, left: 50, right: 50 },
+        maxZoom: 15, duration: 700,
+      })
+    }
+  }, [displayedMapPins]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Highlight selected pin when changed from card click ───────────────────
   useEffect(() => {
+    const map = mapRef.current
+    if (!selectedPinId || !map) return
+
+    const entry = poiMarkersRef.current.find((e) => e.id === selectedPinId)
+    if (!entry) return
+
+    // Highlight the marker
+    highlightMarker(entry.el)
+
+    // Fly to it and open popup
+    map.flyTo({ center: [entry.marker.getLngLat().lng, entry.marker.getLngLat().lat], zoom: Math.max(map.getZoom(), 14), duration: 500 })
+    entry.marker.getPopup()?.addTo(map)
+  }, [selectedPinId])
+
+  // ── Fuel markers ──────────────────────────────────────────────────────────
+  useEffect(() => {
+    const map = mapRef.current
     if (!map || !activeItinerary || !vehicleProfile) return
 
     fuelMarkersRef.current.forEach((m) => m.remove())
@@ -145,103 +171,80 @@ export function MapContainer() {
 
     const origin = waypoints[0].coord
     const dest = waypoints[waypoints.length - 1].coord
-
-    // Use corridor path_coordinates for accurate road-based fuel sampling
     const corridorIds = activeItinerary.route?.corridor_ids ?? []
     const roadPath: Coordinate[] = corridorIds.flatMap(id =>
       CORRIDORS.find(c => c.id === id)?.path_coordinates ?? []
     )
-    // Fallback to straight line if no corridor data
     const pathToSample = roadPath.length >= 3 ? roadPath : [origin, dest]
     const q1 = pathToSample[Math.floor(pathToSample.length * 0.33)]
     const q2 = pathToSample[Math.floor(pathToSample.length * 0.67)]
 
-    const SPOTS = [
-      { coord: q1,   label: 'early on route' },
-      { coord: q2,   label: 'later on route' },
+    ;[
+      { coord: q1, label: 'early on route' },
+      { coord: q2, label: 'later on route' },
       { coord: dest, label: 'near destination' },
-    ]
-
-    SPOTS.forEach(({ coord, label }) => {
+    ].forEach(({ coord, label }) => {
       const brand = (vehicleProfile as { fuel_brand?: string | null }).fuel_brand
       const brandQ = brand && brand !== 'Any' ? `&brand=${encodeURIComponent(brand)}` : ''
       fetch(`/api/fuel?lat=${coord.lat}&lng=${coord.lng}&fuelType=${vehicleProfile.fuel_type}&limit=1&radius=40${brandQ}`)
         .then((r) => r.json())
         .then((data) => {
           const st: FuelStation | undefined = (data as { stations: FuelStation[] }).stations?.[0]
-          if (!st) return
-
+          if (!st || !mapRef.current) return
           const el = document.createElement('div')
-          el.style.cssText = `
-            background: #fff; border: 2px solid #16A34A; border-radius: 8px;
-            padding: 3px 7px; display: flex; align-items: center; gap: 4px;
-            font-size: 11px; font-weight: 700; color: #16A34A;
-            cursor: pointer; box-shadow: 0 2px 8px rgba(0,0,0,0.18);
-            white-space: nowrap; transition: transform 0.12s;
-          `
+          el.style.cssText = `background:#fff;border:2px solid #16A34A;border-radius:8px;padding:3px 7px;display:flex;align-items:center;gap:4px;font-size:11px;font-weight:700;color:#16A34A;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,0.18);white-space:nowrap;transition:transform 0.12s`
           el.innerHTML = `⛽ $${st.pricePerLitre.toFixed(3)}`
-
           const popup = new maplibregl.Popup({ offset: 14, closeButton: true, maxWidth: '220px', closeOnClick: false })
-            .setHTML(`
-              <div style="padding:4px 0;font-family:system-ui,sans-serif">
-                <div style="font-size:12px;font-weight:700;color:#1C1C1A">${st.name}</div>
-                <div style="font-size:11px;color:#8C8A87;margin-top:2px">${st.address}</div>
-                <div style="font-size:18px;font-weight:800;color:#16A34A;margin-top:5px">$${st.pricePerLitre.toFixed(3)}<span style="font-size:10px;font-weight:500;color:#8C8A87">/L</span></div>
-                <div style="font-size:10px;color:#8C8A87;margin-top:2px">Cheapest ${label} · ${st.distanceKm} km away</div>
-              </div>
-            `)
-
-          const marker = new maplibregl.Marker({ element: el })
-            .setLngLat([st.lng, st.lat])
-            .setPopup(popup)
-            .addTo(map)
-
-          el.addEventListener('mouseenter', () => { el.style.transform = 'scale(1.1)'; popup.addTo(map) })
+            .setHTML(`<div style="padding:4px 0;font-family:system-ui,sans-serif"><div style="font-size:12px;font-weight:700;color:#1C1C1A">${st.name}</div><div style="font-size:11px;color:#8C8A87;margin-top:2px">${st.address}</div><div style="font-size:18px;font-weight:800;color:#16A34A;margin-top:5px">$${st.pricePerLitre.toFixed(3)}<span style="font-size:10px;font-weight:500;color:#8C8A87">/L</span></div><div style="font-size:10px;color:#8C8A87;margin-top:2px">Cheapest ${label} · ${st.distanceKm} km away</div></div>`)
+          const marker = new maplibregl.Marker({ element: el }).setLngLat([st.lng, st.lat]).setPopup(popup).addTo(mapRef.current)
+          el.addEventListener('mouseenter', () => { el.style.transform = 'scale(1.1)'; popup.addTo(mapRef.current!) })
           el.addEventListener('mouseleave', () => { el.style.transform = 'scale(1)'; popup.remove() })
-          el.addEventListener('click', (e) => { e.stopPropagation(); popup.addTo(map) })
-
+          el.addEventListener('click', (e) => { e.stopPropagation(); popup.addTo(mapRef.current!) })
           fuelMarkersRef.current.push(marker)
         })
         .catch(() => {})
     })
-  }, [map, activeItinerary, vehicleProfile])
+  }, [activeItinerary, vehicleProfile]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Legacy scored POI markers (from POI scoring system)
+  // ── Legacy scored POI markers ─────────────────────────────────────────────
   useEffect(() => {
+    const map = mapRef.current
     if (!map) return
-
-    markersRef.current.forEach((m) => m.remove())
-    markersRef.current = []
-
+    legacyMarkersRef.current.forEach((m) => m.remove())
+    legacyMarkersRef.current = []
     for (const poi of nearbyPOIs) {
       const el = document.createElement('div')
       el.className = 'poi-marker'
-      el.textContent = categoryEmoji(poi.category)
+      el.textContent = legacyEmoji(poi.category)
       el.addEventListener('click', () => setSelectedPOI(poi))
-
       const marker = new maplibregl.Marker({ element: el })
         .setLngLat([poi.coord.lng, poi.coord.lat])
-        .setPopup(
-          new maplibregl.Popup({ offset: 20, closeButton: false }).setHTML(
-            `<strong style="color:var(--text-primary)">${poi.name}</strong><br>
-             <span style="font-size:12px;color:var(--text-muted)">${poi.description.slice(0, 80)}…</span>`
-          )
-        )
+        .setPopup(new maplibregl.Popup({ offset: 20, closeButton: false }).setHTML(
+          `<strong style="color:var(--text-primary)">${poi.name}</strong><br><span style="font-size:12px;color:var(--text-muted)">${poi.description.slice(0, 80)}…</span>`
+        ))
         .addTo(map)
-
-      markersRef.current.push(marker)
+      legacyMarkersRef.current.push(marker)
     }
-  }, [map, nearbyPOIs, setSelectedPOI])
+  }, [nearbyPOIs, setSelectedPOI])
 
   return <MapView onMapReady={handleMapReady} />
 }
 
+function highlightMarker(el: HTMLElement) {
+  el.style.transform = 'scale(1.35)'
+  el.style.boxShadow = '0 4px 16px rgba(0,0,0,0.28)'
+  el.style.zIndex = '10'
+  setTimeout(() => {
+    el.style.transform = 'scale(1)'
+    el.style.boxShadow = '0 2px 8px rgba(0,0,0,0.18)'
+    el.style.zIndex = ''
+  }, 1500)
+}
 
-function categoryEmoji(cat: string): string {
+function legacyEmoji(cat: string): string {
   const m: Record<string, string> = {
-    Hiking: '🥾', Chilling: '🏖', Lookouts: '👁',
-    Photography: '📷', FreeCamping: '⛺', History: '🏛',
-    Wildlife: '🦘', Beach: '🌊',
+    Hiking: '🥾', Chilling: '🏖', Lookouts: '👁', Photography: '📷',
+    FreeCamping: '⛺', History: '🏛', Wildlife: '🦘', Beach: '🌊',
   }
   return m[cat] ?? '📍'
 }

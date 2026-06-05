@@ -7,6 +7,7 @@ import {
 } from '@/lib/overpass'
 import { fetchHazardsNear, type HazardAlert } from '@/lib/vicEmergency'
 import { captureError } from '@/lib/bugLogger'
+import { fetchDriveTimes } from '@/lib/osrmTable'
 import type { FuelType } from '@/types'
 import { getCurrentSeason, SEASON_META } from '@/utils/season'
 
@@ -238,6 +239,9 @@ export function usePlannerData() {
   const [dbAccommodation, setDbAccommodation] = useState<DbAccommodation[]>([])
   const [dbLoading, setDbLoading] = useState(false)
 
+  // Drive times from destCoord to each POI (slug → minutes), populated async after main fetch
+  const [driveMinutes, setDriveMinutes] = useState<Map<string, number>>(new Map())
+
   // Legacy live state (Overpass fallback + hazards)
   const [livePOIs, setLivePOIs] = useState<LivePOI[] | null>(null)
   const [wikiSummary, setWikiSummary] = useState<string | null>(null)
@@ -254,6 +258,7 @@ export function usePlannerData() {
     setDbNature([])
     setDbFood([])
     setDbAccommodation([])
+    setDriveMinutes(new Map())
     setLivePOIs(null)
     setWikiSummary(null)
     setDbLoading(true)
@@ -268,6 +273,22 @@ export function usePlannerData() {
         setDbFood(result.food)
         setDbAccommodation(result.accommodation)
         if (result.wikiSummary) setWikiSummary(result.wikiSummary)
+
+        // Async: compute drive times from destCoord to all POIs (OSRM table — one request)
+        // Used to filter far-away POIs (>45 min) and annotate cards with distance
+        const allPois = [
+          ...result.activities.filter(a => a.lat && a.lng).map(a => ({ slug: a.slug, lat: a.lat!, lng: a.lng! })),
+          ...result.food.filter(f => f.lat && f.lng).map(f => ({ slug: f.slug, lat: f.lat!, lng: f.lng! })),
+          ...result.nature.filter(n => n.lat && n.lng).map(n => ({ slug: n.slug, lat: n.lat!, lng: n.lng! })),
+        ]
+        if (allPois.length > 0 && destCoord) {
+          fetchDriveTimes(destCoord, allPois).then((times) => {
+            if (signal.aborted) return
+            const map = new Map<string, number>()
+            allPois.forEach((p, i) => { if (times[i] != null) map.set(p.slug, times[i]!) })
+            setDriveMinutes(map)
+          }).catch(() => {}) // non-critical — falls back to showing everything
+        }
       } else {
         console.warn('[usePlannerData] fetchDestinationFromDB returned null for', destId)
       }
@@ -343,6 +364,8 @@ export function usePlannerData() {
   // Descriptions masquerading as venue names (OSM tags, event blurbs, etc.)
   const JUNK_PHRASE_PATTERN = /\bat dusk\b|\bat dawn\b|\bat night\b|\bviewing area\b|\bwombats?\s+(at|near)\b/i
 
+  const DRINK_ACTIVITY_CATS = new Set(['winery', 'brewery', 'distillery', 'pub', 'bar', 'wine', 'wine_cellar', 'drink', 'food', 'restaurant', 'cafe', 'bakery'])
+
   const openActivities = useMemo(() => {
     const byStatus = dbActivities.filter((a) => {
       const attr = (a as unknown as { attributes?: Record<string, unknown> }).attributes ?? {}
@@ -351,6 +374,7 @@ export function usePlannerData() {
       if (!a.name || a.name.trim().length < 3) return false
       if (JUNK_ACT_PATTERN.test(a.name.trim())) return false
       if (JUNK_PHRASE_PATTERN.test(a.name)) return false
+      if (DRINK_ACTIVITY_CATS.has(a.category.toLowerCase())) return false  // food/drink lives in Food & Drinks tab
       return true
     })
     const seen = new Set<string>()
@@ -414,6 +438,8 @@ export function usePlannerData() {
     // DB data (primary — fast, comprehensive, closed places filtered)
     dbActivities: openActivities, dbNature: uniqueNature, dbFood, dbAccommodation, accommodationPOIs,
     dbLoading, dbActivityCount, dbAccomCount,
+    // Drive times from destination to each POI (slug → minutes). Empty map until OSRM responds.
+    driveMinutes,
     // legacy Overpass (fallback)
     livePOIs, wikiSummary,
     activityPOIs, naturePOIs, hazards,

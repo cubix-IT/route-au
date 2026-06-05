@@ -525,7 +525,7 @@ export const VICTORIAN_CLUSTERS: VicCluster[] = [
     themes: ['Beach', 'History', 'Surfing', 'Coastal'],
     seasonalScores: { summer: 9, autumn: 6, winter: 5, spring: 8 },
     image: '🏖️',
-    imageUrl: 'https://images.unsplash.com/photo-1664304431401-0c5c68a879e6?w=1200&q=80',
+    imageUrl: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=1200&q=80',
     gradientFrom: '#0a3a6a',
     gradientTo: '#1a6a5a',
     subDests: [
@@ -943,7 +943,7 @@ export const VICTORIAN_CLUSTERS: VicCluster[] = [
     themes: ['History', 'River', 'Paddle steamers', 'Wine'],
     seasonalScores: { summer: 6, autumn: 8, winter: 7, spring: 8 },
     image: '⛵',
-    imageUrl: 'https://images.unsplash.com/photo-1613223302051-f9b6f66680ac?w=1200&q=80',
+    imageUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=1200&q=80',
     gradientFrom: '#2a4a5a',
     gradientTo: '#4a6a3a',
     subDests: [
@@ -989,7 +989,7 @@ export const VICTORIAN_CLUSTERS: VicCluster[] = [
     themes: ['History', 'River', 'Food', 'Relaxation'],
     seasonalScores: { summer: 5, autumn: 7, winter: 8, spring: 7 },
     image: '🍊',
-    imageUrl: 'https://plus.unsplash.com/premium_photo-1726754728088-5d0949fb6dcf?w=1200&q=80',
+    imageUrl: 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=1200&q=80',
     gradientFrom: '#5a3a0a',
     gradientTo: '#7a5a1a',
     subDests: [
@@ -1035,7 +1035,7 @@ export const VICTORIAN_CLUSTERS: VicCluster[] = [
     themes: ['History', 'Food', 'Art', 'Family'],
     seasonalScores: { summer: 6, autumn: 7, winter: 7, spring: 7 },
     image: '⚙️',
-    imageUrl: 'https://images.unsplash.com/photo-1694517794266-ba945442cb36?w=1200&q=80',
+    imageUrl: 'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=1200&q=80',
     gradientFrom: '#3a2a0a',
     gradientTo: '#6a4a1a',
     subDests: [
@@ -1081,7 +1081,7 @@ export const VICTORIAN_CLUSTERS: VicCluster[] = [
     themes: ['Wine', 'Art', 'History', 'Food'],
     seasonalScores: { summer: 5, autumn: 8, winter: 7, spring: 7 },
     image: '🏛️',
-    imageUrl: 'https://images.unsplash.com/photo-1694356304049-9d2687ef24dd?w=1200&q=80',
+    imageUrl: 'https://images.unsplash.com/photo-1533929736458-ca588d08c8be?w=1200&q=80',
     gradientFrom: '#2a1a3a',
     gradientTo: '#4a2a5a',
     subDests: [

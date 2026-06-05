@@ -1,5 +1,10 @@
 # Changelog
 
+## 6 June 2026 (d38fef6)
+
+- **Geofabrik enrichment, Food & Drinks tab, Stay tab, UI polish**
+  Enrichment:
+
 ## 2 June 2026 (7a49bc1)
 
 - **Restore Haiku descriptions with spend docs + CLAUDE.md spend rules**

@@ -3,6 +3,7 @@ import { useAppStore } from '@/store/useAppStore'
 import type { PreselectedDest } from '@/store/useAppStore'
 import { getCurrentSeason } from '@/utils/season'
 import type { VicCluster, SubDest } from '@/data/victorianClusters.ts'
+import { VICTORIAN_CLUSTERS } from '@/data/victorianClusters.ts'
 import { useClusters } from '@/hooks/useClusters'
 import { useActivities } from '@/hooks/useActivities'
 import { DestinationModal } from './DestinationModal'
@@ -14,7 +15,7 @@ const season = getCurrentSeason()
 
 // ── Dest search — preloaded fuzzy ────────────────────────────────────
 
-interface SubDestResult { id: string; name: string; clusterSlug: string; lat: number; lng: number }
+interface SubDestResult { id: string; name: string; clusterSlug: string; clusterName: string; lat: number; lng: number }
 
 // Loaded once at startup, shared across all instances
 let ALL_DESTS: SubDestResult[] = []
@@ -28,10 +29,12 @@ async function preloadDestinations() {
     .select('slug, name, lat, lng, cluster_id')
     .limit(200)
   if (error) { console.warn('[preloadDests]', error); return }
+  const clusterNameMap = Object.fromEntries(VICTORIAN_CLUSTERS.map((c) => [c.id, c.name]))
   ALL_DESTS = (data ?? []).map((r) => ({
     id: r.slug as string,
     name: r.name as string,
     clusterSlug: String(r.cluster_id ?? ''),
+    clusterName: clusterNameMap[String(r.cluster_id ?? '')] ?? '',
     lat: r.lat as number,
     lng: r.lng as number,
   }))
@@ -67,19 +70,26 @@ function levenshtein(a: string, b: string): number {
 function fuzzyScore(query: string, dest: SubDestResult): number {
   const q = query.toLowerCase().trim()
   const name = dest.name.toLowerCase()
-  const nameClean = name.replace(/[^a-z0-9\s]/g, '') // strip &, – etc
+  const nameClean = name.replace(/[^a-z0-9\s]/g, '')
+  const cluster = dest.clusterName.toLowerCase()
 
   // Exact prefix — highest priority
   if (name.startsWith(q) || nameClean.startsWith(q)) return 1.0
 
-  // Substring match
+  // Cluster name match — region search (e.g. "Yarra Valley", "Mornington")
+  if (cluster.startsWith(q) || cluster.includes(q)) return 0.95
+
+  // Substring match on dest name
   if (name.includes(q) || nameClean.includes(q)) return 0.9
 
   // Each word in the destination starts with the query
   if (name.split(/[\s&–-]+/).some((w) => w.startsWith(q))) return 0.85
 
+  // Each word in cluster name starts with the query
+  if (cluster.split(/[\s&–-]+/).some((w) => w.startsWith(q))) return 0.8
+
   // Trigram similarity (handles transpositions, missing letters)
-  const tg = trigramSimilarity(q, name)
+  const tg = Math.max(trigramSimilarity(q, name), trigramSimilarity(q, cluster))
   if (tg > 0.35) return 0.4 + tg * 0.5
 
   // Levenshtein — allow 1 edit per 4 chars

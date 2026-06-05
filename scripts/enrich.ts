@@ -128,8 +128,9 @@ function foodCategory(tags: Record<string,string>, name: string): string {
   if (tags.amenity === 'winery' || tags.tourism === 'winery' || tags.craft === 'winery' || /winery|cellar door|vineyard/.test(n)) return 'Winery'
   if (tags.amenity === 'pub' || tags.amenity === 'bar' || tags.amenity === 'biergarten') return 'Pub'
   if (tags.shop === 'bakery' || tags.amenity === 'bakery' || /bakery|bakehouse|patisserie/.test(n)) return 'Bakery'
-  if (tags.amenity === 'cafe' || tags.shop === 'coffee' || tags.amenity === 'ice_cream') return 'Cafe'
-  if (tags.amenity === 'fast_food') return 'Cafe'
+  if (tags.amenity === 'ice_cream' || /ice.?cream|gelato|sorbet/.test(n)) return 'Cafe'
+  if (tags.amenity === 'cafe' || tags.shop === 'coffee') return 'Cafe'
+  if (tags.amenity === 'fast_food') return 'Restaurant'  // treat as restaurant, not cafe
   return 'Restaurant'
 }
 
@@ -484,6 +485,12 @@ async function enrichSubDest(
     const tags = el.tags
     const name_ = tags.name
     if (!name_) continue
+    // Skip names that are raw coordinates (e.g. "-38.123, 145.456" or "145.456,-38.123")
+    if (/^-?\d+\.\d+\s*[,;]\s*-?\d+\.\d+$/.test(name_.trim())) continue
+    // Skip very short, purely numeric, or single-word junk names
+    if (name_.trim().length < 4 || /^\d+$/.test(name_.trim())) continue
+    // Skip closed/former/demolished places
+    if (/\bclosed\b|\(closed\)|\bformer\b|\bdemolished\b|\bderelict\b|\babandon/i.test(name_)) continue
 
     const elSlug = `osm-${el.type}-${el.id}`
     if (seenSlugs.has(elSlug)) continue
@@ -509,9 +516,14 @@ async function enrichSubDest(
 
     if (cat === 'food') {
       if (!foodQualifies(tags)) continue
+      const foodCat = foodCategory(tags, name_)
+      const foodDesc = tags.description || null
+      // Quality gate: generic food (restaurants/cafes/pubs/bakeries) must have a description
+      const GENERIC_FOOD = new Set(['Restaurant', 'Cafe', 'Pub', 'Bakery'])
+      if (GENERIC_FOOD.has(foodCat) && !foodDesc) continue
       foods.push({
-        slug: elSlug, sub_dest_id: subDestId, name: name_, category: foodCategory(tags, name_),
-        description: tags.description || null, lat: el.lat, lng: el.lon, address,
+        slug: elSlug, sub_dest_id: subDestId, name: name_, category: foodCat,
+        description: foodDesc, lat: el.lat, lng: el.lon, address,
         attributes: { source:'static', opening_hours_text: tags.opening_hours || null, website_uri: website,
           cuisine: tags.cuisine?.split(';')[0] || null, wikipedia: tags.wikipedia || null,
           wikidata: tags.wikidata || null, quality_score: calcQualityScore(tags, 0) },
@@ -523,6 +535,8 @@ async function enrichSubDest(
       const isVisitor  = /national park|state park|regional park|state forest|conservation park|wilderness park|marine park|scenic reserve|natural features reserve|historic reserve|falls\b|waterfall|gorge|\blake\b|\blagoon\b|\breservoir\b|mineral spring|hot spring|\bbeach\b|\bocean\b|\bbay\b|botanic garden|lookout|summit track|heritage|^wombat|^mount\b|^mt\b/i.test(name_)
       if (/\b[A-Z]\d+\b/.test(name_) || /\bI\d+\b/.test(name_)) continue
       if (!hasContact && !hasDesc && !isVisitor) continue
+      // Quality gate: nature spots must have a description to be stored
+      if (!hasDesc) continue
       nature.push({
         slug: elSlug, sub_dest_id: subDestId, name: name_, type: natureType(tags),
         description: tags.description || null, lat: el.lat, lng: el.lon, address, source: 'static',

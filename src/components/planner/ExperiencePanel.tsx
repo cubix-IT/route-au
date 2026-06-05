@@ -8,6 +8,7 @@ import type { LivePOI, AccommodationPOI } from '@/lib/overpass'
 import type { HazardAlert } from '@/lib/vicEmergency'
 import type { Activity } from '@/data/victorianActivities'
 import type { GuardrailWarning } from '@/types'
+import { ResultCard } from './ResultCard'
 
 const GREEN = '#3A6B4F'
 const WARM  = '#B87333'
@@ -188,46 +189,71 @@ export function ExperiencePanel({ hideTimeline = false }: { hideTimeline?: boole
 
 
 
-  const syncMapPins = useCallback((_f: FilterMode, pois: LivePOI[], stops?: FuelStop[]) => {
+  const CAT_EMOJI_MAP: Record<string, string> = {
+    nature: '🌿', viewpoint: '🌄', history: '🏛️', art: '🎨', active: '🏄',
+    wildlife: '🦘', relaxation: '🧖', wellness: '♨️', beach: '🏖️',
+    entertainment: '🎵', markets: '🛒', family: '👨‍👩‍👧', hiking: '🥾',
+    Winery: '🍷', Brewery: '🍺', Distillery: '🥃', Pub: '🍻',
+    Restaurant: '🍽️', Cafe: '☕', Bakery: '🥐',
+    hotel: '🏨', motel: '🏨', campsite: '⛺', cabin: '🏕️',
+    caravan_park: '🚐', hostel: '🛏️', guest_house: '🏡',
+  }
+
+  const syncMapPins = useCallback((_f: FilterMode, _pois: LivePOI[], stops?: FuelStop[]) => {
+    if (_f === 'all') {
+      // Default view — no POI pins, just destination centred
+      setDisplayedMapPins([])
+      return
+    }
     if (_f === 'fuel') {
       setDisplayedMapPins((stops ?? []).filter((s) => s.station).map((s) => ({
         id: `fuel-${s.label}`, lat: s.station!.lat, lng: s.station!.lng,
-        type: 'attraction' as LivePOI['type'],
+        type: 'fuel', emoji: '⛽',
         name: `${s.station!.brand} — $${s.station!.pricePerLitre.toFixed(3)}/L (${s.label})`,
       })))
       return
     }
     if (_f === 'food') {
-      const pins = (d.dbFood ?? []).filter(f => f.lat && f.lng).slice(0, 20)
-      setDisplayedMapPins(pins.map(f => ({
-        id: `food-${f.food_place_id}`, lat: f.lat!, lng: f.lng!,
-        type: 'attraction' as LivePOI['type'], name: f.name,
-      })))
+      setDisplayedMapPins(
+        (d.dbFood ?? []).filter(f => f.lat && f.lng).map(f => ({
+          id: String(f.food_place_id),
+          lat: f.lat!, lng: f.lng!,
+          type: f.category,
+          emoji: CAT_EMOJI_MAP[f.category] ?? '🍽️',
+          name: f.name,
+        }))
+      )
       return
     }
     if (_f === 'stay') {
-      const pins = (d.accommodationPOIs ?? []).filter(a => a.lat && a.lng).slice(0, 20)
-      setDisplayedMapPins(pins.map(a => ({
-        id: `accom-${a.id}`, lat: a.lat!, lng: a.lng!,
-        type: 'attraction' as LivePOI['type'], name: a.name,
-      })))
+      setDisplayedMapPins(
+        (d.accommodationPOIs ?? []).filter(a => a.lat && a.lng).map(a => ({
+          id: a.id,
+          lat: a.lat!, lng: a.lng!,
+          type: a.type,
+          emoji: CAT_EMOJI_MAP[a.type] ?? '🏨',
+          name: a.name,
+        }))
+      )
       return
     }
-    // activities / all / trails — show activities + nature pins
-    const actPins = [
-      ...d.dbActivities.filter(a => a.lat && a.lng).slice(0, 12).map(a => ({
-        id: String(a.activity_id), lat: a.lat!, lng: a.lng!,
-        type: 'attraction' as LivePOI['type'], name: a.name,
+    // activities / trails tab — DB activities + nature
+    setDisplayedMapPins([
+      ...d.dbActivities.filter(a => a.lat && a.lng).map(a => ({
+        id: String(a.activity_id),
+        lat: a.lat!, lng: a.lng!,
+        type: a.category,
+        emoji: CAT_EMOJI_MAP[a.category] ?? a.emoji ?? '📍',
+        name: a.name,
       })),
-      ...d.dbNature.filter(n => n.lat && n.lng).slice(0, 8).map(n => ({
-        id: `nature-${n.nature_spot_id}`, lat: n.lat!, lng: n.lng!,
-        type: (n.type === 'viewpoint' ? 'viewpoint' : 'attraction') as LivePOI['type'], name: n.name,
+      ...d.dbNature.filter(n => n.lat && n.lng).map(n => ({
+        id: `nature-${n.nature_spot_id}`,
+        lat: n.lat!, lng: n.lng!,
+        type: n.type,
+        emoji: CAT_EMOJI_MAP[n.type] ?? '🌿',
+        name: n.name,
       })),
-    ]
-    if (actPins.length > 0) { setDisplayedMapPins(actPins); return }
-    const ACT_TYPES: LivePOI['type'][] = ['hiking', 'viewpoint', 'attraction', 'winery', 'brewery', 'distillery', 'pub']
-    const ap = pois.filter((p) => ACT_TYPES.includes(p.type) && p.lat && p.lng).slice(0, 10)
-    setDisplayedMapPins(ap.map((p) => ({ id: p.id, lat: p.lat!, lng: p.lng!, type: p.type, name: p.name })))
+    ])
   }, [d.dbActivities, d.dbNature, d.dbFood, d.accommodationPOIs]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const fetchFuelStops = useCallback(async () => {
@@ -279,15 +305,15 @@ export function ExperiencePanel({ hideTimeline = false }: { hideTimeline?: boole
     setActCategoryFilter('all')
     if (f === 'fuel') {
       const stops = fuelStops.length > 0 ? fuelStops : await fetchFuelStops()
-      syncMapPins(f, d.livePOIs ?? [], stops)
+      syncMapPins(f, [], stops)
     } else {
-      syncMapPins(f, d.livePOIs ?? [])
+      syncMapPins(f, [])
     }
     setShowAllActivities(false)
   }
 
   useEffect(() => {
-    syncMapPins(filter, d.livePOIs ?? [])
+    syncMapPins(filter, [])
   }, [d.dbActivities.length, d.dbNature.length, d.dbFood?.length, d.accommodationPOIs?.length, d.livePOIs]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Scroll to and highlight a POI card when selected via map pin click
@@ -434,9 +460,24 @@ export function ExperiencePanel({ hideTimeline = false }: { hideTimeline?: boole
             .slice(0, 6)
             .map(([cat]) => cat)
 
+          // Filter by drive time — exclude POIs >45 min from destination (only when OSRM has loaded)
+          const MAX_DRIVE_MIN = 45
+          const withinRange = (slug: string) => {
+            const mins = d.driveMinutes.get(slug)
+            return mins == null || mins <= MAX_DRIVE_MIN // null = OSRM not yet loaded, show all
+          }
+          const rangeFiltered = d.driveMinutes.size > 0
+            ? allThingsToDo.filter((a) => {
+                const slug = a.id.startsWith('nature-')
+                  ? (d.dbNature.find(n => `nature-${n.nature_spot_id}` === a.id)?.slug ?? '')
+                  : (d.dbActivities.find(act => String(act.activity_id) === a.id)?.slug ?? '')
+                return withinRange(slug)
+              })
+            : allThingsToDo
+
           const filtered = actCategoryFilter === 'all'
-            ? allThingsToDo
-            : allThingsToDo.filter((a) => a.category === actCategoryFilter)
+            ? rangeFiltered
+            : rangeFiltered.filter((a) => a.category === actCategoryFilter)
 
           const CAT_LABEL: Record<string, string> = {
             nature: '🌿 Nature', viewpoint: '🌄 Viewpoints', history: '🏛️ History',
@@ -481,18 +522,38 @@ export function ExperiencePanel({ hideTimeline = false }: { hideTimeline?: boole
                 const primary = ratedActs.length > 0 ? ratedActs : filtered
                 const displayed = showAllActivities ? primary : primary.slice(0, RESULT_LIMIT)
                 const hidden = primary.length - RESULT_LIMIT
-                const renderCard = (act: typeof filtered[0]) => (
-                  <ActivityCard
-                    key={act.id} act={act}
-                    expanded={expandedActId === act.id}
-                    highlighted={selectedPinId === act.id}
-                    onToggle={() => setExpandedActId(expandedActId === act.id ? null : act.id)}
-                    isAdded={addedActIds.has(act.id)}
-                    onAdd={() => d.addActivity({ actId: act.id, actName: act.name, emoji: act.emoji, dayNumber: 1 })}
-                    onRemove={() => d.removeActivity(act.id)}
-                    onMapPin={() => setSelectedPinId(act.id)}
-                  />
-                )
+                const renderCard = (act: typeof filtered[0]) => {
+                  const tag = CAT_TAG[act.category] ?? { label: act.category, color: '#374151', bg: '#F3F4F6' }
+                  const openStatus = getOpenStatus(act.openingHoursPeriods)
+                  const driveMin = act.id.startsWith('nature-')
+                    ? d.driveMinutes.get(d.dbNature.find(n => `nature-${n.nature_spot_id}` === act.id)?.slug ?? '') ?? null
+                    : d.driveMinutes.get(d.dbActivities.find(a => String(a.activity_id) === act.id)?.slug ?? '') ?? null
+                  return (
+                    <ResultCard
+                      key={act.id}
+                      name={act.name}
+                      categoryLabel={tag.label}
+                      categoryColor={tag.color}
+                      categoryBg={tag.bg}
+                      emoji={act.emoji}
+                      description={act.description}
+                      rating={act.rating}
+                      reviewCount={act.reviewCount}
+                      duration={act.duration}
+                      openStatus={openStatus}
+                      isHiddenGem={act.isHiddenGem}
+                      isAdded={addedActIds.has(act.id)}
+                      driveMinutes={driveMin}
+                      highlighted={selectedPinId === act.id}
+                      mapsUrl={act.mapsUrl || coordMapsUrl(act.name, (act as any).lat, (act as any).lng)}
+                      website={act.websiteUri && !act.websiteUri.includes('google.com') ? act.websiteUri : undefined}
+                      phone={(act as any).phone}
+                      onAdd={() => d.addActivity({ actId: act.id, actName: act.name, emoji: act.emoji, dayNumber: 1 })}
+                      onRemove={() => d.removeActivity(act.id)}
+                      onMapPin={() => setSelectedPinId(act.id)}
+                    />
+                  )
+                }
                 return (
                   <>
                     <div className="activity-grid" style={{ padding: '0 16px' }}>
@@ -518,47 +579,6 @@ export function ExperiencePanel({ hideTimeline = false }: { hideTimeline?: boole
           )
         })()}
 
-        {/* ── Drink venues from activities (wineries/breweries/distilleries tagged in OSM) ── */}
-        {(filter === 'all' || filter === 'activities') && (() => {
-          const DRINK_TYPES: LivePOI['type'][] = ['winery', 'brewery', 'distillery', 'pub']
-          const DRINK_CATS = new Set(['winery', 'brewery', 'distillery', 'pub', 'bar', 'wine', 'wine_cellar', 'drink'])
-          // Merge from Supabase activities (primary) + Overpass livePOIs (fallback)
-          const fromDB = d.dbActivities.filter((a) => DRINK_CATS.has(a.category.toLowerCase()))
-          const fromLive = (d.livePOIs ?? []).filter((p) => DRINK_TYPES.includes(p.type))
-          const hasDB = fromDB.length > 0
-          const hasLive = fromLive.length > 0
-          if (!hasDB && !hasLive) return null
-          return (
-            <SectionBlock
-              id="section-drinks"
-              title="Wineries & Breweries"
-              icon="🍷"
-              count={hasDB ? fromDB.length : fromLive.length}
-              loading={d.dbLoading}
-              empty={false}
-            >
-              <div style={{ padding: '0 16px', display: 'flex', flexDirection: 'column', gap: 8 }}>
-                {hasDB ? fromDB.map((a) => {
-                  const cat = a.category.toLowerCase()
-                  const cfg = CAT_TAG[cat] ?? CAT_TAG['winery']
-                  const emoji = cat === 'brewery' ? '🍺' : cat === 'distillery' ? '🥃' : cat === 'pub' ? '🍺' : '🍷'
-                  const website = (a.attributes as Record<string,unknown>)?.website as string | undefined
-                  const mapsUrl = safeMapsUrl(a.maps_url, a.name, (a as any).lat, (a as any).lng)
-                  return (
-                    <DrinkCard key={a.activity_id} name={a.name} emoji={emoji} cfg={cfg} website={website} mapsUrl={mapsUrl} />
-                  )
-                }) : fromLive.map((poi) => {
-                  const cfg = CAT_TAG[poi.type] ?? CAT_TAG['winery']
-                  const emoji = poi.type === 'brewery' ? '🍺' : poi.type === 'distillery' ? '🥃' : poi.type === 'pub' ? '🍺' : '🍷'
-                  const mapsUrl = coordMapsUrl(poi.name, poi.lat, poi.lng)
-                  return (
-                    <DrinkCard key={poi.id} name={poi.name} emoji={emoji} cfg={cfg} website={poi.website} mapsUrl={mapsUrl} />
-                  )
-                })}
-              </div>
-            </SectionBlock>
-          )
-        })()}
 
         {/* ── Food & Drinks ── */}
         {(filter === 'all' || filter === 'food') && (() => {
@@ -592,7 +612,10 @@ export function ExperiencePanel({ hideTimeline = false }: { hideTimeline?: boole
             return (order.indexOf(a) ?? 99) - (order.indexOf(b) ?? 99)
           })
 
-          const filtered = foodCatFilter === 'all' ? allFoods : allFoods.filter(f => f.category === foodCatFilter)
+          const rangeFilteredFood = d.driveMinutes.size > 0
+            ? allFoods.filter(f => { const m = d.driveMinutes.get(f.slug); return m == null || m <= 45 })
+            : allFoods
+          const filtered = foodCatFilter === 'all' ? rangeFilteredFood : rangeFilteredFood.filter(f => f.category === foodCatFilter)
 
           // Split: drink venues first, then food
           const drinkVenues = filtered.filter(f => DRINK_CATS.has(f.category))
@@ -609,42 +632,24 @@ export function ExperiencePanel({ hideTimeline = false }: { hideTimeline?: boole
             const cfg = FOOD_CAT_COLOR[f.category] ?? { color: '#374151', bg: '#F9FAFB' }
             const website = attr.website_uri ?? f.website ?? undefined
             const mapsUrl = coordMapsUrl(f.name, f.lat, f.lng)
+            const driveMin = d.driveMinutes.get(f.slug) ?? null
+            const cardId = String(f.food_place_id)
             return (
-              <div key={f.food_place_id} style={{
-                display: 'flex', alignItems: 'flex-start', gap: 12,
-                padding: '12px 14px', borderRadius: 12,
-                border: '1px solid var(--border)', background: 'var(--bg-card)',
-              }}>
-                <div style={{
-                  width: 40, height: 40, borderRadius: 10, flexShrink: 0,
-                  background: cfg.bg, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontSize: 20,
-                }}>{emoji}</div>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 3 }}>{f.name}</div>
-                  <span style={{
-                    display: 'inline-block', fontSize: 10, fontWeight: 700,
-                    color: cfg.color, background: cfg.bg,
-                    padding: '2px 8px', borderRadius: 20, marginBottom: f.description ? 5 : 0,
-                    textTransform: 'uppercase', letterSpacing: '0.05em',
-                  }}>{f.category}</span>
-                  {f.description && <div style={{ fontSize: 12, color: '#374151', lineHeight: 1.5, marginTop: 2 }}>{f.description}</div>}
-                  {attr.opening_hours_text && <div style={{ fontSize: 11, color: '#6B7280', marginTop: 4 }}>{attr.opening_hours_text}</div>}
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 5, flexShrink: 0, alignSelf: 'center' }}>
-                  {website && (
-                    <a href={website.startsWith('http') ? website : `https://${website}`} target="_blank" rel="noopener noreferrer" style={{
-                      padding: '5px 10px', borderRadius: 7, background: '#3A6B4F', color: '#fff',
-                      fontSize: 11, fontWeight: 600, textDecoration: 'none',
-                    }}>Web ↗</a>
-                  )}
-                  <a href={mapsUrl} target="_blank" rel="noopener noreferrer" style={{
-                    padding: '5px 10px', borderRadius: 7,
-                    background: 'var(--bg-muted)', border: '1px solid var(--border)',
-                    fontSize: 11, fontWeight: 600, color: 'var(--text-primary)', textDecoration: 'none',
-                  }}>Maps ↗</a>
-                </div>
-              </div>
+              <ResultCard
+                key={cardId}
+                name={f.name}
+                categoryLabel={f.category}
+                categoryColor={cfg.color}
+                categoryBg={cfg.bg}
+                emoji={emoji}
+                description={f.description ?? undefined}
+                driveMinutes={driveMin}
+                website={website}
+                mapsUrl={mapsUrl}
+                phone={f.phone ?? undefined}
+                highlighted={selectedPinId === cardId}
+                onMapPin={() => setSelectedPinId(cardId)}
+              />
             )
           }
 
@@ -677,16 +682,18 @@ export function ExperiencePanel({ hideTimeline = false }: { hideTimeline?: boole
                 </div>
               )}
 
-              <div style={{ padding: '0 16px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <div style={{ padding: '0 16px' }}>
                 {/* Drink venues: Wineries, Breweries, Distilleries — shown first */}
                 {showDrinks.length > 0 && (
                   <>
                     {filter === 'food' && foodCatFilter === 'all' && (
-                      <div style={{ fontSize: 11, fontWeight: 700, color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 2, marginTop: 4 }}>
+                      <div style={{ fontSize: 11, fontWeight: 700, color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 8, marginTop: 4 }}>
                         🍷 Cellar Doors & Craft Drinks
                       </div>
                     )}
-                    {showDrinks.map(renderFoodCard)}
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: showFood.length > 0 ? 12 : 0 }}>
+                      {showDrinks.map(renderFoodCard)}
+                    </div>
                   </>
                 )}
 
@@ -694,11 +701,13 @@ export function ExperiencePanel({ hideTimeline = false }: { hideTimeline?: boole
                 {showFood.length > 0 && (
                   <>
                     {filter === 'food' && foodCatFilter === 'all' && drinkVenues.length > 0 && (
-                      <div style={{ fontSize: 11, fontWeight: 700, color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.07em', marginTop: 8, marginBottom: 2 }}>
+                      <div style={{ fontSize: 11, fontWeight: 700, color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.07em', marginTop: 4, marginBottom: 8 }}>
                         🍽️ Places to Eat
                       </div>
                     )}
-                    {showFood.map(renderFoodCard)}
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                      {showFood.map(renderFoodCard)}
+                    </div>
                   </>
                 )}
 
@@ -802,9 +811,27 @@ export function ExperiencePanel({ hideTimeline = false }: { hideTimeline?: boole
             >
               <div style={{ padding: '0 16px', display: 'flex', flexDirection: 'column', gap: 10 }}>
                 <div className="activity-grid" style={{ gap: 8 }}>
-                  {displayed.map((poi) => (
-                    <AccommodationGridCard key={poi.id} poi={poi} destName={d.shortDest} />
-                  ))}
+                  {displayed.map((poi) => {
+                    const cfg = ACCOM_POI_CFG[poi.type] ?? ACCOM_POI_CFG['hotel']
+                    const attr = (poi as unknown as { attributes?: Record<string, unknown> }).attributes ?? {}
+                    const websiteUrl = (attr.website_uri as string | undefined) || poi.website || undefined
+                    return (
+                      <ResultCard
+                        key={poi.id}
+                        name={poi.name}
+                        categoryLabel={cfg.label}
+                        categoryColor={cfg.color}
+                        categoryBg={cfg.bg}
+                        emoji={cfg.emoji}
+                        description={poi.description}
+                        address={poi.address}
+                        mapsUrl={coordMapsUrl(poi.name, poi.lat, poi.lng)}
+                        website={websiteUrl}
+                        highlighted={selectedPinId === poi.id}
+                        onMapPin={() => setSelectedPinId(poi.id)}
+                      />
+                    )
+                  })}
                 </div>
                 {!showAllAccom && hiddenCount > 0 && (
                   <button onClick={() => setShowAllAccom(true)} style={{
@@ -896,41 +923,76 @@ export function ExperiencePanel({ hideTimeline = false }: { hideTimeline?: boole
 
 // ── Drink card ───────────────────────────────────────────────────────────────
 
-function DrinkCard({ name, emoji, cfg, website, mapsUrl }: {
-  name: string
+// ── Shared place card (food, drink, accommodation) ───────────────────────────
+
+function PlaceCard({ emoji, name, categoryLabel, categoryColor, categoryBg, description, website, mapsUrl, phone }: {
   emoji: string
-  cfg: { label: string; color: string; bg: string }
+  name: string
+  categoryLabel: string
+  categoryColor: string
+  categoryBg: string
+  description?: string
   website?: string
   mapsUrl: string
+  phone?: string
 }) {
-  const GREEN = '#3A6B4F'
+  const [expanded, setExpanded] = useState(false)
   return (
-    <div style={{
-      display: 'flex', alignItems: 'center', gap: 12,
-      padding: '12px 14px', borderRadius: 12,
-      border: '1px solid var(--border)', background: 'var(--bg-card)',
-    }}>
-      <span style={{ fontSize: 22, flexShrink: 0 }}>{emoji}</span>
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 3 }}>{name}</div>
-        <span style={{
-          display: 'inline-block', fontSize: 10, fontWeight: 700,
-          color: cfg.color, background: cfg.bg,
-          padding: '2px 7px', borderRadius: 6, textTransform: 'uppercase', letterSpacing: '0.05em',
-        }}>{cfg.label}</span>
+    <div
+      onClick={() => setExpanded((v) => !v)}
+      style={{
+        display: 'flex', flexDirection: 'column',
+        padding: '12px', borderRadius: 12, cursor: 'pointer',
+        border: `1.5px solid ${expanded ? 'rgba(58,107,79,0.35)' : 'var(--border)'}`,
+        background: expanded ? '#F8FBF9' : 'var(--bg-card)',
+        boxShadow: expanded ? '0 4px 16px rgba(0,0,0,0.08)' : '0 1px 3px rgba(0,0,0,0.04)',
+        transition: 'all 0.15s',
+      }}
+    >
+      {/* Header row */}
+      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+        <div style={{
+          width: 34, height: 34, borderRadius: 8, flexShrink: 0,
+          background: categoryBg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18,
+        }}>{emoji}</div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--text-primary)', lineHeight: 1.3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: expanded ? 'normal' : 'nowrap' }}>{name}</div>
+          <span style={{
+            display: 'inline-block', fontSize: 9.5, fontWeight: 700,
+            color: categoryColor, background: categoryBg,
+            padding: '1px 6px', borderRadius: 10, marginTop: 2,
+            textTransform: 'uppercase', letterSpacing: '0.05em',
+          }}>{categoryLabel}</span>
+        </div>
+        <span style={{ fontSize: 11, color: '#9CA3AF', flexShrink: 0, marginTop: 2, transition: 'transform 0.15s', transform: expanded ? 'rotate(180deg)' : 'none' }}>▾</span>
       </div>
-      <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+
+      {/* Description — collapsed: 2-line clamp; expanded: full */}
+      {description && (
+        <div style={{
+          fontSize: 11, color: '#6B7280', lineHeight: 1.45, marginTop: 7,
+          ...(expanded ? {} : { display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }),
+        }}>{description}</div>
+      )}
+
+      {/* Action buttons — always visible */}
+      <div style={{ display: 'flex', gap: 5, marginTop: 10 }} onClick={(e) => e.stopPropagation()}>
         {website && (
-          <a href={website} target="_blank" rel="noopener noreferrer" style={{
-            padding: '6px 12px', borderRadius: 8,
-            background: GREEN, color: '#fff',
-            fontSize: 12, fontWeight: 600, textDecoration: 'none',
-          }}>Website ↗</a>
+          <a href={website.startsWith('http') ? website : `https://${website}`} target="_blank" rel="noopener noreferrer" style={{
+            flex: 1, padding: '6px 0', borderRadius: 7, background: '#3A6B4F', color: '#fff',
+            fontSize: 11, fontWeight: 600, textDecoration: 'none', textAlign: 'center',
+          }}>Web ↗</a>
+        )}
+        {phone && expanded && (
+          <a href={`tel:${phone}`} target="_blank" rel="noopener noreferrer" style={{
+            padding: '6px 10px', borderRadius: 7, background: '#F0FDF4', border: '1px solid #BBF7D0',
+            fontSize: 11, fontWeight: 600, color: '#16A34A', textDecoration: 'none',
+          }}>📞</a>
         )}
         <a href={mapsUrl} target="_blank" rel="noopener noreferrer" style={{
-          padding: '6px 12px', borderRadius: 8,
+          flex: 1, padding: '6px 0', borderRadius: 7, textAlign: 'center',
           background: 'var(--bg-muted)', border: '1px solid var(--border)',
-          fontSize: 12, fontWeight: 600, color: 'var(--text-primary)', textDecoration: 'none',
+          fontSize: 11, fontWeight: 600, color: 'var(--text-primary)', textDecoration: 'none',
         }}>Maps ↗</a>
       </div>
     </div>

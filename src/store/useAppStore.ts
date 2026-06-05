@@ -137,9 +137,9 @@ interface AppState {
 
   // Map pin reactivity — updated when the ExperiencePanel filter changes
   activePOIFilter: string
-  displayedMapPins: Array<{ id: string; lat: number; lng: number; type: string; name: string; placeId?: string }>
+  displayedMapPins: Array<{ id: string; lat: number; lng: number; type: string; name: string; emoji?: string; placeId?: string }>
   setActivePOIFilter: (filter: string) => void
-  setDisplayedMapPins: (pins: Array<{ id: string; lat: number; lng: number; type: string; name: string; placeId?: string }>) => void
+  setDisplayedMapPins: (pins: Array<{ id: string; lat: number; lng: number; type: string; name: string; emoji?: string; placeId?: string }>) => void
 
   // Selected pin — set by map click, consumed by ExperiencePanel to scroll/highlight
   selectedPinId: string | null
