@@ -1,85 +1,128 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
-
 Victorian weekend getaway discovery app. Live at unplanned-escapes.vercel.app.
 Working directory: `/home/raj/unplanned-escapes`
 
 ## Commands
 
 ```bash
-npm run dev          # dev server → localhost:5174
-npm run build        # production build + type check
+npm run dev          # dev server → localhost:5173
+npm run build        # type check + production build
 npm run deploy       # build + deploy to Vercel prod + log to Supabase deploy_log
-npx tsc --noEmit     # type check only (run before every commit)
+npm run enrich       # enrich 8 stale destinations from Geofabrik PBF (local)
+npm run enrich -- --all --force   # re-enrich all 130 destinations
+npm run enrich -- --slug healesville  # single destination
 ```
 
 **Never use `vercel --prod` directly** — bypasses the `deploy_log` table in Supabase.
+
+## ⚠️ Vercel Config Requirements
+- **Node.js version must be 22.x** (set in Vercel dashboard → Build & Deployment)
+- Node 24 causes rolldown to fail with `UNLOADABLE_DEPENDENCY` on `src/data/` files
+- vite-plugin-pwa is disabled on Vercel builds (rolldown compat issue) — stubbed in `vite.config.ts`
 
 ## Architecture
 
 **Data flow:**
 ```
 User wizard → Zustand store (useAppStore) → usePlannerData hook
-  → Supabase (activities / food_places / nature_spots)   ← primary
-  → Overpass API (live OSM fallback if Supabase empty)   ← fallback
+  → Supabase (activities / food_places / nature_spots / accommodation)  ← primary
+  → Overpass API (live OSM fallback if Supabase empty)                  ← fallback
   → ExperiencePanel (desktop ≥768px) / MobilePlanner (mobile)
 ```
 
 **Key files:**
-- `src/store/useAppStore.ts` — single Zustand store, persisted to localStorage `unplanned-escapes-v4`. Scalar selectors only: `(s) => s.x`
-- `src/hooks/usePlannerData.ts` — main data hook; returns memoized `openActivities`, `uniqueNature`, `accommodationPOIs` — **must stay memoized** (unmemoized arrays cause infinite re-render loop, React error #185)
-- `src/components/wizard/ProfileWizard.tsx` → `src/hooks/useItineraryBuilder.ts` — wizard completion builds and sets `activeItinerary` in Zustand
-- `api/cron/enrich.ts` — daily Vercel cron; fetches Overpass + VHD + Wikipedia per destination, upserts to Supabase
+- `src/store/useAppStore.ts` — Zustand store, persisted to localStorage `unplanned-escapes-v4`. Scalar selectors only: `(s) => s.x`
+- `src/hooks/usePlannerData.ts` — main data hook; `openActivities`, `uniqueNature`, `dbFood`, `accommodationPOIs` — **must stay memoized** (unmemoized arrays → infinite re-render, React error #185)
+- `src/components/wizard/ProfileWizard.tsx` → `src/hooks/useItineraryBuilder.ts`
+- `src/components/planner/ExperiencePanel.tsx` — desktop result (tabs: Explore / Food & Drinks / Stay / Trails / Fuel)
+- `src/components/planner/MobilePlanner.tsx` — mobile result (tabs: Explore / Food & Drinks / Stay / Plan / Fuel)
+- `scripts/enrich.ts` — local enrichment script using Geofabrik PBF (replaces old Vercel cron)
 - `src/App.tsx` — `AppErrorBoundary` wraps everything; on crash clears localStorage and redirects home
-- `vercel.json` — cron schedules, route rewrites (`/privacy` → `api/privacy`, `/changelog` → `api/changelog`), function timeouts
+- `vercel.json` — 2 cron jobs (fuel + summaries), route rewrites
 
-**Serverless API routes** (`api/`): 12 functions max on Vercel Hobby. Currently at limit — removing one is required before adding any new function.
+**Serverless API routes** (`api/`): 12 functions max on Vercel Hobby.
 
-**State persistence:** `activeItinerary` is intentionally NOT persisted to localStorage (too large, caused 7MB bloat + QuotaExceededError). It is rebuilt each wizard run.
+**State persistence:** `activeItinerary` intentionally NOT persisted to localStorage (too large → QuotaExceededError).
 
 ## Critical Rules
 
-- **NO PAID APIs without Raj explicitly approving** — Google Places caused A$1,992 bill May 2026. Ask first, implement after "yes". No exceptions, even if cheap.
-- **Only approved paid service:** Anthropic Claude Haiku in enrichment cron (~$0.003/day). Raj's account is prepaid with no auto-reload.
-- **DB `source` column** — always `'static'` (CHECK constraint; `'osm'` and `'google'` will fail)
+- **NO PAID APIs without Raj explicitly approving** — Google Places caused A$1,992 bill May 2026. Ask first, implement after "yes". No exceptions.
+- **Only approved paid service:** Anthropic Claude Haiku in enrichment script (~$0.003/destination). Raj's account is prepaid, no auto-reload.
+- **DB `source` column** — always `'static'` (CHECK constraint)
 - **Activities `category`** — must be one of: `nature wildlife history art family active relaxation markets viewpoint beach wellness entertainment sports shopping food drink`
 - **Slug conventions:** OSM → `osm-<type>-<id>`, VHD heritage → `vhd-<id>`
+- **Maps URLs** — always coordinate format: `https://maps.google.com/?q=LAT,LNG`
 
-## Data Sources (all free + commercially licensed)
+## Enrichment (Geofabrik — replaces Overpass)
 
-| Source | Used for | Limit |
-|---|---|---|
-| Overpass (OSM) | Activities, food, nature | Hard stop at 9,000/day |
-| VHD API (`api.heritagecouncil.vic.gov.au`) | Heritage buildings | No auth, no limit |
-| MET Norway (`api.met.no`) | Weather forecasts | Fair use, CC licence |
-| Wikipedia REST | Descriptions + quality scores | 350ms sleep between calls |
-| Photon (Komoot) | Location autocomplete | No limit |
-| OSRM | Route geometry | No limit |
-| Service Victoria Fuel | Fuel prices | Key in `SERVICE_VIC_FUEL_KEY` env |
-| VicEmergency | Hazard alerts | No auth |
+Overpass removed 2026-06-06. All enrichment uses Geofabrik Victoria PBF.
 
-Full details: `@docs/data-sources.md`
+**Run locally:** `npm run enrich` (supports `--all`, `--force`, `--slug`, `--limit`, `--no-push`)
+
+**PBF file:** `data/victoria-latest.osm.pbf` (~224MB, gitignored, re-downloaded if >1 day old)
+
+**GitHub Actions:** `.github/workflows/enrich.yml` — weekly Sunday 2am AEST when laptop is off.
+Requires GitHub repo secrets: `VITE_SUPABASE_URL`, `SUPABASE_SERVICE_KEY`, `ANTHROPIC_API_KEY`
+
+**Quality gates:**
+- Activities: description required (>20 chars) — Wikipedia always overrides short OSM descriptions
+- Cafes/bakeries: Wikipedia tag required (notable places only)
+- Hotels/motels/resorts: filtered OUT of activities (live in `accommodation` table)
+- Animal enclosure labels (Dingo1, Koala etc.): filtered out
+- `natural=peak` → `active` category (hiking, not viewpoint)
+- Historic people/places (Ned Kelly, bushranger, capture) → `history`
+- Food-named attractions (cheese factory, dairy) → `food`
+- Delete-before-insert per destination (clean slate, no stale records)
+
+**Run log:** `logs/enrich-runs.jsonl` — appended and committed to GitHub after each run.
+
+## Cron Jobs (2 on Vercel Hobby)
+
+| Job | Schedule (UTC) | AEST | Does |
+|---|---|---|---|
+| fuel | `0 18 * * *` | 4am | Service Vic fuel prices |
+| summaries | `0 16 * * 0` | Sunday 2am | AI summaries + trails refresh (1st of month) |
+
+## Data Sources (all free)
+
+| Source | Used for |
+|---|---|
+| Geofabrik (OSM PBF) | All POI enrichment — no rate limits |
+| VHD API (`api.heritagecouncil.vic.gov.au`) | Heritage buildings |
+| Wikipedia REST | Descriptions + quality scores |
+| MET Norway (`api.met.no`) | Weather forecasts |
+| Photon (Komoot) | Location autocomplete |
+| OSRM | Route geometry |
+| Service Victoria Fuel | Fuel prices (`SERVICE_VIC_FUEL_KEY` env) |
+| VicEmergency | Hazard alerts |
 
 ## Database
 
 Supabase free tier, Sydney region, 500MB limit (~13MB used).
-Migrations live in `supabase/migrations/` — run manually in Supabase SQL Editor in order.
-Migration 006 (`006_auth_profiles_trips.sql`) written but **not yet run** in dashboard.
+Migrations in `supabase/migrations/` — run manually in Supabase SQL Editor in order.
+Migration 006 (`006_auth_profiles_trips.sql`) written but **not yet run** (auth not enabled).
 RLS enabled on all tables. Public read, service_role write only.
 
-Full schema + constraints: `@docs/database.md`
+## UI Tabs
 
-## Enrichment Cron
+**ExperiencePanel (desktop) and MobilePlanner (mobile) both have:**
+- 🗺 **Explore / Things to Do** — activities + nature, category filter chips
+- 🍽 **Food & Drinks** — drink venues first (Winery/Brewery/Distillery), then food; category filter chips
+- 🏨 **Stay** — accommodation with address, website or Google search fallback (no Booking.com)
+- 🥾 **Trails** — Great Trails Victoria (proximity 0.5° / ~55km)
+- ⛽ **Fuel** — Service Vic fuel stops on route
 
-Runs daily at 11am AEST, 8 destinations/batch, cycles all 139 destinations every ~17 days.
-Hard stops: 9k Overpass calls/day · 450MB DB · HTTP 429 · 2× timeout.
-Manual trigger: `curl -X POST "https://unplanned-escapes.vercel.app/api/cron/enrich?force=1&limit=8"`
-
-Full details: `@docs/enrichment-cron.md`
+Map pins update per active tab.
 
 ## Current Phase
 
 Phase 2 — Auth + Domain. Auth code written, awaiting Supabase dashboard setup (Google OAuth + migration 006). Custom domain `unplannedescapes.com.au` pending.
 
-Roadmap: `@docs/roadmap.md`
+## P1 Next Session
+1. Region search in wizard (Yarra Valley, Grampians etc.)
+2. Trigger summaries cron — 111/130 destinations missing summaries
+3. Missing banner images on some destinations
+4. Mobile: map on top, panel slides up when filter selected
+5. VicEmergency fire/hazard icons on map
+6. Read `/home/raj/Downloads/Ines Unplanned Escapes.docx` — UX feedback (desktop view)
