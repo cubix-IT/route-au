@@ -1147,11 +1147,11 @@ function ClusterCard({
             onClick={() => setSelectedSubIdx(i)}
             className={`mu-tab${i === selectedSubIdx ? ' mu-tab-active' : ''}`}
             style={{
-              padding: '6px 13px', borderRadius: 8,
-              background: i === selectedSubIdx ? GREEN : 'var(--bg-base)',
-              color: i === selectedSubIdx ? '#fff' : '#4A4948',
-              border: `1.5px solid ${i === selectedSubIdx ? GREEN : 'var(--border)'}`,
-              fontSize: 12, fontWeight: i === selectedSubIdx ? 700 : 500,
+              padding: '6px 14px', borderRadius: 20,
+              background: i === selectedSubIdx ? 'var(--green)' : 'var(--bg-base)',
+              color: i === selectedSubIdx ? '#fff' : 'var(--text-secondary)',
+              border: `2px solid ${i === selectedSubIdx ? 'var(--green)' : 'var(--border)'}`,
+              fontSize: 12, fontWeight: 600,
               cursor: 'pointer',
             }}
           >
