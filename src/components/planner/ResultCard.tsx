@@ -1,6 +1,7 @@
 import { useState } from 'react'
 
 const GREEN = '#3A6B4F'
+const SECONDARY = '#92400E' // warm amber — informational, pairs with forest green brand
 
 export interface ResultCardProps {
   // Identity
@@ -50,14 +51,13 @@ function DriveTimeBadge({ minutes }: { minutes: number }) {
   const hrs = Math.floor(minutes / 60)
   const mins = minutes % 60
   const label = hrs > 0 ? `${hrs}h ${mins}m` : `${mins} min`
-  const color = minutes <= 20 ? '#16A34A' : minutes <= 35 ? '#D97706' : '#6B7280'
-  const bg = minutes <= 20 ? '#F0FDF4' : minutes <= 35 ? '#FEF3C7' : '#F3F4F6'
   return (
     <span style={{
-      fontSize: 9.5, fontWeight: 700, color, background: bg,
-      padding: '2px 7px', borderRadius: 10, flexShrink: 0,
-      border: `1px solid ${color}30`,
-    }}>⏱ {label}</span>
+      fontSize: 10, fontWeight: 600, color: SECONDARY,
+      display: 'inline-flex', alignItems: 'center', gap: 3, flexShrink: 0,
+    }}>
+      <span style={{ fontSize: 9 }}>⏱</span>{label}
+    </span>
   )
 }
 
@@ -76,8 +76,8 @@ export function ResultCard({
     if (!expanded && onMapPin) onMapPin()
   }
 
-  const borderColor = highlighted ? '#3B82F6' : isAdded ? 'rgba(58,107,79,0.4)' : expanded ? 'rgba(58,107,79,0.35)' : 'var(--border)'
-  const bg = highlighted ? '#F0F9FF' : isAdded ? '#F0FDF4' : isHiddenGem ? '#F0FDF4' : expanded ? '#F8FBF9' : '#fff'
+  const borderColor = highlighted ? 'var(--green)' : isAdded ? 'rgba(146,64,14,0.25)' : expanded ? 'rgba(58,107,79,0.35)' : 'var(--border)'
+  const bg = highlighted ? 'var(--green-light)' : isAdded ? '#FFFBF5' : isHiddenGem ? '#F8FBF9' : expanded ? '#F8FBF9' : '#fff'
 
   return (
     <div
@@ -87,33 +87,38 @@ export function ResultCard({
         border: `1.5px solid ${borderColor}`,
         padding: '13px 15px', cursor: 'pointer',
         transition: 'all 0.15s',
-        boxShadow: highlighted ? '0 0 0 3px rgba(59,130,246,0.2)'
-          : isHiddenGem ? '0 2px 8px rgba(58,107,79,0.1)'
-          : expanded ? '0 4px 20px rgba(0,0,0,0.09)'
-          : '0 1px 3px rgba(0,0,0,0.04)',
+        boxShadow: highlighted ? '0 0 0 3px var(--green-glow)'
+          : isHiddenGem ? 'var(--shadow-sm)'
+          : expanded ? 'var(--shadow-md)'
+          : 'var(--shadow-sm)',
         transform: expanded ? 'translateY(-1px)' : 'none',
       }}
     >
       {/* ── Header row ── */}
       <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
         <div style={{ flex: 1, minWidth: 0 }}>
-          {/* Chips row — max 2 rows (#20) */}
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 5, alignItems: 'center', maxHeight: 44, overflow: 'hidden' }}>
-            <span style={{
-              display: 'inline-block', fontSize: 9.5, fontWeight: 600,
-              color: categoryColor, background: categoryBg,
-              padding: '2px 7px', borderRadius: 4,
-              textTransform: 'uppercase', letterSpacing: '0.06em',
-              border: `1px solid ${categoryColor}30`,
-            }}>{emoji ? `${emoji} ` : ''}{categoryLabel}</span>
-            {isAdded && <span style={{ fontSize: 9.5, fontWeight: 600, color: '#0369A1', background: '#E0F2FE', padding: '2px 7px', borderRadius: 4, border: '1px solid rgba(3,105,161,0.2)' }}>✓ In your plan</span>}
+          {/* Category label — flat text with dot, clearly not a button */}
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 5, alignItems: 'center' }}>
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 10, fontWeight: 600, color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.07em' }}>
+              <span style={{ width: 6, height: 6, borderRadius: '50%', background: categoryColor, flexShrink: 0, display: 'inline-block' }} />
+              {emoji ? `${emoji} ` : ''}{categoryLabel}
+            </span>
+            {isAdded && (
+              <span style={{ fontSize: 10, fontWeight: 600, color: SECONDARY, display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+                <span style={{ width: 6, height: 6, borderRadius: '50%', background: SECONDARY, flexShrink: 0, display: 'inline-block' }} />
+                In your plan
+              </span>
+            )}
             {badges.map((b) => (
-              <span key={b.label} style={{ fontSize: 9.5, fontWeight: 600, color: b.color, background: b.bg, padding: '2px 7px', borderRadius: 4, border: `1px solid ${b.color}25` }}>{b.label}</span>
+              <span key={b.label} style={{ fontSize: 10, fontWeight: 600, color: '#6B7280', display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+                <span style={{ width: 5, height: 5, borderRadius: '50%', background: b.color, flexShrink: 0, display: 'inline-block' }} />
+                {b.label}
+              </span>
             ))}
           </div>
 
           {/* Name */}
-          <div style={{ fontSize: 13.5, fontWeight: 700, color: '#1C1B1F', marginBottom: 3, lineHeight: 1.3 }}>{name}</div>
+          <div style={{ fontSize: 14, fontWeight: 700, color: '#1C1B1F', marginBottom: 3, lineHeight: 1.3 }}>{name}</div>
 
           {/* Rating */}
           {rating != null && <div style={{ marginBottom: 3 }}><StarRating rating={rating} count={reviewCount} /></div>}
@@ -148,7 +153,7 @@ export function ResultCard({
           )}
           {onMapPin && !isHiddenGem && (
             <button onClick={(e) => { e.stopPropagation(); onMapPin() }}
-              style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 13, color: highlighted ? '#3B82F6' : '#C8C4BD', padding: 0, lineHeight: 1 }}
+              style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 13, color: highlighted ? 'var(--green)' : '#C8C4BD', padding: 0, lineHeight: 1 }}
               title="Show on map">📍</button>
           )}
           <span style={{ fontSize: 12, color: '#9CA3AF', transition: 'transform 0.15s', transform: expanded ? 'rotate(180deg)' : 'none', marginTop: 2 }}>▾</span>

@@ -369,11 +369,11 @@ export function MobilePlanner() {
               setTab(t); setCatFilter('all')
               if (t === 'fuel' && fuelStops.length === 0) fetchFuel()
             }} style={{
-              padding: '10px 18px', borderRadius: 24, flexShrink: 0, whiteSpace: 'nowrap',
-              background: tab === t ? '#3A6B4F' : '#fff',
-              color: tab === t ? '#fff' : '#374151',
-              border: `2px solid ${tab === t ? '#3A6B4F' : '#E5E7EB'}`,
-              fontSize: 13, fontWeight: 600, cursor: 'pointer',
+              padding: '6px 14px', borderRadius: 20, flexShrink: 0, whiteSpace: 'nowrap',
+              background: tab === t ? 'var(--green)' : 'var(--bg-base)',
+              color: tab === t ? '#fff' : 'var(--text-secondary)',
+              border: `2px solid ${tab === t ? 'var(--green)' : 'var(--border)'}`,
+              fontSize: 12, fontWeight: 600, cursor: 'pointer',
               boxShadow: tab === t ? '0 2px 8px rgba(58,107,79,0.25)' : 'none',
             }}>{label}</button>
           ))}

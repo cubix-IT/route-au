@@ -485,14 +485,14 @@ export function ProfileWizard() {
         {/* Footer */}
         {!generating && (
           <div style={{ padding: '12px 24px 20px', borderTop: '1px solid var(--border)', display: 'flex', gap: 10, flexShrink: 0 }}>
-            <button onClick={handleBack} style={{
+            <button onClick={handleBack} className="mu-btn-ghost" style={{
               padding: '12px 16px', borderRadius: 10,
               background: 'var(--bg-muted)', border: '1px solid var(--border)',
               color: 'var(--text-muted)', fontSize: 13, cursor: 'pointer',
             }}>
               ← Back
             </button>
-            <button onClick={handleNext} disabled={!canContinue} style={{
+            <button onClick={handleNext} disabled={!canContinue} className={canContinue ? 'mu-btn-primary' : ''} style={{
               flex: 1, padding: '12px', borderRadius: 10,
               background: canContinue ? GREEN : 'var(--bg-muted)',
               border: canContinue ? 'none' : '1px solid var(--border)',

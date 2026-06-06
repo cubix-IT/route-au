@@ -385,10 +385,10 @@ export function ExperiencePanel({ hideTimeline = false }: { hideTimeline?: boole
           ...(d.vehicleProfile && d.vehicleProfile.fuel_type !== 'Electric' && !(d.vehicleProfile as unknown as { skip_fuel?: boolean }).skip_fuel ? [['fuel', '⛽ Fuel']] : []),
         ]) as [string, string][]).map(([f, label]) => (
           <button key={f} onClick={() => handleFilterChange(f as FilterMode)} style={{
-            padding: '8px 16px', borderRadius: 24, flexShrink: 0,
-            background: filter === f ? '#3A6B4F' : '#fff',
-            color: filter === f ? '#fff' : '#374151',
-            border: `2px solid ${filter === f ? '#3A6B4F' : '#E5E7EB'}`,
+            padding: '6px 14px', borderRadius: 20, flexShrink: 0,
+            background: filter === f ? 'var(--green)' : 'var(--bg-base)',
+            color: filter === f ? '#fff' : 'var(--text-secondary)',
+            border: `2px solid ${filter === f ? 'var(--green)' : 'var(--border)'}`,
             fontSize: 12, fontWeight: 600,
             cursor: 'pointer', whiteSpace: 'nowrap',
             boxShadow: filter === f ? '0 2px 8px rgba(58,107,79,0.25)' : 'none',
@@ -531,17 +531,17 @@ export function ExperiencePanel({ hideTimeline = false }: { hideTimeline?: boole
               {topCats.length > 1 && (
                 <div style={{ display: 'flex', gap: 6, padding: '0 16px 12px', overflowX: 'auto', flexShrink: 0 }}>
                   <button onClick={() => setActCategoryFilter('all')} style={{
-                    padding: '4px 12px', borderRadius: 16, flexShrink: 0, fontSize: 11, fontWeight: 600, cursor: 'pointer',
-                    background: actCategoryFilter === 'all' ? '#1C1B1F' : '#fff',
-                    color: actCategoryFilter === 'all' ? '#fff' : '#6B7280',
-                    border: `1.5px solid ${actCategoryFilter === 'all' ? '#1C1B1F' : 'var(--border)'}`,
+                    padding: '6px 14px', borderRadius: 20, flexShrink: 0, fontSize: 12, fontWeight: 600, cursor: 'pointer',
+                    background: actCategoryFilter === 'all' ? 'var(--green)' : 'var(--bg-base)',
+                    color: actCategoryFilter === 'all' ? '#fff' : 'var(--text-secondary)',
+                    border: `2px solid ${actCategoryFilter === 'all' ? 'var(--green)' : 'var(--border)'}`,
                   }}>All</button>
                   {topCats.map((cat) => (
                     <button key={cat} onClick={() => setActCategoryFilter(cat)} style={{
-                      padding: '4px 12px', borderRadius: 16, flexShrink: 0, fontSize: 11, fontWeight: 600, cursor: 'pointer',
-                      background: actCategoryFilter === cat ? '#1C1B1F' : '#fff',
-                      color: actCategoryFilter === cat ? '#fff' : '#6B7280',
-                      border: `1.5px solid ${actCategoryFilter === cat ? '#1C1B1F' : 'var(--border)'}`,
+                      padding: '6px 14px', borderRadius: 20, flexShrink: 0, fontSize: 12, fontWeight: 600, cursor: 'pointer',
+                      background: actCategoryFilter === cat ? 'var(--green)' : 'var(--bg-base)',
+                      color: actCategoryFilter === cat ? '#fff' : 'var(--text-secondary)',
+                      border: `2px solid ${actCategoryFilter === cat ? 'var(--green)' : 'var(--border)'}`,
                     }}>{CAT_LABEL[cat] ?? cat}</button>
                   ))}
                 </div>
@@ -697,17 +697,17 @@ export function ExperiencePanel({ hideTimeline = false }: { hideTimeline?: boole
               {filter === 'food' && availCats.length > 1 && (
                 <div style={{ display: 'flex', gap: 6, padding: '0 16px 12px', overflowX: 'auto', flexShrink: 0 }}>
                   <button onClick={() => setFoodCatFilter('all')} style={{
-                    padding: '4px 12px', borderRadius: 16, flexShrink: 0, fontSize: 11, fontWeight: 600, cursor: 'pointer',
-                    background: foodCatFilter === 'all' ? '#1C1B1F' : '#fff',
-                    color: foodCatFilter === 'all' ? '#fff' : '#6B7280',
-                    border: `1.5px solid ${foodCatFilter === 'all' ? '#1C1B1F' : 'var(--border)'}`,
+                    padding: '6px 14px', borderRadius: 20, flexShrink: 0, fontSize: 12, fontWeight: 600, cursor: 'pointer',
+                    background: foodCatFilter === 'all' ? 'var(--green)' : 'var(--bg-base)',
+                    color: foodCatFilter === 'all' ? '#fff' : 'var(--text-secondary)',
+                    border: `2px solid ${foodCatFilter === 'all' ? 'var(--green)' : 'var(--border)'}`,
                   }}>All</button>
                   {availCats.map(cat => (
                     <button key={cat} onClick={() => setFoodCatFilter(cat)} style={{
-                      padding: '4px 12px', borderRadius: 16, flexShrink: 0, fontSize: 11, fontWeight: 600, cursor: 'pointer',
-                      background: foodCatFilter === cat ? '#1C1B1F' : '#fff',
-                      color: foodCatFilter === cat ? '#fff' : '#6B7280',
-                      border: `1.5px solid ${foodCatFilter === cat ? '#1C1B1F' : 'var(--border)'}`,
+                      padding: '6px 14px', borderRadius: 20, flexShrink: 0, fontSize: 12, fontWeight: 600, cursor: 'pointer',
+                      background: foodCatFilter === cat ? 'var(--green)' : 'var(--bg-base)',
+                      color: foodCatFilter === cat ? '#fff' : 'var(--text-secondary)',
+                      border: `2px solid ${foodCatFilter === cat ? 'var(--green)' : 'var(--border)'}`,
                     }}>{FOOD_CAT_EMOJI[cat]} {cat}s</button>
                   ))}
                 </div>
@@ -1082,12 +1082,12 @@ function ActivityCard({ act, expanded, highlighted, onToggle, isAdded, onAdd, on
 
   return (
     <div data-poi-id={act.id} onClick={handleToggle} style={{
-      background: highlighted ? '#F0F9FF' : isAdded ? '#F0FDF4' : act.isHiddenGem ? '#F0FDF4' : '#fff',
+      background: highlighted ? 'var(--green-light)' : isAdded ? '#F0FDF4' : act.isHiddenGem ? '#F0FDF4' : '#fff',
       borderRadius: 14,
-      border: `1.5px solid ${highlighted ? '#3B82F6' : isAdded ? 'rgba(58,107,79,0.4)' : act.isHiddenGem ? 'rgba(58,107,79,0.25)' : 'var(--border)'}`,
+      border: `1.5px solid ${highlighted ? 'var(--green)' : isAdded ? 'rgba(58,107,79,0.4)' : act.isHiddenGem ? 'rgba(58,107,79,0.25)' : 'var(--border)'}`,
       padding: '13px 15px', cursor: 'pointer',
       transition: 'all 0.15s',
-      boxShadow: highlighted ? '0 0 0 3px rgba(59,130,246,0.2)' : act.isHiddenGem ? '0 2px 8px rgba(58,107,79,0.1)' : expanded ? '0 4px 20px rgba(0,0,0,0.09)' : '0 1px 3px rgba(0,0,0,0.04)',
+      boxShadow: highlighted ? '0 0 0 3px var(--green-glow)' : act.isHiddenGem ? 'var(--shadow-sm)' : expanded ? 'var(--shadow-md)' : 'var(--shadow-sm)',
       transform: expanded ? 'translateY(-1px)' : 'none',
     }}>
       <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
@@ -1122,7 +1122,7 @@ function ActivityCard({ act, expanded, highlighted, onToggle, isAdded, onAdd, on
                 <span style={{ fontSize: 9.5, fontWeight: 700, color: GREEN, letterSpacing: '0.02em' }}>Local gem</span>
               </span>
             : onMapPin && (
-                <button onClick={(e) => { e.stopPropagation(); onMapPin() }} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 13, color: highlighted ? '#3B82F6' : '#C8C4BD', padding: 0, lineHeight: 1 }} title="Show on map">📍</button>
+                <button onClick={(e) => { e.stopPropagation(); onMapPin() }} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 13, color: highlighted ? 'var(--green)' : '#C8C4BD', padding: 0, lineHeight: 1 }} title="Show on map">📍</button>
               )
           }
           <span style={{ fontSize: 12, color: '#9CA3AF', transition: 'transform 0.15s', transform: expanded ? 'rotate(180deg)' : 'none', marginTop: 2 }}>▾</span>
