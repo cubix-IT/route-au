@@ -79,17 +79,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const estimatedMB = Math.round(totalRows * 2 / 1024)
   const emailsMonth = emailCountRes.count ?? 0
 
-  const wantsHtml = req.headers.accept?.includes('text/html')
-  if (!wantsHtml) {
-    return res.status(200).json({
-      generated_at: now.toISOString(),
-      cron_jobs: cronJobs,
-      data: { activities: actRes.count, food_places: foodRes.count, nature_spots: natureRes.count },
-      overpass_today: overpassToday,
-      estimated_db_mb: estimatedMB,
-    })
-  }
-
   // Group sub-destinations by cluster
   const clusterMap = new Map(clusters.map(c => [c.cluster_id, c.name]))
   const byCluster: Record<string, typeof subDests> = {}
