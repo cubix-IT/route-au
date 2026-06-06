@@ -1682,31 +1682,123 @@ function StepPlanningDetails({
 
 function GeneratingScreen({ step, messages }: { step: number; messages: string[] }) {
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flex: 1, gap: 24 }}>
-      <div style={{ position: 'relative', width: 60, height: 60 }}>
-        <svg className="spin-slow" viewBox="0 0 60 60" fill="none" style={{ position: 'absolute', inset: 0 }}>
-          <circle cx="30" cy="30" r="26" stroke="var(--green-light)" strokeWidth="3" />
-          <path d="M30 4 A26 26 0 0 1 56 30" stroke={GREEN} strokeWidth="3" strokeLinecap="round" />
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flex: 1, gap: 20, padding: '0 24px' }}>
+
+      {/* Victorian landscape SVG animation */}
+      <div style={{ width: '100%', maxWidth: 380, borderRadius: 20, overflow: 'hidden', background: '#E8F3ED' }}>
+        <svg viewBox="0 0 380 160" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ display: 'block', width: '100%' }}>
+          <defs>
+            <style>{`
+              @keyframes drive { from { transform: translateX(-90px) } to { transform: translateX(420px) } }
+              @keyframes cloud1 { from { transform: translateX(0) } to { transform: translateX(-200px) } }
+              @keyframes cloud2 { from { transform: translateX(60px) } to { transform: translateX(-200px) } }
+              @keyframes treeSway { 0%,100% { transform-origin: bottom center; transform: rotate(-1deg) } 50% { transform: rotate(1.5deg) } }
+              @keyframes dustPuff { 0% { opacity: 0.6; transform: translateX(0) scale(1) } 100% { opacity: 0; transform: translateX(-18px) scale(2.5) } }
+              .car { animation: drive 3.2s cubic-bezier(0.4,0,0.6,1) infinite }
+              .cloud1 { animation: cloud1 18s linear infinite }
+              .cloud2 { animation: cloud2 26s linear infinite }
+              .tree1 { animation: treeSway 2.8s ease-in-out infinite }
+              .tree2 { animation: treeSway 3.4s ease-in-out infinite 0.6s }
+              .dust { animation: dustPuff 0.6s ease-out infinite }
+            `}</style>
+          </defs>
+
+          {/* Sky */}
+          <rect width="380" height="160" fill="#C8E6D8"/>
+
+          {/* Clouds */}
+          <g className="cloud1">
+            <ellipse cx="80" cy="38" rx="28" ry="12" fill="white" opacity="0.7"/>
+            <ellipse cx="100" cy="32" rx="18" ry="11" fill="white" opacity="0.7"/>
+            <ellipse cx="60" cy="34" rx="16" ry="9" fill="white" opacity="0.7"/>
+          </g>
+          <g className="cloud2">
+            <ellipse cx="280" cy="28" rx="22" ry="10" fill="white" opacity="0.5"/>
+            <ellipse cx="296" cy="23" rx="14" ry="9" fill="white" opacity="0.5"/>
+          </g>
+
+          {/* Far hills */}
+          <path d="M0 100 Q60 60 120 80 Q180 55 240 75 Q300 50 380 70 L380 160 L0 160Z" fill="#4A8C65" opacity="0.5"/>
+
+          {/* Mid hills */}
+          <path d="M0 115 Q50 85 110 100 Q170 78 230 95 Q290 70 380 90 L380 160 L0 160Z" fill="#3A6B4F" opacity="0.7"/>
+
+          {/* Ground */}
+          <path d="M0 130 Q95 118 190 128 Q285 115 380 125 L380 160 L0 160Z" fill="#2D5440"/>
+
+          {/* Road */}
+          <path d="M0 140 Q190 132 380 138 L380 145 Q190 137 0 145Z" fill="#1A3D2B" opacity="0.6"/>
+          {/* Road dashes */}
+          <rect x="40" y="141" width="30" height="2" rx="1" fill="#B7EDCA" opacity="0.5"/>
+          <rect x="120" y="140" width="30" height="2" rx="1" fill="#B7EDCA" opacity="0.5"/>
+          <rect x="200" y="141" width="30" height="2" rx="1" fill="#B7EDCA" opacity="0.5"/>
+          <rect x="280" y="140" width="30" height="2" rx="1" fill="#B7EDCA" opacity="0.5"/>
+
+          {/* Trees - background */}
+          <g className="tree1" style={{ transformOrigin: '310px 118px' }}>
+            <rect x="308" y="110" width="4" height="18" fill="#1A3D2B"/>
+            <ellipse cx="310" cy="104" rx="10" ry="12" fill="#2D5440"/>
+          </g>
+          <g className="tree2" style={{ transformOrigin: '330px 115px' }}>
+            <rect x="328" y="108" width="4" height="20" fill="#1A3D2B"/>
+            <ellipse cx="330" cy="102" rx="8" ry="10" fill="#3A6B4F"/>
+          </g>
+          <g style={{ transform: 'none' }}>
+            <rect x="348" y="112" width="3" height="16" fill="#1A3D2B"/>
+            <ellipse cx="349.5" cy="107" rx="7" ry="9" fill="#2D5440"/>
+          </g>
+
+          {/* Car group — animates across */}
+          <g className="car">
+            {/* Dust puff */}
+            <g className="dust" style={{ transformOrigin: '8px 138px' }}>
+              <ellipse cx="8" cy="138" rx="5" ry="3" fill="#B7EDCA" opacity="0.5"/>
+            </g>
+            {/* 4WD body */}
+            <rect x="14" y="124" width="52" height="18" rx="5" fill="#B87333"/>
+            {/* Cabin */}
+            <rect x="22" y="114" width="34" height="12" rx="4" fill="#92400E"/>
+            {/* Windows */}
+            <rect x="25" y="116" width="13" height="8" rx="2" fill="#C8E6D8" opacity="0.8"/>
+            <rect x="41" y="116" width="12" height="8" rx="2" fill="#C8E6D8" opacity="0.8"/>
+            {/* Roof rack */}
+            <rect x="22" y="113" width="34" height="2" rx="1" fill="#6B3A1F"/>
+            <rect x="26" y="111" width="4" height="3" rx="0.5" fill="#6B3A1F"/>
+            <rect x="34" y="111" width="4" height="3" rx="0.5" fill="#6B3A1F"/>
+            <rect x="42" y="111" width="4" height="3" rx="0.5" fill="#6B3A1F"/>
+            {/* Wheels */}
+            <circle cx="26" cy="142" r="8" fill="#1A1A1A"/>
+            <circle cx="26" cy="142" r="4" fill="#3A3A3A"/>
+            <circle cx="54" cy="142" r="8" fill="#1A1A1A"/>
+            <circle cx="54" cy="142" r="4" fill="#3A3A3A"/>
+            {/* Headlight */}
+            <rect x="65" y="128" width="4" height="5" rx="1" fill="#FEF3C7" opacity="0.9"/>
+          </g>
         </svg>
-        <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22 }}>🗺️</div>
       </div>
+
+      {/* Brand wordmark */}
       <div style={{ textAlign: 'center' }}>
-        <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 4 }}>Building your trip…</div>
-        <div style={{ fontSize: 13, color: GREEN }}>{messages[step]}</div>
+        <div style={{ fontFamily: "'Fraunces', Georgia, serif", fontSize: 18, fontWeight: 700, color: '#002112', letterSpacing: '-0.02em' }}>
+          Unplanned <span style={{ color: GREEN }}>Escapes</span>
+        </div>
+        <div style={{ fontSize: 13, color: '#3F4F42', marginTop: 4 }}>{messages[step]}</div>
       </div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 8, width: '100%', maxWidth: 240 }}>
+
+      {/* Progress steps */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 7, width: '100%', maxWidth: 260 }}>
         {messages.map((msg, i) => (
           <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 12 }}>
             <span style={{
-              width: 18, height: 18, borderRadius: '50%',
+              width: 18, height: 18, borderRadius: '50%', flexShrink: 0,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: 10, color: 'white', flexShrink: 0,
-              background: i < step ? GREEN : i === step ? '#B87333' : 'var(--border)',
+              fontSize: 10, fontWeight: 700, color: 'white',
+              background: i < step ? GREEN : i === step ? WARM : '#C8D8C4',
               transition: 'background 0.3s',
             }}>
               {i < step ? '✓' : ''}
             </span>
-            <span style={{ color: i <= step ? 'var(--text-primary)' : 'var(--text-muted)' }}>{msg}</span>
+            <span style={{ color: i <= step ? '#002112' : '#6F7F71', fontWeight: i === step ? 600 : 400 }}>{msg}</span>
           </div>
         ))}
       </div>
