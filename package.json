@@ -12,6 +12,9 @@
     "deploy": "vercel --prod --yes && npx tsx scripts/log-deploy.mts",
     "db": "npx tsx --env-file=.env --env-file=.env.local scripts/db-query.mts",
     "db:status": "npx tsx --env-file=.env --env-file=.env.local scripts/db-status.mts",
+    "cost": "npx tsx --env-file=.env --env-file=.env.local scripts/cost-check.mts",
+    "mapcheck": "npx tsx --env-file=.env --env-file=.env.local scripts/map-check.mts",
+    "issue-sync": "npx tsx --env-file=.env --env-file=.env.local scripts/issue-sync.mts",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui"
   },

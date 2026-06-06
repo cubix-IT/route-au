@@ -830,7 +830,7 @@ function MActivityCard({ act, isAdded, onAdd, onRemove }: {
 
 function MFoodCard({ f, emoji, cfg }: { f: import('@/hooks/usePlannerData').DbFoodPlace; emoji: string; cfg: { color: string; bg: string } }) {
   const website = (f.attributes as Record<string,unknown>)?.website_uri as string | undefined ?? f.website ?? undefined
-  const mapsUrl = f.lat && f.lng ? `https://maps.google.com/?q=${f.lat},${f.lng}` : undefined
+  const mapsUrl = f.lat && f.lng ? `https://www.google.com/maps/maps?q=${f.lat},${f.lng}+(${encodeURIComponent(f.name)})` : undefined
   return (
     <div style={{ background: '#fff', borderRadius: 16, border: '1px solid rgba(0,0,0,0.07)', padding: '14px', boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>

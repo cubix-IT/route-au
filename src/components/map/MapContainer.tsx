@@ -113,7 +113,7 @@ export function MapContainer() {
           <div style="padding:4px 0;font-family:system-ui,sans-serif">
             <div style="font-size:13px;font-weight:700;color:#1C1C1A;line-height:1.3;margin-bottom:4px">${pin.name}</div>
             <div style="font-size:11px;color:#8C8A87;margin-bottom:8px">${emoji} ${pin.type}</div>
-            <a href="https://maps.google.com/?q=${pin.lat},${pin.lng}" target="_blank" rel="noopener noreferrer"
+            <a href="https://www.google.com/maps/maps?q=${pin.lat},${pin.lng}+(${encodeURIComponent(pin.name)})" target="_blank" rel="noopener noreferrer"
               style="display:inline-block;font-size:11px;font-weight:700;color:#fff;background:#1C1B1F;padding:5px 10px;border-radius:6px;text-decoration:none">
               Open in Maps ↗
             </a>

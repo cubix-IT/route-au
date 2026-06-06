@@ -750,7 +750,7 @@ async function enrichSubDest(
       name: vhd.name.toLowerCase().replace(/\b\w/g,c=>c.toUpperCase()).replace(/\bOf\b/g,'of').replace(/\bThe\b/g,'the').replace(/^The\b/,'The'),
       category: 'history', emoji: '🏛️', description, duration: null, cost: 'free',
       lat: vLat, lng: vLng, address: vhd.location || null, kids_ok: true, is_hidden_gem: false,
-      maps_url: `https://maps.google.com/?q=${vLat},${vLng}`,
+      maps_url: `https://www.google.com/maps/maps?q=${vLat},${vLng}+(${encodeURIComponent(vhd.name)})`,
       website: vhd.url || null, phone: null, tags: ['heritage','vhr'], source: 'static',
       attributes: { source:'static', vhd_id: vhd.id, vhd_url: vhd.url, vhr_number: vhd.vhr_number, image_url: vhd.primary_image_url, quality_score: 40 },
     })
