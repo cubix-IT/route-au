@@ -25,6 +25,12 @@ function coordMapsUrl(name: string, lat?: number | null, lng?: number | null, de
   return `https://www.google.com/maps/search/?api=1&query=${q}`
 }
 
+function haversineKm(lat1: number, lng1: number, lat2: number, lng2: number): number {
+  const R = 6371, dLat = (lat2 - lat1) * Math.PI / 180, dLng = (lng2 - lng1) * Math.PI / 180
+  const a = Math.sin(dLat / 2) ** 2 + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLng / 2) ** 2
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+}
+
 function safeMapsUrl(mapsUrl: string | undefined | null, name: string, lat?: number | null, lng?: number | null, destName?: string): string {
   // Pass through named search and place_id URLs; fix any remaining coord-pin format
   if (mapsUrl && (mapsUrl.includes('query_place_id=') || mapsUrl.includes('maps/search'))) return mapsUrl
@@ -547,18 +553,22 @@ export function ExperiencePanel({ hideTimeline = false }: { hideTimeline?: boole
                 </div>
               )}
               {(() => {
-                // Rated activities first, unrated behind "Show more"
-                const ratedActs = filtered.filter(a => a.rating)
-                const unratedActs = filtered.filter(a => !a.rating)
-                const primary = ratedActs.length > 0 ? ratedActs : filtered
-                const displayed = showAllActivities ? primary : primary.slice(0, RESULT_LIMIT)
-                const hidden = primary.length - RESULT_LIMIT
+                const getActDriveMin = (act: typeof filtered[0]) =>
+                  act.id.startsWith('nature-')
+                    ? d.driveMinutes.get(d.dbNature.find(n => `nature-${n.nature_spot_id}` === act.id)?.slug ?? '') ?? null
+                    : d.driveMinutes.get(d.dbActivities.find(a => String(a.activity_id) === act.id)?.slug ?? '') ?? null
+
                 const renderCard = (act: typeof filtered[0]) => {
                   const tag = CAT_TAG[act.category] ?? { label: act.category, color: '#374151', bg: '#F3F4F6' }
                   const openStatus = getOpenStatus(act.openingHoursPeriods)
-                  const driveMin = act.id.startsWith('nature-')
-                    ? d.driveMinutes.get(d.dbNature.find(n => `nature-${n.nature_spot_id}` === act.id)?.slug ?? '') ?? null
-                    : d.driveMinutes.get(d.dbActivities.find(a => String(a.activity_id) === act.id)?.slug ?? '') ?? null
+                  const driveMin = getActDriveMin(act)
+                  const actLat = (act as any).lat, actLng = (act as any).lng
+                  const distKm = destCoord && actLat && actLng
+                    ? haversineKm(destCoord.lat, destCoord.lng, actLat, actLng)
+                    : null
+                  const distLabel = distKm != null && distKm > 2
+                    ? `${distKm < 10 ? distKm.toFixed(1) : Math.round(distKm)} km from town`
+                    : undefined
                   return (
                     <ResultCard
                       key={act.id}
@@ -570,13 +580,13 @@ export function ExperiencePanel({ hideTimeline = false }: { hideTimeline?: boole
                       description={act.description}
                       rating={act.rating}
                       reviewCount={act.reviewCount}
-                      duration={act.duration}
+                      duration={distLabel ?? act.duration}
                       openStatus={openStatus}
                       isHiddenGem={act.isHiddenGem}
                       isAdded={addedActIds.has(act.id)}
                       driveMinutes={driveMin}
                       highlighted={selectedPinId === act.id}
-                      mapsUrl={act.mapsUrl || coordMapsUrl(act.name, (act as any).lat, (act as any).lng)}
+                      mapsUrl={act.mapsUrl || coordMapsUrl(act.name, actLat, actLng)}
                       website={act.websiteUri && !act.websiteUri.includes('google.com') ? act.websiteUri : undefined}
                       phone={(act as any).phone}
                       onAdd={() => d.addActivity({ actId: act.id, actName: act.name, emoji: act.emoji, dayNumber: 1 })}
@@ -585,6 +595,19 @@ export function ExperiencePanel({ hideTimeline = false }: { hideTimeline?: boole
                     />
                   )
                 }
+
+                // Split into local (≤10 min) and nearby (>10 min) — only when OSRM loaded
+                const osrmLoaded = d.driveMinutes.size > 0
+                const ratedActs = filtered.filter(a => a.rating)
+                const primary = ratedActs.length > 0 ? ratedActs : filtered
+                const unratedActs = filtered.filter(a => !a.rating)
+
+                const localActs  = osrmLoaded ? primary.filter(a => { const m = getActDriveMin(a); return m == null || m <= 10 }) : primary
+                const nearbyActs = osrmLoaded ? primary.filter(a => { const m = getActDriveMin(a); return m != null && m > 10 }) : []
+
+                const displayed = showAllActivities ? localActs : localActs.slice(0, RESULT_LIMIT)
+                const hidden = localActs.length - RESULT_LIMIT
+
                 return (
                   <>
                     <div className="activity-grid" style={{ padding: '0 16px' }}>
@@ -597,11 +620,20 @@ export function ExperiencePanel({ hideTimeline = false }: { hideTimeline?: boole
                         border: '1px dashed var(--border)', background: 'none',
                         fontSize: 12, color: '#6B7280', fontWeight: 600, cursor: 'pointer',
                       }}>
-                        Show all {primary.length} things to do ↓
+                        Show all {localActs.length} things to do ↓
                       </button>
                     )}
                     {showAllActivities && unratedActs.length > 0 && ratedActs.length > 0 && (
                       <div className="activity-grid" style={{ padding: '0 16px', marginTop: 8 }}>{unratedActs.map(renderCard)}</div>
+                    )}
+                    {nearbyActs.length > 0 && (
+                      <>
+                        <div style={{ margin: '16px 16px 8px', display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <span style={{ fontSize: 11, fontWeight: 700, color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.07em' }}>Also nearby</span>
+                          <div style={{ flex: 1, height: 1, background: 'var(--border)' }} />
+                        </div>
+                        <div className="activity-grid" style={{ padding: '0 16px' }}>{nearbyActs.map(renderCard)}</div>
+                      </>
                     )}
                   </>
                 )
@@ -631,22 +663,25 @@ export function ExperiencePanel({ hideTimeline = false }: { hideTimeline?: boole
             Bakery:     { color: '#047857', bg: '#ECFDF5' },
           }
 
-          // Category filter state — use actCategoryFilter reused for food when in food mode
-          const [foodCatFilter, setFoodCatFilter] = [
+          // Simplified grouped filter chips: All | Cellar Doors | Places to Eat | Pubs
+          const [foodGroupFilter, setFoodGroupFilter] = [
             filter === 'food' ? actCategoryFilter : 'all',
             filter === 'food' ? setActCategoryFilter : (_: string) => {},
           ]
-
-          // Available categories in this destination
-          const availCats = [...new Set(allFoods.map(f => f.category))].sort((a, b) => {
-            const order = ['Winery','Brewery','Distillery','Pub','Restaurant','Cafe','Bakery']
-            return (order.indexOf(a) ?? 99) - (order.indexOf(b) ?? 99)
-          })
+          const FOOD_GROUPS: { key: string; label: string; cats: Set<string> }[] = [
+            { key: 'cellar',  label: '🍷 Cellar Doors', cats: new Set(['Winery','Brewery','Distillery']) },
+            { key: 'eat',     label: '🍽 Places to Eat', cats: new Set(['Restaurant','Cafe','Bakery']) },
+            { key: 'pub',     label: '🍻 Pubs',          cats: new Set(['Pub']) },
+          ]
 
           const rangeFilteredFood = d.driveMinutes.size > 0
             ? allFoods.filter(f => { const m = d.driveMinutes.get(f.slug); return m == null || m <= 45 })
             : allFoods
-          const filtered = foodCatFilter === 'all' ? rangeFilteredFood : rangeFilteredFood.filter(f => f.category === foodCatFilter)
+          const activeGroup = FOOD_GROUPS.find(g => g.key === foodGroupFilter)
+          const filtered = activeGroup ? rangeFilteredFood.filter(f => activeGroup.cats.has(f.category)) : rangeFilteredFood
+
+          // Only show group chips that have results
+          const availGroups = FOOD_GROUPS.filter(g => rangeFilteredFood.some(f => g.cats.has(f.category)))
 
           // Split: drink venues first, then food
           const drinkVenues = filtered.filter(f => DRINK_CATS.has(f.category))
@@ -658,18 +693,23 @@ export function ExperiencePanel({ hideTimeline = false }: { hideTimeline?: boole
           const totalShown = showDrinks.length + showFood.length
 
           const renderFoodCard = (f: import('@/hooks/usePlannerData').DbFoodPlace) => {
-            const attr = f.attributes as { website_uri?: string; opening_hours_text?: string }
+            const attr = f.attributes as { website_uri?: string; opening_hours_text?: string; cuisine?: string }
             const emoji = FOOD_CAT_EMOJI[f.category] ?? '🍽️'
             const cfg = FOOD_CAT_COLOR[f.category] ?? { color: '#374151', bg: '#F9FAFB' }
             const website = attr.website_uri ?? f.website ?? undefined
             const mapsUrl = coordMapsUrl(f.name, f.lat, f.lng, d.shortDest)
             const driveMin = d.driveMinutes.get(f.slug) ?? null
             const cardId = String(f.food_place_id)
+            // Cuisine tag: e.g. "italian" → "Italian" shown as secondary label
+            const cuisine = attr.cuisine
+              ? attr.cuisine.split(';')[0].trim().replace(/^./, c => c.toUpperCase())
+              : undefined
+            const categoryLabel = cuisine ? `${f.category} · ${cuisine}` : f.category
             return (
               <ResultCard
                 key={cardId}
                 name={f.name}
-                categoryLabel={f.category}
+                categoryLabel={categoryLabel}
                 categoryColor={cfg.color}
                 categoryBg={cfg.bg}
                 emoji={emoji}
@@ -693,22 +733,22 @@ export function ExperiencePanel({ hideTimeline = false }: { hideTimeline?: boole
               loading={d.dbLoading}
               empty={!d.dbLoading && allFoods.length === 0}
             >
-              {/* Category filter chips — only shown in food tab */}
-              {filter === 'food' && availCats.length > 1 && (
+              {/* Grouped filter chips — only shown in food tab */}
+              {filter === 'food' && availGroups.length > 0 && (
                 <div style={{ display: 'flex', gap: 6, padding: '0 16px 12px', overflowX: 'auto', flexShrink: 0 }}>
-                  <button onClick={() => setFoodCatFilter('all')} style={{
+                  <button onClick={() => setFoodGroupFilter('all')} style={{
                     padding: '6px 14px', borderRadius: 20, flexShrink: 0, fontSize: 12, fontWeight: 600, cursor: 'pointer',
-                    background: foodCatFilter === 'all' ? 'var(--green)' : 'var(--bg-base)',
-                    color: foodCatFilter === 'all' ? '#fff' : 'var(--text-secondary)',
-                    border: `2px solid ${foodCatFilter === 'all' ? 'var(--green)' : 'var(--border)'}`,
+                    background: foodGroupFilter === 'all' ? 'var(--green)' : 'var(--bg-base)',
+                    color: foodGroupFilter === 'all' ? '#fff' : 'var(--text-secondary)',
+                    border: `2px solid ${foodGroupFilter === 'all' ? 'var(--green)' : 'var(--border)'}`,
                   }}>All</button>
-                  {availCats.map(cat => (
-                    <button key={cat} onClick={() => setFoodCatFilter(cat)} style={{
+                  {availGroups.map(g => (
+                    <button key={g.key} onClick={() => setFoodGroupFilter(g.key)} style={{
                       padding: '6px 14px', borderRadius: 20, flexShrink: 0, fontSize: 12, fontWeight: 600, cursor: 'pointer',
-                      background: foodCatFilter === cat ? 'var(--green)' : 'var(--bg-base)',
-                      color: foodCatFilter === cat ? '#fff' : 'var(--text-secondary)',
-                      border: `2px solid ${foodCatFilter === cat ? 'var(--green)' : 'var(--border)'}`,
-                    }}>{FOOD_CAT_EMOJI[cat]} {cat}s</button>
+                      background: foodGroupFilter === g.key ? 'var(--green)' : 'var(--bg-base)',
+                      color: foodGroupFilter === g.key ? '#fff' : 'var(--text-secondary)',
+                      border: `2px solid ${foodGroupFilter === g.key ? 'var(--green)' : 'var(--border)'}`,
+                    }}>{g.label}</button>
                   ))}
                 </div>
               )}
