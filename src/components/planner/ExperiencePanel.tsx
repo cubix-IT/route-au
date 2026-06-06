@@ -585,8 +585,12 @@ export function ExperiencePanel({ hideTimeline = false }: { hideTimeline?: boole
                 const primary = ratedActs.length > 0 ? ratedActs : filtered
                 const unratedActs = filtered.filter(a => !a.rating)
 
-                const localActs  = osrmLoaded ? primary.filter(a => { const m = getActDriveMin(a); return m == null || m <= 10 }) : primary
-                const nearbyActs = osrmLoaded ? primary.filter(a => { const m = getActDriveMin(a); return m != null && m > 10 }) : []
+                const allLocal   = osrmLoaded ? primary.filter(a => { const m = getActDriveMin(a); return m == null || m <= 20 }) : primary
+                const allNearby  = osrmLoaded ? primary.filter(a => { const m = getActDriveMin(a); return m != null && m > 20 }) : []
+                // Guarantee at least 5 items in the local section — pull from nearby if needed
+                const MIN_LOCAL = 5
+                const localActs  = allLocal.length >= MIN_LOCAL ? allLocal : [...allLocal, ...allNearby.slice(0, MIN_LOCAL - allLocal.length)]
+                const nearbyActs = allLocal.length >= MIN_LOCAL ? allNearby : allNearby.slice(MIN_LOCAL - allLocal.length)
 
                 const displayed = showAllActivities ? localActs : localActs.slice(0, RESULT_LIMIT)
                 const hidden = localActs.length - RESULT_LIMIT
