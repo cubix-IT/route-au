@@ -375,12 +375,13 @@ export function ExperiencePanel({ hideTimeline = false }: { hideTimeline?: boole
           ...(d.vehicleProfile && d.vehicleProfile.fuel_type !== 'Electric' && !(d.vehicleProfile as unknown as { skip_fuel?: boolean }).skip_fuel ? [['fuel', '⛽ Fuel']] : []),
         ]) as [string, string][]).map(([f, label]) => (
           <button key={f} onClick={() => handleFilterChange(f as FilterMode)} style={{
-            padding: '6px 14px', borderRadius: 20, flexShrink: 0,
-            background: filter === f ? '#1C1B1F' : '#fff',
-            color: filter === f ? '#fff' : '#6B7280',
-            border: `1.5px solid ${filter === f ? '#1C1B1F' : 'var(--border)'}`,
-            fontSize: 12, fontWeight: filter === f ? 700 : 500,
+            padding: '8px 16px', borderRadius: 24, flexShrink: 0,
+            background: filter === f ? '#3A6B4F' : '#fff',
+            color: filter === f ? '#fff' : '#374151',
+            border: `2px solid ${filter === f ? '#3A6B4F' : '#E5E7EB'}`,
+            fontSize: 12, fontWeight: 600,
             cursor: 'pointer', whiteSpace: 'nowrap',
+            boxShadow: filter === f ? '0 2px 8px rgba(58,107,79,0.25)' : 'none',
             transition: 'all 0.12s',
           }}>
             {label}
