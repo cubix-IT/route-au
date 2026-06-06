@@ -276,7 +276,17 @@ export function ProfileWizard() {
     buildItinerary(startDate, tripType === 'multiday' ? endDate : undefined,
       `${storedOriginName} → ${effectiveDest.name}`, diningPrefs)
 
-    await new Promise((r) => setTimeout(r, 300))
+    // Wait for Supabase data to load — so wizard closes directly into ready results
+    const TIMEOUT_MS = 8000
+    const start = Date.now()
+    await new Promise<void>((resolve) => {
+      const check = () => {
+        if (useAppStore.getState().tripDataReady || Date.now() - start > TIMEOUT_MS) return resolve()
+        setTimeout(check, 100)
+      }
+      check()
+    })
+
     setGenerating(false)
     setWizardOpen(false)
     setPreselectedDest(null)
@@ -347,8 +357,8 @@ export function ProfileWizard() {
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               {/* Step X of Y — #16 */}
               {!generating && (
-                <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '0.05em' }}>
-                  {step + 1} / {totalSteps}
+                <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)' }}>
+                  Step {step + 1} of {totalSteps}
                 </span>
               )}
               {/* Progress dots */}

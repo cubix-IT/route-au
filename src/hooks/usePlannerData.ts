@@ -263,6 +263,7 @@ export function usePlannerData() {
     setLivePOIs(null)
     setWikiSummary(null)
     setDbLoading(true)
+    useAppStore.getState().setTripDataReady(false)
 
     // Primary: fetch everything from Supabase DB (instant, no per-user API cost)
     fetchDestinationFromDB(destId, destCoord ?? undefined).then((result) => {
@@ -294,6 +295,7 @@ export function usePlannerData() {
         console.warn('[usePlannerData] fetchDestinationFromDB returned null for', destId)
       }
       setDbLoading(false)
+      useAppStore.getState().setTripDataReady(true)
 
       // Always fetch live POIs for drink venues (wineries/breweries) — not in Supabase enrichment
       fetchLivePOIs(destId, destCoord.lat, destCoord.lng).then((pois) => {
@@ -309,6 +311,7 @@ export function usePlannerData() {
     }).catch(() => {
       if (signal.aborted) return
       setDbLoading(false)
+      useAppStore.getState().setTripDataReady(true)
       // Full fallback to Overpass
       Promise.all([
         fetchLivePOIs(destId, destCoord.lat, destCoord.lng),

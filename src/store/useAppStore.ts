@@ -150,6 +150,10 @@ interface AppState {
   activeHazards: HazardAlert[]
   setActiveHazards: (h: HazardAlert[]) => void
 
+  // Trip data ready — set true by usePlannerData when DB fetch completes; wizard waits on it
+  tripDataReady: boolean
+  setTripDataReady: (v: boolean) => void
+
   // Overpass/OSM data mode
   placesLimitedMode: boolean
   setPlacesLimitedMode: (v: boolean) => void
@@ -272,6 +276,9 @@ export const useAppStore = create<AppState>()(
 
       activeHazards: [],
       setActiveHazards: (h) => set({ activeHazards: h }),
+
+      tripDataReady: false,
+      setTripDataReady: (v) => set({ tripDataReady: v }),
 
       placesLimitedMode: false,
       setPlacesLimitedMode: (v) => set({ placesLimitedMode: v }),
