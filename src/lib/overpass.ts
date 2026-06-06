@@ -26,7 +26,7 @@ const OVERPASS_MIRROR2 = 'https://overpass.private.coffee/api/interpreter'
 const poiCache = new Map<string, LivePOI[]>()
 const wikiCache = new Map<string, string | null>()
 
-const WIKI_LS_KEY = 'ue-wiki-cache-v1'
+const WIKI_LS_KEY = 'ue-wiki-cache-v2'
 const WIKI_TTL_MS = 24 * 60 * 60 * 1000
 
 function loadWikiLS(): void {
@@ -146,8 +146,11 @@ export async function fetchWikipediaSummary(cacheKey: string, placeName: string)
       if (!res.ok) continue
       const json = await res.json()
       if (!json.extract || json.extract.length < 60 || json.type === 'disambiguation') continue
-      const match = json.extract.match(/^(.+?[.!?](?:\s.+?[.!?])?)(?:\s|$)/)
-      const summary = match ? match[1].trim() : json.extract.slice(0, 220)
+      // Pick a visitor-relevant sentence — skip encyclopaedic openers about location, population, disasters
+      const SKIP = /\b(population|founded|established|bushfire|fire|flood|disaster|devastat|shire|municipality|km²|square kilo|north-?east|north-?west|south-?east|south-?west|north of|south of|east of|west of)\b/i
+      const sentences = json.extract.split(/(?<=[.!?])\s+/)
+      const useful = sentences.find(s => s.length > 40 && !SKIP.test(s)) ?? sentences[0]
+      const summary = (useful.length > 220 ? useful.slice(0, 217) + '…' : useful).trim()
       wikiCache.set(cacheKey, summary)
       saveWikiLS(cacheKey, summary)
       const thumbUrl: string | null = json.thumbnail?.source ?? json.originalimage?.source ?? null
