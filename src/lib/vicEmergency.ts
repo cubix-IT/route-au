@@ -6,6 +6,8 @@ export interface HazardAlert {
   distanceKm: number
   severity: 'urgent' | 'warning'
   url?: string
+  lat?: number
+  lng?: number
 }
 
 // Categories worth surfacing to travellers
@@ -94,6 +96,8 @@ export async function fetchHazardsNear(
         distanceKm: Math.round(dist),
         severity: dist < 50 ? 'urgent' : 'warning',
         url: p.url,
+        lat: pt[1],
+        lng: pt[0],
       })
     }
 

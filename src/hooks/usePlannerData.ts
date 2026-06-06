@@ -322,7 +322,7 @@ export function usePlannerData() {
 
     // Hazards always live (VicEmergency — real-time safety data)
     fetchHazardsNear(destCoord.lat, destCoord.lng)
-      .then((alerts) => { if (!signal.aborted) setHazards(alerts) })
+      .then((alerts) => { if (!signal.aborted) { setHazards(alerts); useAppStore.getState().setActiveHazards(alerts) } })
       .catch(() => {})
 
     return () => ac.abort()

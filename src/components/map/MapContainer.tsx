@@ -13,16 +13,22 @@ interface FuelStation {
 // Stable ref to avoid re-creating markers on every render
 type MarkerEntry = { marker: maplibregl.Marker; el: HTMLElement; id: string }
 
+const HAZARD_EMOJI: Record<string, string> = {
+  Fire: '🔥', Flooding: '💧', Met: '⛈️',
+}
+
 export function MapContainer() {
   const mapRef = useRef<maplibregl.Map | null>(null)
   const destMarkerRef = useRef<maplibregl.Marker | null>(null)
   const poiMarkersRef = useRef<MarkerEntry[]>([])
   const fuelMarkersRef = useRef<maplibregl.Marker[]>([])
   const legacyMarkersRef = useRef<maplibregl.Marker[]>([])
+  const hazardMarkersRef = useRef<maplibregl.Marker[]>([])
 
   const {
     activeItinerary, nearbyPOIs, displayedMapPins,
     vehicleProfile, setSelectedPOI, selectedPinId, setSelectedPinId,
+    activeHazards,
   } = useAppStore()
 
   const handleMapReady = useCallback((m: maplibregl.Map) => {
@@ -226,6 +232,50 @@ export function MapContainer() {
       legacyMarkersRef.current.push(marker)
     }
   }, [nearbyPOIs, setSelectedPOI])
+
+  // ── Hazard markers ────────────────────────────────────────────────────────
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map) return
+
+    hazardMarkersRef.current.forEach((m) => m.remove())
+    hazardMarkersRef.current = []
+
+    for (const h of activeHazards) {
+      if (h.lat == null || h.lng == null) continue
+      const emoji = HAZARD_EMOJI[h.category] ?? '⚠️'
+      const isUrgent = h.severity === 'urgent'
+
+      const el = document.createElement('div')
+      el.style.cssText = `
+        width: 36px; height: 36px; border-radius: 50%;
+        background: ${isUrgent ? '#FEF2F2' : '#FFF7ED'};
+        border: 2.5px solid ${isUrgent ? '#DC2626' : '#D97706'};
+        display: flex; align-items: center; justify-content: center;
+        font-size: 18px; cursor: pointer;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+        animation: pulse 2s infinite;
+      `
+      el.textContent = emoji
+
+      const popup = new maplibregl.Popup({ offset: 20, closeButton: true, maxWidth: '240px', closeOnClick: false })
+        .setHTML(`
+          <div style="padding:4px 0;font-family:system-ui,sans-serif">
+            <div style="font-size:13px;font-weight:700;color:${isUrgent ? '#B91C1C' : '#92400E'};margin-bottom:4px">${emoji} ${h.title}</div>
+            <div style="font-size:11px;color:#6B7280;margin-bottom:6px">${h.category} · ${h.status} · ${h.distanceKm} km away</div>
+            ${h.url ? `<a href="${h.url}" target="_blank" rel="noopener noreferrer" style="font-size:11px;font-weight:700;color:#fff;background:#DC2626;padding:5px 10px;border-radius:6px;text-decoration:none;display:inline-block">View on VicEmergency ↗</a>` : ''}
+          </div>
+        `)
+
+      const marker = new maplibregl.Marker({ element: el })
+        .setLngLat([h.lng, h.lat])
+        .setPopup(popup)
+        .addTo(map)
+
+      el.addEventListener('click', (e) => { e.stopPropagation(); popup.addTo(map) })
+      hazardMarkersRef.current.push(marker)
+    }
+  }, [activeHazards]) // eslint-disable-line react-hooks/exhaustive-deps
 
   return <MapView onMapReady={handleMapReady} />
 }

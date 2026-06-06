@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
+import type { HazardAlert } from '@/lib/vicEmergency'
 
 // Synchronous migrations — run before Zustand reads the persisted key
 try {
@@ -145,6 +146,10 @@ interface AppState {
   selectedPinId: string | null
   setSelectedPinId: (id: string | null) => void
 
+  // Active hazards — set by usePlannerData, read by MapContainer
+  activeHazards: HazardAlert[]
+  setActiveHazards: (h: HazardAlert[]) => void
+
   // Overpass/OSM data mode
   placesLimitedMode: boolean
   setPlacesLimitedMode: (v: boolean) => void
@@ -264,6 +269,9 @@ export const useAppStore = create<AppState>()(
 
       selectedPinId: null,
       setSelectedPinId: (id) => set({ selectedPinId: id }),
+
+      activeHazards: [],
+      setActiveHazards: (h) => set({ activeHazards: h }),
 
       placesLimitedMode: false,
       setPlacesLimitedMode: (v) => set({ placesLimitedMode: v }),
