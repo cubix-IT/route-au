@@ -65,14 +65,8 @@ const ACT_LEISURE = new Set(['sports_centre','stadium','golf_course','miniature_
 const ACT_AMENITY = new Set(['theatre','cinema','arts_centre','library','marketplace','spa'])
 const CHAIN_BLACKLIST = /\b(mcdonald'?s|hungry jack'?s|kfc|subway|domino'?s|pizza hut|red rooster|oporto|nando'?s|grill'?d|betty'?s burgers|guzman|taco bell|carl'?s jr|burger king|wendy'?s|seven.?eleven|7.?eleven|bp|caltex|shell|ampol|united petroleum|woolworths|coles|aldi|chemist warehouse)\b/i
 
-// Natural features (waterfalls, lookouts, parks) → pin to coordinates; businesses → named search
-const NATURAL_CATS = new Set(['nature','viewpoint','beach','active','wellness'])
-function mapsUrl(name: string, destName: string, lat: number, lon: number, category: string): string {
-  if (NATURAL_CATS.has(category)) {
-    // Pin to exact coordinates with name label — avoids matching wrong nearby business
-    return `https://maps.google.com/maps?q=${lat},${lon}+(${encodeURIComponent(name)})`
-  }
-  // Named search biased to destination coordinates
+// Named search biased to destination — no coordinates visible in URL
+function mapsUrl(name: string, destName: string, lat: number, lon: number, _category: string): string {
   return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(name + ', ' + destName)}&ll=${lat},${lon}`
 }
 const CRAFT_TYPES = new Set(['brewery','cider','winery','wine','distillery'])

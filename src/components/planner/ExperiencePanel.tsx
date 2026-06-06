@@ -18,7 +18,7 @@ const WARM  = '#B87333'
 // Build a Google Maps URL that opens pinned to exact coordinates when available.
 // Coordinate-based URLs open the right location on the map immediately.
 // Coordinate pin link — always opens at the exact location, no Google Place ID needed
-// Named search biased to coordinates — shows place name in Google Maps, not raw coordinates
+// Named search biased to coordinates — no coordinates visible in URL
 function coordMapsUrl(name: string, lat?: number | null, lng?: number | null, destName?: string): string {
   const q = encodeURIComponent(name + (destName ? `, ${destName}` : ''))
   if (lat && lng) return `https://www.google.com/maps/search/?api=1&query=${q}&ll=${lat},${lng}`
@@ -26,7 +26,17 @@ function coordMapsUrl(name: string, lat?: number | null, lng?: number | null, de
 }
 
 function safeMapsUrl(mapsUrl: string | undefined | null, name: string, lat?: number | null, lng?: number | null, destName?: string): string {
-  if (mapsUrl && (mapsUrl.includes('query_place_id=') || mapsUrl.includes('maps/search') || mapsUrl.includes('maps?q='))) return mapsUrl
+  // Pass through named search and place_id URLs; fix any remaining coord-pin format
+  if (mapsUrl && (mapsUrl.includes('query_place_id=') || mapsUrl.includes('maps/search'))) return mapsUrl
+  if (mapsUrl && mapsUrl.includes('maps?q=') && mapsUrl.includes('+(')) {
+    // Convert coord-pin format maps?q=lat,lng+(Name) → named search
+    const nameMatch = mapsUrl.match(/\+\(([^)]+)\)/)
+    const coordMatch = mapsUrl.match(/q=(-?\d+\.\d+),(-?\d+\.\d+)/)
+    if (nameMatch && coordMatch) {
+      const n = decodeURIComponent(nameMatch[1])
+      return coordMapsUrl(n, parseFloat(coordMatch[1]), parseFloat(coordMatch[2]), destName)
+    }
+  }
   return coordMapsUrl(name, lat, lng, destName)
 }
 

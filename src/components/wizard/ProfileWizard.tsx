@@ -296,10 +296,23 @@ export function ProfileWizard() {
 
   const msgs = ['Finding your route…', 'Matching experiences…', 'Building your day…', 'Almost ready…']
 
-  // ── Step labels ──
+  // ── Step labels + subtitles (#17) ──
   const discoveryStepLabels = ['How far & who', 'What you love', 'Pick a spot', 'Finishing touches', 'Trip summary']
+  const discoveryStepSubtitles = [
+    'Tell us how far you want to travel and who\'s coming',
+    'We\'ll match destinations to what you enjoy',
+    'Choose from your personalised recommendations',
+    'Set dates, food preferences, and your vehicle',
+    'Review your trip before we build it',
+  ]
   const preselectedStepLabels = ['Your trip details', 'Your vehicle', 'Trip summary']
+  const preselectedStepSubtitles = [
+    'Set your dates and who\'s coming',
+    'Help us find fuel stops along the way',
+    'Review your trip before we build it',
+  ]
   const stepLabels = isPreselected ? preselectedStepLabels : discoveryStepLabels
+  const stepSubtitles = isPreselected ? preselectedStepSubtitles : discoveryStepSubtitles
 
   const isPickStep = !isPreselected && step === 2
 
@@ -311,27 +324,55 @@ export function ProfileWizard() {
       >
 
         {/* Header */}
-        <div style={{ padding: '20px 24px 0', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
-          <div>
+        <div style={{ padding: '16px 20px 0', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexShrink: 0 }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{
               fontFamily: "'Fraunces', Georgia, serif",
               fontSize: 15, fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-0.02em',
             }}>
               {!generating ? stepLabels[step] : 'Building your trip…'}
             </div>
-            <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 1 }}>
-              {!generating ? `Step ${step + 1} of ${totalSteps}` : 'Hang tight'}
-            </div>
+            {/* Step subtitle — #17 */}
+            {!generating && (
+              <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
+                {stepSubtitles[step] ?? ''}
+              </div>
+            )}
+            {generating && (
+              <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>Hang tight</div>
+            )}
           </div>
-          {/* Progress dots */}
-          <div style={{ display: 'flex', gap: 5 }}>
-            {Array.from({ length: totalSteps }).map((_, i) => (
-              <div key={i} style={{
-                width: i === step ? 18 : 6, height: 6, borderRadius: 3,
-                background: i <= step ? GREEN : 'var(--border)',
-                transition: 'all 0.25s',
-              }} />
-            ))}
+          {/* Right: progress + step counter + close — #16, #18 */}
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6, flexShrink: 0, marginLeft: 12 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              {/* Step X of Y — #16 */}
+              {!generating && (
+                <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '0.05em' }}>
+                  {step + 1} / {totalSteps}
+                </span>
+              )}
+              {/* Progress dots */}
+              <div style={{ display: 'flex', gap: 4 }}>
+                {Array.from({ length: totalSteps }).map((_, i) => (
+                  <div key={i} style={{
+                    width: i === step ? 16 : 5, height: 5, borderRadius: 3,
+                    background: i <= step ? GREEN : 'var(--border)',
+                    transition: 'all 0.25s',
+                  }} />
+                ))}
+              </div>
+              {/* Close X — #18 */}
+              <button
+                onClick={() => setWizardOpen(false)}
+                style={{
+                  width: 28, height: 28, borderRadius: '50%', border: 'none',
+                  background: 'var(--bg-muted)', color: 'var(--text-muted)',
+                  fontSize: 14, cursor: 'pointer', display: 'flex',
+                  alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                }}
+                title="Close"
+              >✕</button>
+            </div>
           </div>
         </div>
 

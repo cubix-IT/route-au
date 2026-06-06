@@ -213,48 +213,7 @@ export function buildDaySchedule(
 
   if (isLastDay) return items
 
-  // 8. Evening
-  const arrAfter = addMinutes(h, m, 60)
-  h = arrAfter.h; m = arrAfter.m
-
-  const sunsetH = 17
-  const sunsetM = 45
-  if (h * 60 + m < sunsetH * 60 + sunsetM) { h = sunsetH; m = sunsetM }
-
-  items.push({
-    id: nextId(),
-    time: fmt(h, m),
-    emoji: '🌅',
-    title: 'Golden hour',
-    subtitle: 'The light at this time of day is worth stepping outside for',
-    duration_min: 30,
-    type: 'sunset',
-    is_highlight: true,
-  })
-
-  const dinnerH = h + 1
-  items.push({
-    id: nextId(),
-    time: fmt(dinnerH, 0),
-    emoji: hasKids ? '🍕' : '🍺',
-    title: 'Dinner',
-    subtitle: hasKids ? 'Find somewhere relaxed for the family' : 'Find the local pub or restaurant',
-    duration_min: 75,
-    type: 'dinner',
-  })
-
-  if (!hasKids) {
-    items.push({
-      id: nextId(),
-      time: fmt(dinnerH + 2, 0),
-      emoji: '🌌',
-      title: 'Stargazing',
-      subtitle: 'Away from city lights — Milky Way visible on a clear night',
-      duration_min: 60,
-      type: 'stargazing',
-      is_highlight: true,
-    })
-  }
+  // No auto evening items — user adds their own via Plan it
 
   return items
 }
