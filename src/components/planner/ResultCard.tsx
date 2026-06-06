@@ -97,17 +97,18 @@ export function ResultCard({
       {/* ── Header row ── */}
       <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
         <div style={{ flex: 1, minWidth: 0 }}>
-          {/* Chips row */}
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 5, alignItems: 'center' }}>
+          {/* Chips row — max 2 rows (#20) */}
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 5, alignItems: 'center', maxHeight: 44, overflow: 'hidden' }}>
             <span style={{
-              display: 'inline-block', fontSize: 10, fontWeight: 700,
+              display: 'inline-block', fontSize: 9.5, fontWeight: 600,
               color: categoryColor, background: categoryBg,
-              padding: '2px 8px', borderRadius: 20,
-              textTransform: 'uppercase', letterSpacing: '0.05em',
+              padding: '2px 7px', borderRadius: 4,
+              textTransform: 'uppercase', letterSpacing: '0.06em',
+              border: `1px solid ${categoryColor}30`,
             }}>{emoji ? `${emoji} ` : ''}{categoryLabel}</span>
-            {isAdded && <span style={{ fontSize: 10, fontWeight: 700, color: GREEN, background: '#E8F5EE', padding: '2px 8px', borderRadius: 20 }}>In your plan</span>}
+            {isAdded && <span style={{ fontSize: 9.5, fontWeight: 600, color: '#0369A1', background: '#E0F2FE', padding: '2px 7px', borderRadius: 4, border: '1px solid rgba(3,105,161,0.2)' }}>✓ In your plan</span>}
             {badges.map((b) => (
-              <span key={b.label} style={{ fontSize: 10, fontWeight: 700, color: b.color, background: b.bg, padding: '2px 8px', borderRadius: 20 }}>{b.label}</span>
+              <span key={b.label} style={{ fontSize: 9.5, fontWeight: 600, color: b.color, background: b.bg, padding: '2px 7px', borderRadius: 4, border: `1px solid ${b.color}25` }}>{b.label}</span>
             ))}
           </div>
 

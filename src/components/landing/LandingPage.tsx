@@ -412,9 +412,8 @@ function SurpriseMeSearch({ onSearch }: {
 
     {/* No-from prompt */}
     <div style={{ overflow: 'hidden', maxHeight: showNoFrom ? 80 : 0, opacity: showNoFrom ? 1 : 0, transition: 'max-height 0.32s cubic-bezier(0.05,0.7,0.1,1), opacity 0.25s ease' }}>
-      <div style={{ marginTop: 10, background: 'rgba(255,255,255,0.92)', backdropFilter: 'blur(8px)', border: '1px solid rgba(232,168,124,0.5)', borderRadius: 12, padding: '12px 16px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, textAlign: 'center' }}>
-        <span style={{ fontSize: 13, color: '#5C3A1E' }}>We need your starting suburb to calculate drive times.</span>
-        <button onClick={() => setShowNoFrom(false)} style={{ padding: '6px 24px', borderRadius: 8, border: 'none', background: GREEN, fontSize: 12, fontWeight: 700, cursor: 'pointer', color: '#fff' }}>Got it</button>
+      <div style={{ marginTop: 6, padding: '6px 4px', display: 'flex', alignItems: 'center', gap: 6 }}>
+        <span style={{ fontSize: 11, color: '#C0622A', fontWeight: 600 }}>⚠ Please enter your starting suburb to continue.</span>
       </div>
     </div>
     </div>
@@ -568,45 +567,10 @@ function FromToSearch({ onSearch, onSwitchToSurprise }: {
       opacity: (showNoDest || showNoFrom) ? 1 : 0,
       transition: 'max-height 0.32s cubic-bezier(0.05,0.7,0.1,1), opacity 0.25s ease',
     }}>
-      <div style={{
-        marginTop: 10,
-        background: 'rgba(255,255,255,0.92)',
-        backdropFilter: 'blur(8px)',
-        border: '1px solid rgba(232,168,124,0.5)',
-        borderRadius: 12,
-        padding: '10px 16px',
-        display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, textAlign: 'center',
-      }}>
-        <span style={{ fontSize: 13, color: '#5C3A1E' }}>
-          {showNoFrom
-            ? 'Where are you starting from? We need this to calculate drive times.'
-            : 'Not sure where to go? We can pick somewhere for you.'}
+      <div style={{ marginTop: 6, padding: '6px 4px', display: 'flex', alignItems: 'center', gap: 6 }}>
+        <span style={{ fontSize: 11, color: '#C0622A', fontWeight: 600 }}>
+          ⚠ {showNoFrom ? 'Please enter your starting suburb to continue.' : 'Please choose a destination to continue.'}
         </span>
-        <div style={{ display: 'flex', gap: 8, justifyContent: 'center' }}>
-          {showNoFrom ? (
-            <button
-              onClick={() => setShowNoFrom(false)}
-              style={{ padding: '6px 24px', borderRadius: 8, border: 'none', background: GREEN, fontSize: 12, fontWeight: 700, cursor: 'pointer', color: '#fff' }}
-            >
-              Got it
-            </button>
-          ) : (
-            <>
-              <button
-                onClick={() => setShowNoDest(false)}
-                style={{ padding: '5px 14px', borderRadius: 8, border: '1px solid rgba(0,0,0,0.12)', background: 'none', fontSize: 12, fontWeight: 500, cursor: 'pointer', color: '#6B6966' }}
-              >
-                I'll choose
-              </button>
-              <button
-                onClick={() => { setShowNoDest(false); onSwitchToSurprise?.() }}
-                style={{ padding: '5px 14px', borderRadius: 8, border: 'none', background: GREEN, fontSize: 12, fontWeight: 700, cursor: 'pointer', color: '#fff' }}
-              >
-                Surprise me →
-              </button>
-            </>
-          )}
-        </div>
       </div>
     </div>
     </div>

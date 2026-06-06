@@ -1095,7 +1095,7 @@ function ActivityCard({ act, expanded, highlighted, onToggle, isAdded, onAdd, on
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 6 }}>
             <Chip label={tag.label} color={tag.color} bg={tag.bg} />
             {act.cost === 'free' && <Chip label="Free" color={GREEN} bg="#E8F5EE" />}
-            {isAdded && <Chip label="In your plan" color={GREEN} bg="#E8F5EE" />}
+            {isAdded && <Chip label="✓ In your plan" color="#0369A1" bg="#E0F2FE" />}
           </div>
           <div style={{ fontSize: 13.5, fontWeight: 700, color: '#1C1B1F', marginBottom: 3, lineHeight: 1.3 }}>{act.name}</div>
           {act.rating && (
