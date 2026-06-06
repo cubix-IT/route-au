@@ -130,11 +130,12 @@ async function fetchDestinationFromDB(
   const cLng = destCoord?.lng ?? (subDest as any).lng
 
   // Bounding box size:
-  // - Urban Melbourne (within 0.5° of CBD): 0.08° ≈ 8km — prevents St Kilda showing MCG etc.
-  // - Regional Victoria: 0.23° ≈ 25km — wide enough to catch nearby attractions
+  // - Urban Melbourne (within 0.5° of CBD): 0.08° ≈ 8km
+  // - Regional Victoria: 0.13° ≈ 14km — tight enough to exclude far stations/suburbs
+  //   (OSRM 45-min filter refines further after load)
   const MELB_CBD_LAT = -37.814, MELB_CBD_LNG = 144.963
   const distFromCBD = Math.abs(cLat - MELB_CBD_LAT) + Math.abs(cLng - MELB_CBD_LNG)
-  const DELTA = distFromCBD < 0.5 ? 0.08 : 0.23
+  const DELTA = distFromCBD < 0.5 ? 0.08 : 0.13
   const latMin = cLat - DELTA, latMax = cLat + DELTA
   const lngMin = cLng - DELTA, lngMax = cLng + DELTA
 
@@ -366,6 +367,16 @@ export function usePlannerData() {
 
   const DRINK_ACTIVITY_CATS = new Set(['winery', 'brewery', 'distillery', 'pub', 'bar', 'wine', 'wine_cellar', 'drink', 'food', 'restaurant', 'cafe', 'bakery'])
 
+  // Fast haversine pre-filter — cut anything >15km straight-line from destination
+  // This runs immediately (no OSRM wait) and prevents far-away items showing on first load.
+  // OSRM then refines to 45-min drive time after it loads.
+  const haversineKm = (lat1: number, lng1: number, lat2: number, lng2: number) => {
+    const R = 6371, dLat = (lat2 - lat1) * Math.PI / 180, dLng = (lng2 - lng1) * Math.PI / 180
+    const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLng/2)**2
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a))
+  }
+  const MAX_HAVERSINE_KM = 15
+
   const openActivities = useMemo(() => {
     const byStatus = dbActivities.filter((a) => {
       const attr = (a as unknown as { attributes?: Record<string, unknown> }).attributes ?? {}
@@ -374,7 +385,11 @@ export function usePlannerData() {
       if (!a.name || a.name.trim().length < 3) return false
       if (JUNK_ACT_PATTERN.test(a.name.trim())) return false
       if (JUNK_PHRASE_PATTERN.test(a.name)) return false
-      if (DRINK_ACTIVITY_CATS.has(a.category.toLowerCase())) return false  // food/drink lives in Food & Drinks tab
+      if (DRINK_ACTIVITY_CATS.has(a.category.toLowerCase())) return false
+      // Fast distance pre-filter — exclude activities >15km from destination
+      if (a.lat && a.lng && destCoord) {
+        if (haversineKm(destCoord.lat, destCoord.lng, a.lat, a.lng) > MAX_HAVERSINE_KM) return false
+      }
       return true
     })
     const seen = new Set<string>()

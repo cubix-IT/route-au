@@ -72,7 +72,7 @@ function osmCategory(tags: Record<string,string>): 'food'|'nature'|'activity'|nu
   if (FOOD_CRAFT.has(tags.craft))        return 'food'
   if (FOOD_TOURISM.has(tags.tourism))    return 'food'
   if (tags.natural === 'hot_spring' || tags.natural === 'spring') return 'activity'
-  if (tags.railway === 'station')        return 'activity'
+  if (tags.railway === 'station' || tags.railway === 'narrow_gauge' || tags.railway === 'preserved' || tags.railway === 'heritage') return 'activity'
   if (tags.historic)                     return 'activity'
   if (tags.waterway === 'waterfall')     return 'activity'
   if (tags.waterway === 'lake' || tags.waterway === 'reservoir' || tags.waterway === 'dam') return 'activity'
@@ -95,6 +95,7 @@ function activityCategory(tags: Record<string,string>, name: string): string {
   if (tags.natural === 'waterfall' || /waterfall|falls(?!.?creek)/.test(n)) return 'nature'
   if (tags.natural === 'beach' || tags.leisure === 'beach_resort' || /\bbeach\b|\bcoast\b/.test(n)) return 'beach'
   if (tags.natural === 'hot_spring' || /hot spring|mineral spring|thermal|bathhouse|day spa/.test(n)) return 'wellness'
+  if (tags.railway === 'narrow_gauge' || tags.railway === 'preserved' || tags.railway === 'heritage' || /puffing billy|steam train|steam railway|heritage railway|narrow.gauge/.test(n)) return 'entertainment'
   if (tags.railway === 'station' || /railway|train station|historic station/.test(n)) return 'history'
   // Historic people, events, sites — catch names like "Ned Kelly's Capture", "Burke & Wills"
   if (tags.historic || /museum|heritage|historic|history|colonial|ruins|memorial|courthouse|gaol|capture|battle|gold rush|explorers?|ned kelly|burke|wills|bushranger/.test(n)) return 'history'
@@ -461,6 +462,107 @@ async function fillDescriptions(destName: string, activities: any[], foods: any[
   if (filled > 0) console.log(`  [descriptions] filled ${filled} via Wikipedia/Haiku (${Object.keys(resolved).filter(s => allItems.find(i=>i.slug===s && i.attributes?.wikipedia)).length} wiki, ${needHaiku.filter(i=>resolved[i.slug]).length} haiku)`)
 }
 
+// ── Wikipedia-first: extract named attractions from the destination's Wikipedia article ──
+async function fetchWikipediaAttractions(destName: string, destSlug: string, subDestId: number, allPois: Poi[], lat: number, lng: number): Promise<any[]> {
+  if (!anthropicKey) return []
+  try {
+    // Fetch relevant sections (Tourism, Recreation, Sport, Heritage, Events, Present)
+    const wikiPage = encodeURIComponent(destName.replace(/ /g, '_') + ',_Victoria')
+    const secRes = await fetch(`https://en.wikipedia.org/w/api.php?action=parse&page=${wikiPage}&prop=sections&format=json`, {
+      headers: { 'User-Agent': USER_AGENT }, signal: AbortSignal.timeout(8000),
+    })
+    if (!secRes.ok) return []
+    const secData = await secRes.json() as { parse?: { sections?: { number: string; line: string }[] } }
+    const sections = secData.parse?.sections ?? []
+    const RELEVANT = /tourism|recreation|sport|heritage|event|present|attraction|culture|entertainment|festival/i
+    const relevantSections = sections.filter(s => RELEVANT.test(s.line))
+    if (relevantSections.length === 0) return []
+
+    // Fetch wikitext for each relevant section
+    const texts: string[] = []
+    for (const sec of relevantSections.slice(0, 4)) {
+      const r = await fetch(`https://en.wikipedia.org/w/api.php?action=parse&page=${wikiPage}&prop=wikitext&section=${sec.number}&format=json`, {
+        headers: { 'User-Agent': USER_AGENT }, signal: AbortSignal.timeout(6000),
+      })
+      if (!r.ok) continue
+      const d = await r.json() as { parse?: { wikitext?: { '*': string } } }
+      let text = d.parse?.wikitext?.['*'] ?? ''
+      // Strip wiki markup
+      text = text.replace(/\[\[([^\]|]+\|)?([^\]]+)\]\]/g, '$2')
+        .replace(/\{\{[^}]+\}\}/g, '').replace(/==+[^=]=+/g, '')
+        .replace(/\'{2,}/g, '').replace(/<ref[^>]*>.*?<\/ref>/gs, '')
+        .replace(/<[^>]+>/g, '').trim()
+      if (text.length > 50) texts.push(`## ${sec.line}\n${text.slice(0, 800)}`)
+    }
+    if (texts.length === 0) return []
+
+    // Ask Haiku to extract named attractions as structured data
+    const r = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'x-api-key': anthropicKey, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-haiku-4-5-20251001', max_tokens: 1500, temperature: 0,
+        system: `Extract named tourist attractions, recreation venues, events, and notable places from Wikipedia text about ${destName}, Victoria Australia.
+Return ONLY a JSON array: [{"name":"...","category":"history|nature|active|wildlife|art|entertainment|markets|viewpoint|beach|relaxation|wellness","description":"one vivid sentence 15-25 words"}]
+Only include specific named places/events (not general descriptions). Max 12 items. Skip pubs, restaurants, cafes, wineries — those come from a separate source.`,
+        messages: [{ role: 'user', content: texts.join('\n\n') }],
+      }),
+      signal: AbortSignal.timeout(25000),
+    })
+    if (!r.ok) return []
+    const data = await r.json() as { content?: { text: string }[] }
+    const text = data.content?.[0]?.text?.trim() ?? ''
+    const s = text.indexOf('['), e = text.lastIndexOf(']')
+    if (s === -1 || e === -1) return []
+    const items: { name: string; category: string; description: string }[] = JSON.parse(text.slice(s, e + 1))
+
+    // Geocode each item using Photon (near destination lat/lng)
+    const results: any[] = []
+    for (const item of items.slice(0, 12)) {
+      if (!item.name || !item.description || item.name.length < 4) continue
+      // First check if already in OSM POIs
+      const osmMatch = allPois.find(p => p.tags.name && p.tags.name.toLowerCase().includes(item.name.toLowerCase().slice(0, 15)))
+      let itemLat = osmMatch?.lat ?? null
+      let itemLng = osmMatch?.lon ?? null
+
+      if (!itemLat || !itemLng) {
+        // Try Photon geocoder
+        try {
+          const q = encodeURIComponent(`${item.name} ${destName} Victoria`)
+          const pr = await fetch(`https://photon.komoot.io/api/?q=${q}&limit=1&bbox=140,-39,150,-34`, {
+            signal: AbortSignal.timeout(5000),
+          })
+          if (pr.ok) {
+            const pd = await pr.json() as { features?: { geometry: { coordinates: [number, number] } }[] }
+            const feat = pd.features?.[0]
+            if (feat) { itemLng = feat.geometry.coordinates[0]; itemLat = feat.geometry.coordinates[1] }
+          }
+        } catch { /* skip */ }
+        await sleep(100)
+      }
+
+      const wikiSlug = `wiki-${destSlug}-${item.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 30)}`
+      results.push({
+        slug: wikiSlug, sub_dest_id: subDestId,
+        name: item.name, category: item.category,
+        emoji: activityEmoji(item.category),
+        description: item.description,
+        duration: null, cost: 'free', lat: itemLat, lng: itemLng, address: null,
+        kids_ok: true, is_hidden_gem: false,
+        maps_url: itemLat && itemLng ? `https://maps.google.com/?q=${itemLat},${itemLng}` : null,
+        website: osmMatch?.tags?.website || null,
+        phone: osmMatch?.tags?.phone || null,
+        tags: ['wikipedia', item.category], source: 'static',
+        attributes: { source: 'static', quality_score: 40, from_wikipedia: true },
+      })
+    }
+    if (results.length > 0) console.log(`  [wikipedia] +${results.length} attractions from Wikipedia article`)
+    return results
+  } catch (e) {
+    return []
+  }
+}
+
 // ── Enrich one destination ────────────────────────────────────────────────────
 async function enrichSubDest(
   allPois: Poi[],
@@ -480,6 +582,14 @@ async function enrichSubDest(
   const foods: any[] = []
   const nature: any[] = []
   const seenSlugs = new Set<string>()
+
+  // Wikipedia-first: seed activities from Wikipedia Tourism/Recreation sections
+  // Food & Drinks come from OSM only (OSM is reliable for cafes/pubs/wineries)
+  const wikiActivities = await fetchWikipediaAttractions(name, slug, subDestId, elements, lat, lng)
+  for (const wa of wikiActivities) {
+    seenSlugs.add(wa.slug)
+    activities.push(wa)
+  }
 
   for (const el of elements) {
     const tags = el.tags
@@ -545,8 +655,23 @@ async function enrichSubDest(
       })
     } else {
       const actCat = activityCategory(tags, name_)
+      // For heritage railway stations, derive display name from Wikipedia title or well-known operator names
+      // e.g. "Belgrave (Narrow-gauge)" → "Puffing Billy Railway"
+      const operator = tags.operator || tags['operator:en'] || ''
+      const wikiTitle = (tags.wikipedia || '').replace(/^en:/i, '')
+      const isHeritageRailway = tags.railway === 'station' || tags.railway === 'narrow_gauge' || tags.railway === 'preserved' || tags.railway === 'heritage'
+      let displayName = name_
+      if (isHeritageRailway) {
+        // Extract railway name from Wikipedia title: "Belgrave (Puffing Billy) railway station" → "Puffing Billy Railway"
+        const pbMatch = wikiTitle.match(/\(([^)]+)\)\s*railway station/i)
+        if (pbMatch) displayName = pbMatch[1] + ' Railway'
+        // Known operator name mappings
+        else if (/puffing billy/i.test(operator)) displayName = 'Puffing Billy Railway'
+        else if (/zig.?zag/i.test(operator) || /zig.?zag/i.test(wikiTitle)) displayName = 'Zig Zag Railway'
+        else if (/puffing billy/i.test(wikiTitle)) displayName = 'Puffing Billy Railway'
+      }
       activities.push({
-        slug: elSlug, sub_dest_id: subDestId, name: name_, category: actCat, emoji: activityEmoji(actCat),
+        slug: elSlug, sub_dest_id: subDestId, name: displayName, category: actCat, emoji: activityEmoji(actCat),
         description: tags.description || null, duration: null, cost: 'free', lat: el.lat, lng: el.lon, address,
         kids_ok: tags.min_age ? parseInt(tags.min_age) <= 5 : true, is_hidden_gem: false,
         maps_url: el.lat && el.lon ? `https://maps.google.com/?q=${el.lat},${el.lon}` : null,

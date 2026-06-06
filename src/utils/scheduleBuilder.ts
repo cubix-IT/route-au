@@ -70,28 +70,9 @@ export function buildDaySchedule(
       type: 'depart',
     })
 
-    // En-route break for long drives
-    if (driveHours >= 1.5) {
-      const stopAt = addMinutes(h, m, Math.round(driveMinutes * 0.45))
-      h = stopAt.h; m = stopAt.m
-      items.push({
-        id: nextId(),
-        time: fmt(h, m),
-        emoji: '☕',
-        title: 'Stretch & coffee stop',
-        subtitle: 'Roughly halfway — good time for a coffee break',
-        duration_min: 20,
-        type: 'breakfast',
-      })
-      const after = addMinutes(h, m, 20)
-      h = after.h; m = after.m
-      const remaining = driveMinutes - Math.round(driveMinutes * 0.45) - 20
-      const arr = addMinutes(h, m, Math.max(0, remaining))
-      h = arr.h; m = arr.m
-    } else {
-      const arr = addMinutes(h, m, driveMinutes)
-      h = arr.h; m = arr.m
-    }
+    // Drive to destination
+    const arr = addMinutes(h, m, driveMinutes)
+    h = arr.h; m = arr.m
 
     items.push({
       id: nextId(),
@@ -132,35 +113,7 @@ export function buildDaySchedule(
       h = after.h; m = after.m
     }
 
-    if (true) { // lunch always shown for multi-stop days
-      if (h * 60 + m < 12 * 60 + 30) { h = 12; m = 30 }
-      const lunchAct = foodAtDest[0]
-      const lunchDur = 75
-      if (lunchAct) {
-        items.push({
-          id: nextId(),
-          time: fmt(h, m),
-          emoji: lunchAct.emoji,
-          title: lunchAct.name,
-          subtitle: lunchAct.description.slice(0, 70) + (lunchAct.description.length > 70 ? '…' : ''),
-          duration_min: lunchDur,
-          type: 'lunch',
-          is_highlight: lunchAct.isHiddenGem,
-        })
-      } else {
-        items.push({
-          id: nextId(),
-          time: fmt(h, m),
-          emoji: '🍽️',
-          title: 'Lunch',
-          subtitle: hasKids ? 'Find somewhere family-friendly' : 'Find a local spot or pack a picnic',
-          duration_min: 60,
-          type: 'lunch',
-        })
-      }
-      const afterLunch = addMinutes(h, m, lunchDur)
-      h = afterLunch.h; m = afterLunch.m
-    }
+    // No auto-lunch — user adds dining stops via 'Plan it' on Food & Drinks tab
 
     // Afternoon activities (up to 2)
     for (const act of sightseeing.slice(2, 4)) {
@@ -195,18 +148,7 @@ export function buildDaySchedule(
     type: 'depart',
   })
 
-  // 2. Breakfast stop for long drives
-  if (driveHours >= 1.5) {
-    const bt = addMinutes(h, m, 60)
-    h = bt.h; m = bt.m
-    items.push({
-      id: nextId(), time: fmt(h, m), emoji: '☕',
-      title: 'Grab a coffee', subtitle: 'Fuel up before you hit the road',
-      duration_min: 20, type: 'breakfast',
-    })
-    const after = addMinutes(h, m, 20)
-    h = after.h; m = after.m
-  }
+  // No auto coffee stop — user adds stops via 'Plan it'
 
   // 3. Drive to first stop (30% of drive time)
   const driveToFirst = addMinutes(h, m, Math.round(driveMinutes * 0.3))
@@ -230,17 +172,7 @@ export function buildDaySchedule(
     h = after.h; m = after.m
   }
 
-  // 5. Lunch break for longer drives
-  if (driveHours >= 2) {
-    if (h * 60 + m < 12 * 60 + 30) { h = 12; m = 30 }
-    items.push({
-      id: nextId(), time: fmt(h, m), emoji: '🍽️',
-      title: 'Lunch', subtitle: 'Find a local spot to refuel',
-      duration_min: 45, type: 'lunch',
-    })
-    const after = addMinutes(h, m, 45)
-    h = after.h; m = after.m
-  }
+  // No auto-lunch — user adds dining stops via 'Plan it'
 
   // 6. Afternoon POIs
   const afternoonPOIs = pois.filter((p) => p.vibe_score >= 30).slice(2, 4)
