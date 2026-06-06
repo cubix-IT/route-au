@@ -400,14 +400,16 @@ async function fetchVhd(name: string, lat: number, lng: number, radiusKm: number
 
 // ── Descriptions: Wikipedia + Haiku, written to in-memory objects ────────────
 // Must be called BEFORE quality filtering so descriptions inform what gets upserted.
-async function fillDescriptions(destName: string, activities: any[], foods: any[]) {
+async function fillDescriptions(destName: string, activities: any[], foods: any[], nature: any[]) {
   if (!anthropicKey) return
 
   // Items to enrich: those without a description, PLUS those with a wikipedia tag
   // (Wikipedia always wins over a short OSM description tag like "A bushland haven...")
   const allItems = [
-    ...activities.filter(a => !a.description || a.attributes?.wikipedia).slice(0, 30),
-    ...foods.filter(f => !f.description || f.attributes?.wikipedia).slice(0, 20),
+    ...activities.filter(a => !a.description || a.attributes?.wikipedia).slice(0, 25),
+    ...foods.filter(f => !f.description || f.attributes?.wikipedia).slice(0, 15),
+    // Nature spots without usable description — let Haiku write one
+    ...nature.filter(n => !n.description || n.description.length < 20).slice(0, 10),
   ]
   if (allItems.length === 0) return
 
@@ -422,8 +424,16 @@ async function fillDescriptions(destName: string, activities: any[], foods: any[
       })
       if (r.ok) {
         const d = await r.json() as { extract?: string }
-        const extract = d.extract?.split('.')[0]
-        if (extract && extract.length > 20) resolved[item.slug] = extract + '.'
+        if (d.extract && d.extract.length > 20) {
+          // Skip encyclopaedic openers (population, founding, "is a X in Y" sentences)
+          const sentences = d.extract.split(/(?<=[.!?])\s+/)
+          const useful = sentences.find(s =>
+            s.length > 30 &&
+            !/\bis (a|an|the)\b.*\b(town|city|suburb|municipality|locality|shire|council|region|state|country)\b/i.test(s) &&
+            !/population|founded|established|incorporated|census|km²|square kilo/i.test(s)
+          ) ?? sentences[0]
+          resolved[item.slug] = (useful.length > 220 ? useful.slice(0, 217) + '…' : useful).trim()
+        }
       }
     } catch { /* skip */ }
   }
@@ -444,7 +454,7 @@ async function fillDescriptions(destName: string, activities: any[], foods: any[
         headers: { 'x-api-key': anthropicKey, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
         body: JSON.stringify({
           model: 'claude-haiku-4-5-20251001', max_tokens: 2000, temperature: 0.2,
-          system: `You are a local travel writer for Victoria, Australia. Write one specific, vivid sentence (15-25 words) for each place. Be concrete — mention the food type, view, history, or atmosphere. Respond ONLY with valid JSON mapping slug to description.`,
+          system: `You are a local travel writer for Victoria, Australia. Write one specific, vivid sentence (15-25 words) about what each place OFFERS VISITORS — the experience, activity, food, view, or atmosphere. Never mention population, history dates, or founding facts. Respond ONLY with valid JSON mapping slug to description.`,
           messages: [{ role: 'user', content: `Places near ${destName}, Victoria:\n${itemList}\n\nJSON: {"slug":"description",...}` }],
         }),
         signal: AbortSignal.timeout(30000),
@@ -471,7 +481,7 @@ async function fillDescriptions(destName: string, activities: any[], foods: any[
       filled++
     }
   }
-  if (filled > 0) console.log(`  [descriptions] filled ${filled} via Wikipedia/Haiku (${Object.keys(resolved).filter(s => allItems.find(i=>i.slug===s && i.attributes?.wikipedia)).length} wiki, ${needHaiku.filter(i=>resolved[i.slug]).length} haiku)`)
+  if (filled > 0) console.log(`  [descriptions] filled ${filled} via Wikipedia/Haiku (${Object.keys(resolved).filter(s => allItems.find(i => i.slug === s && i.attributes?.wikipedia)).length} wiki, ${needHaiku.filter(i => resolved[i.slug]).length} haiku)`)
 }
 
 // ── Wikipedia-first: extract named attractions from the destination's Wikipedia article ──
@@ -515,7 +525,7 @@ async function fetchWikipediaAttractions(destName: string, destSlug: string, sub
       body: JSON.stringify({
         model: 'claude-haiku-4-5-20251001', max_tokens: 1500, temperature: 0,
         system: `Extract named tourist attractions, recreation venues, events, and notable places from Wikipedia text about ${destName}, Victoria Australia.
-Return ONLY a JSON array: [{"name":"...","category":"history|nature|active|wildlife|art|entertainment|markets|viewpoint|beach|relaxation|wellness","description":"one vivid sentence 15-25 words"}]
+Return ONLY a JSON array: [{"name":"...","category":"history|nature|active|wildlife|art|entertainment|markets|viewpoint|beach|relaxation|wellness","description":"one vivid sentence 15-25 words about what visitors can DO or EXPERIENCE there — never population, dates, or founding facts"}]
 Only include specific named places/events (not general descriptions). Max 12 items. Skip pubs, restaurants, cafes, wineries — those come from a separate source.`,
         messages: [{ role: 'user', content: texts.join('\n\n') }],
       }),
@@ -551,6 +561,12 @@ Only include specific named places/events (not general descriptions). Max 12 ite
           }
         } catch { /* skip */ }
         await sleep(100)
+      }
+
+      // Skip if we couldn't locate this attraction — a pin-less card is useless
+      if (!itemLat || !itemLng) {
+        console.log(`  [wikipedia] skipping "${item.name}" — no coordinates found`)
+        continue
       }
 
       const wikiSlug = `wiki-${destSlug}-${item.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 30)}`
@@ -600,6 +616,8 @@ async function enrichSubDest(
   // Wikipedia-first: seed activities from Wikipedia Tourism/Recreation sections
   // Food & Drinks come from OSM only (OSM is reliable for cafes/pubs/wineries)
   const wikiActivities = await fetchWikipediaAttractions(name, slug, subDestId, elements, lat, lng)
+  // Build a set of normalised names from Wikipedia discoveries for dedup
+  const wikiNames = new Set(wikiActivities.map(wa => wa.name.toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 20)))
   for (const wa of wikiActivities) {
     seenSlugs.add(wa.slug)
     activities.push(wa)
@@ -619,6 +637,10 @@ async function enrichSubDest(
     const elSlug = `osm-${el.type}-${el.id}`
     if (seenSlugs.has(elSlug)) continue
     seenSlugs.add(elSlug)
+
+    // Skip if Wikipedia already discovered this attraction by name — avoid duplicates
+    const normName = name_.toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 20)
+    if (wikiNames.has(normName)) continue
 
     const website = tags.website || tags['contact:website'] || null
     const phone   = tags.phone   || tags['contact:phone']   || null
@@ -659,14 +681,16 @@ async function enrichSubDest(
     } else if (cat === 'nature') {
       const hasContact = !!(website || phone || tags.opening_hours)
       const hasDesc    = !!(tags.description || tags.note)
+      const hasWiki    = !!(tags.wikipedia || tags.wikidata)
       const isVisitor  = /national park|state park|regional park|state forest|conservation park|wilderness park|marine park|scenic reserve|natural features reserve|historic reserve|falls\b|waterfall|gorge|\blake\b|\blagoon\b|\breservoir\b|mineral spring|hot spring|\bbeach\b|\bocean\b|\bbay\b|botanic garden|lookout|summit track|heritage|^wombat|^mount\b|^mt\b/i.test(name_)
       if (/\b[A-Z]\d+\b/.test(name_) || /\bI\d+\b/.test(name_)) continue
-      if (!hasContact && !hasDesc && !isVisitor) continue
-      // Quality gate: nature spots must have a description to be stored
-      if (!hasDesc) continue
+      if (!hasContact && !hasDesc && !isVisitor && !hasWiki) continue
+      // Quality gate: must have usable description (>20 chars) OR wikipedia tag for auto-fill
+      const descText = (tags.description || tags.note || '').trim()
+      if (!hasWiki && descText.length < 20) continue
       nature.push({
         slug: elSlug, sub_dest_id: subDestId, name: name_, type: natureType(tags),
-        description: tags.description || null, lat: el.lat, lng: el.lon, address, source: 'static',
+        description: tags.description || tags.note || null, lat: el.lat, lng: el.lon, address, source: 'static',
         attributes: { source:'static', website_uri: website, opening_hours_text: tags.opening_hours || null,
           wikipedia: tags.wikipedia || null, wikidata: tags.wikidata || null, quality_score: calcQualityScore(tags, 0) },
       })
@@ -734,14 +758,16 @@ async function enrichSubDest(
   if (vhdPlaces.length > 0) console.log(`  [vhd] +${vhdPlaces.length} heritage places`)
 
   // Fill descriptions BEFORE quality filter — Haiku writes to in-memory objects
-  await fillDescriptions(name, activities, foods)
+  await fillDescriptions(name, activities, foods, nature)
 
-  // Upsert
+  // Upsert — apply quality gates after descriptions have been filled
   let upserted = 0
   const qualityActivities = activities.filter(a => a.description && a.description.trim().length > 20)
+  // Nature: must have description now (either from OSM or filled by Wikipedia/Haiku)
+  const qualityNature = nature.filter(n => n.description && n.description.trim().length > 20)
   const actSlugs    = qualityActivities.map(a => a.slug)
   const foodSlugs   = foods.map(f => f.slug)
-  const natureSlugs = nature.map(n => n.slug)
+  const natureSlugs = qualityNature.map(n => n.slug)
 
   // Delete stale records BEFORE inserting — clean slate per destination, no leftovers
   await db.from('activities').delete().eq('sub_dest_id', subDestId)
@@ -759,13 +785,13 @@ async function enrichSubDest(
     if (!error) upserted += foods.length
     else console.error('  [err] food:', error.message)
   }
-  if (nature.length > 0) {
-    const { error } = await db.from('nature_spots').upsert(nature, { onConflict: 'slug', ignoreDuplicates: false })
-    if (!error) upserted += nature.length
+  if (qualityNature.length > 0) {
+    const { error } = await db.from('nature_spots').upsert(qualityNature, { onConflict: 'slug', ignoreDuplicates: false })
+    if (!error) upserted += qualityNature.length
     else console.error('  [err] nature:', error.message)
   }
 
-  console.log(`  activities: ${activities.length} found, ${qualityActivities.length} with desc | food: ${foods.length} | nature: ${nature.length} | upserted: ${upserted}`)
+  console.log(`  activities: ${activities.length} found, ${qualityActivities.length} with desc | food: ${foods.length} | nature: ${nature.length} → ${qualityNature.length} with desc | upserted: ${upserted}`)
   return upserted
 }
 
