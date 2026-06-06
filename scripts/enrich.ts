@@ -626,6 +626,9 @@ async function enrichSubDest(
       ? `${tags['addr:housenumber'] ? tags['addr:housenumber'] + ' ' : ''}${tags['addr:street']}, ${tags['addr:suburb'] || tags['addr:city'] || ''}`.trim()
       : null)
 
+    // Skip libraries — public libraries are not weekend getaway destinations
+    if (tags.amenity === 'library') continue
+
     // Filter out zoo/sanctuary sub-enclosure labels — OSM names like "Dingo1", "Koala",
     // "Lyre Bird", "Platypus" etc. are internal facility markers, not visitor destinations.
     // Pattern: single animal/bird name (optionally followed by a digit), no other context words.

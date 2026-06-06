@@ -760,22 +760,13 @@ export function LandingPage() {
         <SeasonalWatercolour season={season} />
         <div style={{ position: 'relative', zIndex: 10, maxWidth: 680, margin: '0 auto' }}>
 
-          {/* Kicker */}
-          <p style={{
-            fontSize: 13, fontWeight: 600, letterSpacing: '0.08em',
-            textTransform: 'uppercase', color: GREEN,
-            margin: '0 0 20px',
-          }}>
-            Victorian weekend getaways
-          </p>
-
-          {/* H1 — 3–4× body size, charcoal near-black */}
+          {/* H1 — charm + clarity in two lines */}
           <h1 style={{
             fontFamily: "'Fraunces', Georgia, serif",
             fontSize: 'clamp(32px, 5vw, 56px)',
             fontWeight: 700, letterSpacing: '-0.03em', lineHeight: 1.15,
             color: '#1A1A1A',
-            margin: '0 0 24px',
+            margin: '0 0 20px',
           }}>
             <span style={{
               color: GREEN,
@@ -783,21 +774,29 @@ export function LandingPage() {
             }}>Have you seen...</span>{' '}{highlight}
           </h1>
 
-          {/* Subheadline — body ~16px (H1 ÷ 3) */}
+          {/* Subheadline — answers "what is this / why care" */}
           <p style={{
             fontSize: 'clamp(15px, 1.6vw, 18px)',
             color: '#4A4A4A', lineHeight: 1.65, fontWeight: 400,
             maxWidth: 460, margin: '0 auto 48px',
           }}>
-            Find your next Victorian escape — local food, nature, and stays, planned in 30 seconds.
+            Discover Victorian weekend escapes — local food, nature &amp; stays, planned in 30 seconds.
           </p>
 
           {/* Search — visual centre, primary action */}
-          <div style={{ width: '100%', position: 'relative', zIndex: 20, marginBottom: 20 }}>
+          <div style={{ width: '100%', position: 'relative', zIndex: 20, marginBottom: 16 }}>
             <HeroSearchToggle onSearch={handleSearch} />
           </div>
 
-          {/* Ghost secondary — text link, doesn't compete */}
+          {/* Trust signal */}
+          <p style={{
+            fontSize: 13, color: '#6B7280', margin: '0 0 16px',
+            letterSpacing: '0.01em',
+          }}>
+            130 Victorian destinations · Free to plan · No account needed
+          </p>
+
+          {/* Ghost secondary — min 44px tap target for mobile */}
           <button
             onClick={() => document.getElementById('clusters')?.scrollIntoView({ behavior: 'smooth' })}
             className="mu-browse-link"
@@ -805,7 +804,7 @@ export function LandingPage() {
               background: 'none', border: 'none',
               color: '#6B7280', fontSize: 14, cursor: 'pointer',
               textDecoration: 'underline', textDecorationColor: '#D1D5DB',
-              padding: '4px 8px',
+              padding: '12px 8px', minHeight: 44,
             }}>
             or browse destinations ↓
           </button>
