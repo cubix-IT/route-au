@@ -1044,7 +1044,7 @@ function ClusterCard({
   const driveOriginLabel = storedOriginName ? storedOriginName.split(',')[0] : 'Melbourne'
 
   return (
-    <div style={{
+    <div className="mu-card" style={{
       borderRadius: 18,
       overflow: 'hidden',
       background: '#fff',

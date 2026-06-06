@@ -415,8 +415,8 @@ export function ExperiencePanel({ hideTimeline = false }: { hideTimeline?: boole
         )}
       </div>
 
-      {/* ── Content ── */}
-      <div style={{ padding: '0 0 32px', flex: 1 }}>
+      {/* ── Content — keyed so fade-up plays on filter change ── */}
+      <div key={filter} className="animate-fade-up" style={{ padding: '0 0 32px', flex: 1 }}>
 
         {/* Guardrail alerts */}
         {(d.activeItinerary.all_warnings?.length ?? 0) > 0 && (

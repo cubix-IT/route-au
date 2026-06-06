@@ -377,7 +377,7 @@ export function ProfileWizard() {
         </div>
 
         {/* Body */}
-        <div style={{
+        <div key={`${step}-${generating}`} className="animate-fade-up" style={{
           flex: 1,
           overflowY: isPickStep ? 'hidden' : 'auto',
           padding: isPickStep ? '12px 0 0' : '16px 24px',
