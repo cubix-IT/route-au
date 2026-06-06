@@ -1,3 +1,4 @@
+import { GREEN, WARM, SECONDARY } from '@/lib/brand'
 import { useState, useRef, useEffect, useMemo, useCallback } from 'react'
 import { useAppStore } from '@/store/useAppStore'
 import type { PreselectedDest } from '@/store/useAppStore'
@@ -9,7 +10,6 @@ import { useActivities } from '@/hooks/useActivities'
 import { DestinationModal } from './DestinationModal'
 import { supabase } from '@/lib/supabase'
 
-const GREEN = '#3A6B4F'
 
 const season = getCurrentSeason()
 

@@ -1,6 +1,6 @@
+import { GREEN, WARM, SECONDARY } from '@/lib/brand'
 import { usePlannerData } from '@/hooks/usePlannerData'
 
-const GREEN = '#3A6B4F'
 
 const ACCOM_EMOJI: Record<string, string> = {
   Hotel: '🏨', Motel: '🏩', Glamping: '🛖', 'Caravan Park': '🚐',

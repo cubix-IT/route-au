@@ -1,3 +1,4 @@
+import { GREEN, WARM, SECONDARY } from '@/lib/brand'
 import { useState, useRef, useEffect } from 'react'
 import toast from 'react-hot-toast'
 import { useAppStore } from '@/store/useAppStore'
@@ -5,7 +6,6 @@ import { signOut } from '@/hooks/useAuth'
 import { saveTrip, loadTrips, deleteTrip, FREE_TRIP_LIMIT } from '@/lib/tripsService'
 import logoSrc from '@/assets/logo.png'
 
-const GREEN = '#3A6B4F'
 
 export function LogoMark({ size = 56 }: { size?: number }) {
   return (

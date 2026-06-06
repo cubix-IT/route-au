@@ -1,7 +1,6 @@
+import { GREEN, WARM, SECONDARY } from '@/lib/brand'
 import { useAppStore } from '@/store/useAppStore'
 
-const GREEN = '#3A6B4F'
-const WARM = '#B87333'
 
 function parseTimeToHours(timeStr: string): number {
   const match = timeStr.match(/(\d+):(\d+)\s*(am|pm)/i)

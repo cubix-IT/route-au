@@ -264,7 +264,8 @@ const FILTER_LABELS: { key: FilterKey; label: string }[] = [
   { key: 'relaxation', label: 'Relaxation' },
 ]
 
-const GREEN_EXPLORE = '#3A6B4F'
+import { GREEN } from '@/lib/brand'
+const GREEN_EXPLORE = GREEN
 
 const POI_CFG_EXPLORE: Record<LivePOI['type'], { label: string; emoji: string }> = {
   pub:        { label: 'Pubs',              emoji: '🍺' },
@@ -470,7 +471,6 @@ function ExploreTab() {
 }
 
 function ActivityCard({ activity: act }: { activity: Activity }) {
-  const GREEN = '#3A6B4F'
   const costMap: Record<string, string> = { free: 'Free', '$': 'Budget', '$$': 'Mid-range', '$$$': 'Premium' }
   const costColor: Record<string, string> = {
     free: GREEN, '$': 'var(--text-muted)', '$$': '#B87333', '$$$': '#C94040',

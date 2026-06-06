@@ -6,6 +6,12 @@
 /* Plus Jakarta Sans — all UI text                                  */
 
 :root {
+  /* Border radius scale */
+  --radius-sm:  10px;   /* buttons, badges */
+  --radius-md:  14px;   /* cards, inputs */
+  --radius-lg:  20px;   /* sheets, containers */
+  --radius-xl:  24px;   /* wizard, modals */
+
   /* Backgrounds */
   --bg-base:         #F8F7F4;
   --bg-surface:      #FFFFFF;

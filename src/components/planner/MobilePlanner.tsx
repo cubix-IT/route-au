@@ -1,3 +1,4 @@
+import { GREEN, WARM, SECONDARY } from '@/lib/brand'
 import React, { useState, useEffect, useMemo } from 'react'
 import { MapContainer } from '@/components/map/MapContainer'
 import { usePlannerData } from '@/hooks/usePlannerData'
@@ -8,8 +9,6 @@ import type { HazardAlert } from '@/lib/vicEmergency'
 import type { Activity } from '@/data/victorianActivities.ts'
 import { ResultCard } from './ResultCard'
 
-const GREEN = '#3A6B4F'
-const WARM  = '#B87333'
 
 interface OpenPeriod { open: { day: number; hour: number; minute: number }; close?: { day: number; hour: number; minute: number } }
 function getOpenStatus(periods?: OpenPeriod[]): { isOpen: boolean; nextOpen?: string } | null {

@@ -1,8 +1,7 @@
+import { GREEN, WARM, SECONDARY } from '@/lib/brand'
 import { useAppStore } from '@/store/useAppStore'
 import { usePlannerData } from '@/hooks/usePlannerData'
 
-const GREEN = '#3A6B4F'
-const WARM  = '#B87333'
 
 function fmtDate(iso: string): string {
   try { return new Date(iso + 'T00:00').toLocaleDateString('en-AU', { weekday: 'short', day: 'numeric', month: 'short' }) }

@@ -1,3 +1,4 @@
+import { GREEN, WARM, SECONDARY } from '@/lib/brand'
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { usePlannerData } from '@/hooks/usePlannerData'
 import { useAppStore } from '@/store/useAppStore'
@@ -11,8 +12,6 @@ import type { Activity } from '@/data/victorianActivities'
 import type { GuardrailWarning } from '@/types'
 import { ResultCard } from './ResultCard'
 
-const GREEN = '#3A6B4F'
-const WARM  = '#B87333'
 
 // Build a Google Maps URL that opens pinned to exact coordinates when available.
 // Coordinate-based URLs open the right location on the map immediately.
@@ -48,7 +47,7 @@ function safeMapsUrl(mapsUrl: string | undefined | null, name: string, lat?: num
 // ── Category tag config ────────────────────────────────────────────────────────
 
 const CAT_TAG: Record<string, { label: string; color: string; bg: string }> = {
-  nature:        { label: 'Nature',        color: '#2D7A4A', bg: '#E8F5EE' },
+  nature:        { label: 'Nature',        color: '#2D7A4A', bg: 'var(--green-light)' },
   active:        { label: 'Outdoor',       color: '#2563EB', bg: '#EFF6FF' },
   wildlife:      { label: 'Wildlife',      color: '#047857', bg: '#ECFDF5' },
   history:       { label: 'History',       color: '#7C3AED', bg: '#F5F3FF' },
@@ -59,7 +58,7 @@ const CAT_TAG: Record<string, { label: string; color: string; bg: string }> = {
   drink:         { label: 'Drink',         color: '#B87333', bg: '#FFF5EB' },
   winery:        { label: 'Winery',        color: '#7E22CE', bg: '#FAF5FF' },
   brewery:       { label: 'Brewery',       color: '#92400E', bg: '#FEF3C7' },
-  distillery:    { label: 'Distillery',    color: '#374151', bg: '#F3F4F6' },
+  distillery:    { label: 'Distillery',    color: 'var(--text-secondary)', bg: '#F3F4F6' },
   markets:       { label: 'Markets',       color: '#059669', bg: '#ECFDF5' },
   viewpoint:     { label: 'Scenic View',   color: '#4338CA', bg: '#EEF2FF' },
   beach:         { label: 'Beach',         color: '#0369A1', bg: '#E0F2FE' },
@@ -172,7 +171,7 @@ function StarRating({ rating, count }: { rating: number; count?: number }) {
       <span style={{ fontSize: 11, color: '#F59E0B', letterSpacing: '-0.5px' }}>
         {'★'.repeat(full)}{half ? '½' : ''}{'☆'.repeat(Math.max(0, 5 - full - (half ? 1 : 0)))}
       </span>
-      <span style={{ fontSize: 10, color: '#6B7280', fontWeight: 500 }}>
+      <span style={{ fontSize: 10, color: 'var(--text-muted)', fontWeight: 500 }}>
         {rating.toFixed(1)}{count ? ` (${count > 999 ? `${Math.round(count / 1000)}k` : count})` : ''}
       </span>
     </div>
@@ -540,7 +539,7 @@ export function ExperiencePanel({ hideTimeline = false }: { hideTimeline?: boole
                     : d.driveMinutes.get(d.dbActivities.find(a => String(a.activity_id) === act.id)?.slug ?? '') ?? null
 
                 const renderCard = (act: typeof filtered[0]) => {
-                  const tag = CAT_TAG[act.category] ?? { label: act.category, color: '#374151', bg: '#F3F4F6' }
+                  const tag = CAT_TAG[act.category] ?? { label: act.category, color: 'var(--text-secondary)', bg: '#F3F4F6' }
                   const openStatus = getOpenStatus(act.openingHoursPeriods)
                   const driveMin = getActDriveMin(act)
                   const actLat = (act as any).lat, actLng = (act as any).lng
@@ -605,7 +604,7 @@ export function ExperiencePanel({ hideTimeline = false }: { hideTimeline?: boole
                         margin: '4px 16px 0', width: 'calc(100% - 32px)',
                         padding: '10px', borderRadius: 10,
                         border: '1px dashed var(--border)', background: 'none',
-                        fontSize: 12, color: '#6B7280', fontWeight: 600, cursor: 'pointer',
+                        fontSize: 12, color: 'var(--text-muted)', fontWeight: 600, cursor: 'pointer',
                       }}>
                         Show all {localActs.length} things to do ↓
                       </button>
@@ -616,7 +615,7 @@ export function ExperiencePanel({ hideTimeline = false }: { hideTimeline?: boole
                     {nearbyActs.length > 0 && (
                       <>
                         <div style={{ margin: '16px 16px 8px', display: 'flex', alignItems: 'center', gap: 8 }}>
-                          <span style={{ fontSize: 11, fontWeight: 700, color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.07em' }}>Also nearby</span>
+                          <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.07em' }}>Also nearby</span>
                           <div style={{ flex: 1, height: 1, background: 'var(--border)' }} />
                         </div>
                         <div className="activity-grid" style={{ padding: '0 16px' }}>{nearbyActs.map(renderCard)}</div>
@@ -643,7 +642,7 @@ export function ExperiencePanel({ hideTimeline = false }: { hideTimeline?: boole
           const FOOD_CAT_COLOR: Record<string, { color: string; bg: string }> = {
             Winery:     { color: '#7E22CE', bg: '#FAF5FF' },
             Brewery:    { color: '#92400E', bg: '#FEF3C7' },
-            Distillery: { color: '#374151', bg: '#F3F4F6' },
+            Distillery: { color: 'var(--text-secondary)', bg: '#F3F4F6' },
             Pub:        { color: '#1D4ED8', bg: '#EFF6FF' },
             Restaurant: { color: '#B45309', bg: '#FFFBEB' },
             Cafe:       { color: '#0369A1', bg: '#E0F2FE' },
@@ -682,7 +681,7 @@ export function ExperiencePanel({ hideTimeline = false }: { hideTimeline?: boole
           const renderFoodCard = (f: import('@/hooks/usePlannerData').DbFoodPlace) => {
             const attr = f.attributes as { website_uri?: string; opening_hours_text?: string; cuisine?: string }
             const emoji = FOOD_CAT_EMOJI[f.category] ?? '🍽️'
-            const cfg = FOOD_CAT_COLOR[f.category] ?? { color: '#374151', bg: '#F9FAFB' }
+            const cfg = FOOD_CAT_COLOR[f.category] ?? { color: 'var(--text-secondary)', bg: '#F9FAFB' }
             const website = attr.website_uri ?? f.website ?? undefined
             const mapsUrl = coordMapsUrl(f.name, f.lat, f.lng, d.shortDest)
             const driveMin = d.driveMinutes.get(f.slug) ?? null
@@ -747,7 +746,7 @@ export function ExperiencePanel({ hideTimeline = false }: { hideTimeline?: boole
                 {showDrinks.length > 0 && (
                   <>
                     {filter === 'food' && foodCatFilter === 'all' && (
-                      <div style={{ fontSize: 11, fontWeight: 700, color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 8, marginTop: 4 }}>
+                      <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 8, marginTop: 4 }}>
                         🍷 Cellar Doors & Craft Drinks
                       </div>
                     )}
@@ -761,7 +760,7 @@ export function ExperiencePanel({ hideTimeline = false }: { hideTimeline?: boole
                 {showFood.length > 0 && (
                   <>
                     {filter === 'food' && foodCatFilter === 'all' && drinkVenues.length > 0 && (
-                      <div style={{ fontSize: 11, fontWeight: 700, color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.07em', marginTop: 4, marginBottom: 8 }}>
+                      <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.07em', marginTop: 4, marginBottom: 8 }}>
                         🍽️ Places to Eat
                       </div>
                     )}
@@ -775,7 +774,7 @@ export function ExperiencePanel({ hideTimeline = false }: { hideTimeline?: boole
                   <button onClick={() => handleFilterChange('food')} style={{
                     width: '100%', padding: '9px', borderRadius: 9,
                     border: '1px dashed var(--border)', background: 'none',
-                    fontSize: 12, color: '#6B7280', fontWeight: 500, cursor: 'pointer',
+                    fontSize: 12, color: 'var(--text-muted)', fontWeight: 500, cursor: 'pointer',
                   }}>
                     View all {allFoods.length} food & drink spots ↓
                   </button>
@@ -792,7 +791,7 @@ export function ExperiencePanel({ hideTimeline = false }: { hideTimeline?: boole
               {trails.map((trail) => {
                 const typeLabel = trail.type === 'walk' ? 'Walking' : trail.type === 'cycle' ? 'Cycling' : 'Mountain Bike'
                 const typeColor = trail.type === 'walk' ? '#2563EB' : trail.type === 'cycle' ? GREEN : '#7C3AED'
-                const typeBg   = trail.type === 'walk' ? '#EFF6FF' : trail.type === 'cycle' ? '#F0FDF4' : '#F5F3FF'
+                const typeBg   = trail.type === 'walk' ? '#EFF6FF' : trail.type === 'cycle' ? 'var(--green-light)' : '#F5F3FF'
                 const topWps   = (trail.waypoints ?? []).filter(w => w.description).slice(0, 2)
                 return (
                   <div key={trail.slug} style={{
@@ -811,7 +810,7 @@ export function ExperiencePanel({ hideTimeline = false }: { hideTimeline?: boole
                           <span style={{ fontSize: 11, fontWeight: 600, color: typeColor, background: typeBg, padding: '2px 8px', borderRadius: 6 }}>
                             {typeLabel}
                           </span>
-                          <span style={{ fontSize: 12, color: '#6B7280' }}>
+                          <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>
                             {trail.distance_km} km · {trail.region}
                           </span>
                         </div>
@@ -831,7 +830,7 @@ export function ExperiencePanel({ hideTimeline = false }: { hideTimeline?: boole
                         {topWps.map((wp) => (
                           <div key={wp.name} style={{ fontSize: 12, color: '#4A4948', lineHeight: 1.5 }}>
                             <span style={{ fontWeight: 600, color: '#1C1C1A' }}>{wp.name}</span>
-                            {wp.description && <span style={{ color: '#6B7280' }}> — {wp.description.slice(0, 120)}{wp.description.length > 120 ? '…' : ''}</span>}
+                            {wp.description && <span style={{ color: 'var(--text-muted)' }}> — {wp.description.slice(0, 120)}{wp.description.length > 120 ? '…' : ''}</span>}
                           </div>
                         ))}
                       </div>
@@ -841,15 +840,15 @@ export function ExperiencePanel({ hideTimeline = false }: { hideTimeline?: boole
                     <a
                       href={`https://www.parks.vic.gov.au/search#stq=${encodeURIComponent(trail.name)}`}
                       target="_blank" rel="noopener noreferrer"
-                      style={{ fontSize: 11, color: '#6B7280', textDecoration: 'underline' }}
+                      style={{ fontSize: 11, color: 'var(--text-muted)', textDecoration: 'underline' }}
                     >
                       Check closures & conditions at Parks Victoria →
                     </a>
                   </div>
                 )
               })}
-              <p style={{ fontSize: 11, color: '#9CA3AF', margin: '4px 0 8px', lineHeight: 1.6 }}>
-                Trail data © <a href="https://www.data.vic.gov.au" target="_blank" rel="noopener noreferrer" style={{ color: '#9CA3AF' }}>data.vic.gov.au</a> (CC BY 4.0)
+              <p style={{ fontSize: 11, color: 'var(--text-muted)', margin: '4px 0 8px', lineHeight: 1.6 }}>
+                Trail data © <a href="https://www.data.vic.gov.au" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--text-muted)' }}>data.vic.gov.au</a> (CC BY 4.0)
               </p>
             </div>
           </SectionBlock>
@@ -897,7 +896,7 @@ export function ExperiencePanel({ hideTimeline = false }: { hideTimeline?: boole
                   <button onClick={() => setShowAllAccom(true)} style={{
                     width: '100%', padding: '9px', borderRadius: 9,
                     border: '1px dashed var(--border)', background: 'none',
-                    fontSize: 12, color: '#6B7280', fontWeight: 500, cursor: 'pointer',
+                    fontSize: 12, color: 'var(--text-muted)', fontWeight: 500, cursor: 'pointer',
                   }}>
                     View all {allAccom.length} options near {d.shortDest} ↓
                   </button>
@@ -915,9 +914,9 @@ export function ExperiencePanel({ hideTimeline = false }: { hideTimeline?: boole
           <div style={{ padding: '16px 16px 0' }}>
             <SectionHeader title="Best Fuel Along Your Route" icon="⛽" count={0} />
             {fuelLoading ? (
-              <div style={{ padding: '20px 0', textAlign: 'center', fontSize: 13, color: '#9CA3AF' }}>Finding stations…</div>
+              <div style={{ padding: '20px 0', textAlign: 'center', fontSize: 13, color: 'var(--text-muted)' }}>Finding stations…</div>
             ) : fuelStops.length === 0 ? (
-              <div style={{ padding: '20px 0', textAlign: 'center', fontSize: 13, color: '#9CA3AF' }}>No fuel data available.</div>
+              <div style={{ padding: '20px 0', textAlign: 'center', fontSize: 13, color: 'var(--text-muted)' }}>No fuel data available.</div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 10 }}>
                 {fuelStops.map((stop) => (
@@ -925,26 +924,26 @@ export function ExperiencePanel({ hideTimeline = false }: { hideTimeline?: boole
                     background: '#fff', borderRadius: 14, border: '1px solid var(--border)',
                     padding: '14px 16px', boxShadow: '0 1px 4px rgba(0,0,0,0.05)',
                   }}>
-                    <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#9CA3AF', marginBottom: 6 }}>{stop.label}</div>
+                    <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--text-muted)', marginBottom: 6 }}>{stop.label}</div>
                     {stop.brandNotFound ? (
-                      <div style={{ fontSize: 12, color: '#9CA3AF' }}>
+                      <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
                         No {(d.vehicleProfile as unknown as { fuel_brand?: string }).fuel_brand} stations found nearby — try selecting "Any" brand in trip settings.
                       </div>
                     ) : stop.station ? (
                       <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                         <div style={{
-                          width: 52, height: 52, borderRadius: 12, background: '#F0FDF4',
+                          width: 52, height: 52, borderRadius: 12, background: 'var(--green-light)',
                           border: '1.5px solid #BBF7D0', display: 'flex', flexDirection: 'column',
                           alignItems: 'center', justifyContent: 'center', flexShrink: 0,
                         }}>
                           <span style={{ fontSize: 13, fontWeight: 900, color: '#16A34A', lineHeight: 1 }}>${stop.station.pricePerLitre.toFixed(3)}</span>
-                          <span style={{ fontSize: 8, color: '#6B7280', marginTop: 1 }}>/litre</span>
+                          <span style={{ fontSize: 8, color: 'var(--text-muted)', marginTop: 1 }}>/litre</span>
                         </div>
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <div style={{ fontSize: 14, fontWeight: 700, color: '#1C1C1A', marginBottom: 1 }}>{stop.station.name}</div>
-                          <div style={{ fontSize: 12, color: '#6B7280', marginBottom: 2 }}>{stop.station.brand} · Service Station</div>
-                          {stop.station.address && <div style={{ fontSize: 11, color: '#9CA3AF' }}>{stop.station.address}</div>}
-                          <div style={{ fontSize: 11, color: '#9CA3AF', marginTop: 2 }}>{stop.station.distanceKm} km from your route</div>
+                          <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 2 }}>{stop.station.brand} · Service Station</div>
+                          {stop.station.address && <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{stop.station.address}</div>}
+                          <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>{stop.station.distanceKm} km from your route</div>
                         </div>
                         <a
                           href={coordMapsUrl(stop.station.brand + ' ' + stop.station.address, stop.station.lat, stop.station.lng)}
@@ -953,11 +952,11 @@ export function ExperiencePanel({ hideTimeline = false }: { hideTimeline?: boole
                         >Maps ↗</a>
                       </div>
                     ) : (
-                      <div style={{ fontSize: 12, color: '#9CA3AF' }}>No stations found nearby.</div>
+                      <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>No stations found nearby.</div>
                     )}
                   </div>
                 ))}
-                <div style={{ fontSize: 11, color: '#9CA3AF', textAlign: 'center', paddingBottom: 4 }}>
+                <div style={{ fontSize: 11, color: 'var(--text-muted)', textAlign: 'center', paddingBottom: 4 }}>
                   Prices from Service Victoria — updated daily
                 </div>
               </div>
@@ -968,11 +967,11 @@ export function ExperiencePanel({ hideTimeline = false }: { hideTimeline?: boole
         {/* ── Footer ── */}
         <div style={{ padding: '24px 16px 20px', borderTop: '1px solid var(--border)', marginTop: 8, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span style={{ fontSize: 11, color: '#9CA3AF' }}>Data © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer" style={{ color: '#9CA3AF' }}>OpenStreetMap</a> (ODbL) · Tiles © <a href="https://carto.com/attributions" target="_blank" rel="noopener noreferrer" style={{ color: '#9CA3AF' }}>CARTO</a> · Content © <a href="https://en.wikipedia.org" target="_blank" rel="noopener noreferrer" style={{ color: '#9CA3AF' }}>Wikipedia</a> (CC BY-SA) · Heritage © <a href="https://vhd.heritagecouncil.vic.gov.au" target="_blank" rel="noopener noreferrer" style={{ color: '#9CA3AF' }}>Heritage Council Vic</a> (CC BY 4.0)</span>
+            <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>Data © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--text-muted)' }}>OpenStreetMap</a> (ODbL) · Tiles © <a href="https://carto.com/attributions" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--text-muted)' }}>CARTO</a> · Content © <a href="https://en.wikipedia.org" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--text-muted)' }}>Wikipedia</a> (CC BY-SA) · Heritage © <a href="https://vhd.heritagecouncil.vic.gov.au" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--text-muted)' }}>Heritage Council Vic</a> (CC BY 4.0)</span>
           </div>
           <div style={{ display: 'flex', gap: 12 }}>
-            <a href="/privacy" target="_blank" rel="noopener noreferrer" style={{ fontSize: 11, color: '#9CA3AF', textDecoration: 'none', fontWeight: 500 }}>Privacy & Attribution</a>
-            <a href="mailto:support@cubixit.com.au" style={{ fontSize: 11, color: '#9CA3AF', textDecoration: 'none', fontWeight: 500 }}>Feedback</a>
+            <a href="/privacy" target="_blank" rel="noopener noreferrer" style={{ fontSize: 11, color: 'var(--text-muted)', textDecoration: 'none', fontWeight: 500 }}>Privacy & Attribution</a>
+            <a href="mailto:support@cubixit.com.au" style={{ fontSize: 11, color: 'var(--text-muted)', textDecoration: 'none', fontWeight: 500 }}>Feedback</a>
           </div>
         </div>
       </div>
@@ -1024,13 +1023,13 @@ function PlaceCard({ emoji, name, categoryLabel, categoryColor, categoryBg, desc
             textTransform: 'uppercase', letterSpacing: '0.05em',
           }}>{categoryLabel}</span>
         </div>
-        <span style={{ fontSize: 11, color: '#9CA3AF', flexShrink: 0, marginTop: 2, transition: 'transform 0.15s', transform: expanded ? 'rotate(180deg)' : 'none' }}>▾</span>
+        <span style={{ fontSize: 11, color: 'var(--text-muted)', flexShrink: 0, marginTop: 2, transition: 'transform 0.15s', transform: expanded ? 'rotate(180deg)' : 'none' }}>▾</span>
       </div>
 
       {/* Description — collapsed: 2-line clamp; expanded: full */}
       {description && (
         <div style={{
-          fontSize: 11, color: '#6B7280', lineHeight: 1.45, marginTop: 7,
+          fontSize: 11, color: 'var(--text-muted)', lineHeight: 1.45, marginTop: 7,
           ...(expanded ? {} : { display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }),
         }}>{description}</div>
       )}
@@ -1045,7 +1044,7 @@ function PlaceCard({ emoji, name, categoryLabel, categoryColor, categoryBg, desc
         )}
         {phone && expanded && (
           <a href={`tel:${phone}`} target="_blank" rel="noopener noreferrer" style={{
-            padding: '6px 10px', borderRadius: 7, background: '#F0FDF4', border: '1px solid #BBF7D0',
+            padding: '6px 10px', borderRadius: 7, background: 'var(--green-light)', border: '1px solid #BBF7D0',
             fontSize: 11, fontWeight: 600, color: '#16A34A', textDecoration: 'none',
           }}>📞</a>
         )}
@@ -1065,9 +1064,9 @@ function SectionHeader({ title, icon, count }: { title: string; icon: string; co
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
       <span style={{ fontSize: 15 }}>{icon}</span>
-      <span style={{ fontSize: 13, fontWeight: 800, color: '#1C1B1F', letterSpacing: '-0.01em' }}>{title}</span>
+      <span style={{ fontSize: 13, fontWeight: 800, color: 'var(--text-primary)', letterSpacing: '-0.01em' }}>{title}</span>
       {count > 0 && (
-        <span style={{ fontSize: 10, fontWeight: 700, color: '#9CA3AF', background: '#F3F4F6', padding: '1px 7px', borderRadius: 10 }}>{count}</span>
+        <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-muted)', background: '#F3F4F6', padding: '1px 7px', borderRadius: 10 }}>{count}</span>
       )}
       <div style={{ flex: 1, height: 1, background: 'var(--border)' }} />
     </div>
@@ -1099,7 +1098,7 @@ function ActivityCard({ act, expanded, highlighted, onToggle, isAdded, onAdd, on
   act: Activity; expanded: boolean; highlighted?: boolean; onToggle: () => void
   isAdded?: boolean; onAdd?: () => void; onRemove?: () => void; onMapPin?: () => void
 }) {
-  const tag = CAT_TAG[act.category] ?? { label: act.category, color: '#374151', bg: '#F3F4F6' }
+  const tag = CAT_TAG[act.category] ?? { label: act.category, color: 'var(--text-secondary)', bg: '#F3F4F6' }
   const mapsUrl = act.mapsUrl || coordMapsUrl(act.name, (act as any).lat, (act as any).lng)
   const websiteUrl = act.websiteUri && !act.websiteUri.includes('google.com') ? act.websiteUri : null
   const openStatus = getOpenStatus(act.openingHoursPeriods)
@@ -1111,7 +1110,7 @@ function ActivityCard({ act, expanded, highlighted, onToggle, isAdded, onAdd, on
 
   return (
     <div data-poi-id={act.id} onClick={handleToggle} style={{
-      background: highlighted ? 'var(--green-light)' : isAdded ? '#F0FDF4' : act.isHiddenGem ? '#F0FDF4' : '#fff',
+      background: highlighted ? 'var(--green-light)' : isAdded ? 'var(--green-light)' : act.isHiddenGem ? 'var(--green-light)' : '#fff',
       borderRadius: 14,
       border: `1.5px solid ${highlighted ? 'var(--green)' : isAdded ? 'rgba(58,107,79,0.4)' : act.isHiddenGem ? 'rgba(58,107,79,0.25)' : 'var(--border)'}`,
       padding: '13px 15px', cursor: 'pointer',
@@ -1126,14 +1125,14 @@ function ActivityCard({ act, expanded, highlighted, onToggle, isAdded, onAdd, on
             {act.cost === 'free' && <Chip label="Free" color={GREEN} bg="#E8F5EE" />}
             {isAdded && <Chip label="✓ In your plan" color="#0369A1" bg="#E0F2FE" />}
           </div>
-          <div style={{ fontSize: 13.5, fontWeight: 700, color: '#1C1B1F', marginBottom: 3, lineHeight: 1.3 }}>{act.name}</div>
+          <div style={{ fontSize: 13.5, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 3, lineHeight: 1.3 }}>{act.name}</div>
           {act.rating && (
             <div style={{ marginBottom: 3 }}>
               <StarRating rating={act.rating} count={act.reviewCount} />
             </div>
           )}
           {!expanded && act.description && (
-            <div style={{ fontSize: 11.5, color: '#49454F', lineHeight: 1.55 }}>
+            <div style={{ fontSize: 11.5, color: 'var(--text-secondary)', lineHeight: 1.55 }}>
               {act.description.length > 90 ? act.description.slice(0, 90) + '…' : act.description}
             </div>
           )}
@@ -1142,11 +1141,11 @@ function ActivityCard({ act, expanded, highlighted, onToggle, isAdded, onAdd, on
               {openStatus.isOpen ? 'Open now' : `Closed${openStatus.nextOpen ? ` — opens ${openStatus.nextOpen}` : ''}`}
             </div>
           )}
-          <div style={{ fontSize: 10.5, color: '#9CA3AF', marginTop: 4 }}>⏱ {act.duration}</div>
+          <div style={{ fontSize: 10.5, color: 'var(--text-muted)', marginTop: 4 }}>⏱ {act.duration}</div>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
           {act.isHiddenGem
-            ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, background: '#E8F5EE', border: '1px solid rgba(58,107,79,0.2)', borderRadius: 20, padding: '3px 8px', flexShrink: 0 }}>
+            ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, background: 'var(--green-light)', border: '1px solid rgba(58,107,79,0.2)', borderRadius: 20, padding: '3px 8px', flexShrink: 0 }}>
                 <span style={{ fontSize: 10, color: GREEN }}>◆</span>
                 <span style={{ fontSize: 9.5, fontWeight: 700, color: GREEN, letterSpacing: '0.02em' }}>Local gem</span>
               </span>
@@ -1154,13 +1153,13 @@ function ActivityCard({ act, expanded, highlighted, onToggle, isAdded, onAdd, on
                 <button onClick={(e) => { e.stopPropagation(); onMapPin() }} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 13, color: highlighted ? 'var(--green)' : '#C8C4BD', padding: 0, lineHeight: 1 }} title="Show on map">📍</button>
               )
           }
-          <span style={{ fontSize: 12, color: '#9CA3AF', transition: 'transform 0.15s', transform: expanded ? 'rotate(180deg)' : 'none', marginTop: 2 }}>▾</span>
+          <span style={{ fontSize: 12, color: 'var(--text-muted)', transition: 'transform 0.15s', transform: expanded ? 'rotate(180deg)' : 'none', marginTop: 2 }}>▾</span>
         </div>
       </div>
       {expanded && (
         <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid var(--border)', display: 'flex', flexDirection: 'column', gap: 10 }}>
           {act.description && (
-            <p style={{ fontSize: 12, color: '#374151', lineHeight: 1.65, margin: 0 }}>{act.description}</p>
+            <p style={{ fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.65, margin: 0 }}>{act.description}</p>
           )}
           {openStatus && (
             <div style={{ fontSize: 11.5, fontWeight: 600, color: openStatus.isOpen ? '#16A34A' : '#DC2626' }}>
@@ -1170,7 +1169,7 @@ function ActivityCard({ act, expanded, highlighted, onToggle, isAdded, onAdd, on
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
             {websiteUrl && (
               <a href={websiteUrl} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()}
-                style={{ padding: '9px 14px', borderRadius: 9, background: '#F8F7F4', border: '1px solid var(--border)', color: '#374151', fontSize: 12, fontWeight: 700, textDecoration: 'none', whiteSpace: 'nowrap' }}>
+                style={{ padding: '9px 14px', borderRadius: 9, background: '#F8F7F4', border: '1px solid var(--border)', color: 'var(--text-secondary)', fontSize: 12, fontWeight: 700, textDecoration: 'none', whiteSpace: 'nowrap' }}>
                 Website ↗
               </a>
             )}
@@ -1178,7 +1177,7 @@ function ActivityCard({ act, expanded, highlighted, onToggle, isAdded, onAdd, on
               {act.phone && (
                 <a href={`tel:${act.phone}`} onClick={(e) => e.stopPropagation()}
                   title={act.phone}
-                  style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 36, height: 36, borderRadius: 9, background: '#F0FDF4', border: '1px solid #BBF7D0', color: '#16A34A', textDecoration: 'none', fontSize: 16 }}>
+                  style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 36, height: 36, borderRadius: 9, background: 'var(--green-light)', border: '1px solid #BBF7D0', color: '#16A34A', textDecoration: 'none', fontSize: 16 }}>
                   📞
                 </a>
               )}
@@ -1190,7 +1189,7 @@ function ActivityCard({ act, expanded, highlighted, onToggle, isAdded, onAdd, on
             </div>
             {onAdd && !isAdded && (
               <button onClick={(e) => { e.stopPropagation(); onAdd() }}
-                style={{ padding: '9px 14px', borderRadius: 9, border: `1.5px solid ${GREEN}`, background: '#E8F5EE', color: GREEN, fontSize: 12, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                style={{ padding: '9px 14px', borderRadius: 9, border: `1.5px solid ${GREEN}`, background: 'var(--green-light)', color: GREEN, fontSize: 12, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}>
                 + Plan it
               </button>
             )}
@@ -1232,18 +1231,18 @@ function AccommodationGridCard({ poi }: { poi: AccommodationPOI; destName?: stri
       </div>
 
       {/* Name */}
-      <div style={{ fontSize: 13.5, fontWeight: 800, color: '#1C1B1F', lineHeight: 1.3 }}>
+      <div style={{ fontSize: 13.5, fontWeight: 800, color: 'var(--text-primary)', lineHeight: 1.3 }}>
         {poi.name}
       </div>
 
       {/* Description */}
       {poi.description && (
-        <div style={{ fontSize: 11.5, color: '#49454F', lineHeight: 1.55 }}>{poi.description}</div>
+        <div style={{ fontSize: 11.5, color: 'var(--text-secondary)', lineHeight: 1.55 }}>{poi.description}</div>
       )}
 
       {/* Address */}
       {poi.address && (
-        <div style={{ fontSize: 11, color: '#6B7280' }}>📍 {poi.address}</div>
+        <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>📍 {poi.address}</div>
       )}
 
       {/* Buttons */}
@@ -1256,7 +1255,7 @@ function AccommodationGridCard({ poi }: { poi: AccommodationPOI; destName?: stri
         ) : (
           <a href={`https://www.google.com/search?q=${encodeURIComponent(poi.name + ' ' + (poi.address ?? 'Victoria Australia'))}`}
             target="_blank" rel="noopener noreferrer"
-            style={{ flex: 1, textAlign: 'center', padding: '7px 10px', borderRadius: 8, background: '#F8F7F4', border: '1px solid var(--border)', color: '#374151', fontSize: 11.5, fontWeight: 700, textDecoration: 'none' }}>
+            style={{ flex: 1, textAlign: 'center', padding: '7px 10px', borderRadius: 8, background: '#F8F7F4', border: '1px solid var(--border)', color: 'var(--text-secondary)', fontSize: 11.5, fontWeight: 700, textDecoration: 'none' }}>
             Search ↗
           </a>
         )}
@@ -1284,7 +1283,7 @@ function AdvisoryBanner({ warning }: { warning: GuardrailWarning }) {
       <span style={{ fontSize: 16, flexShrink: 0, marginTop: 1 }}>{cfg.icon}</span>
       <div style={{ flex: 1 }}>
         <div style={{ fontSize: 11, fontWeight: 800, color: cfg.color, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 2 }}>{cfg.label}</div>
-        <div style={{ fontSize: 12, color: '#374151', lineHeight: 1.45 }}>{warning.message}</div>
+        <div style={{ fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.45 }}>{warning.message}</div>
       </div>
     </div>
   )
@@ -1304,7 +1303,7 @@ function HazardBanner({ alert }: { alert: HazardAlert }) {
           {alert.category} — {alert.status}
           <span style={{ fontWeight: 500, marginLeft: 6 }}>{alert.distanceKm} km away</span>
         </div>
-        <div style={{ fontSize: 11, color: '#374151', lineHeight: 1.4 }}>{alert.title}</div>
+        <div style={{ fontSize: 11, color: 'var(--text-secondary)', lineHeight: 1.4 }}>{alert.title}</div>
       </div>
       {alert.url && (
         <a href={alert.url} target="_blank" rel="noopener noreferrer" style={{ fontSize: 10, fontWeight: 700, color, textDecoration: 'none', flexShrink: 0 }}>Details ↗</a>
@@ -1353,7 +1352,7 @@ function VerticalStepper({ d }: { d: ReturnType<typeof usePlannerData> }) {
     <div style={{ marginTop: 2 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '16px 16px 10px' }}>
         <span style={{ fontSize: 15 }}>🗓</span>
-        <span style={{ fontSize: 13, fontWeight: 800, color: '#1C1B1F', letterSpacing: '-0.01em' }}>Your Day at a Glance</span>
+        <span style={{ fontSize: 13, fontWeight: 800, color: 'var(--text-primary)', letterSpacing: '-0.01em' }}>Your Day at a Glance</span>
         <div style={{ flex: 1, height: 1, background: 'var(--border)' }} />
       </div>
       <div style={{ padding: '4px 20px 24px', display: 'flex', flexDirection: 'column' }}>
@@ -1373,10 +1372,10 @@ function VerticalStepper({ d }: { d: ReturnType<typeof usePlannerData> }) {
               {i < steps.length - 1 && <div style={{ width: 2, flex: 1, minHeight: 18, background: 'var(--border)', margin: '3px 0', borderRadius: 1 }} />}
             </div>
             <div style={{ flex: 1, paddingBottom: i < steps.length - 1 ? 14 : 0, paddingTop: 4, minWidth: 0 }}>
-              <div style={{ fontSize: 13, fontWeight: step.endpoint ? 800 : 600, color: step.endpoint ? (step.color ?? GREEN) : '#1C1B1F', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              <div style={{ fontSize: 13, fontWeight: step.endpoint ? 800 : 600, color: step.endpoint ? (step.color ?? GREEN) : 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                 {step.label}
               </div>
-              <div style={{ fontSize: 11, color: '#9CA3AF', marginTop: 1 }}>{step.time}</div>
+              <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 1 }}>{step.time}</div>
             </div>
           </div>
         ))}

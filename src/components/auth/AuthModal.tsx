@@ -1,9 +1,9 @@
+import { GREEN, WARM, SECONDARY } from '@/lib/brand'
 import { useState } from 'react'
 import toast from 'react-hot-toast'
 import { useAppStore } from '@/store/useAppStore'
 import { signInWithGoogle, signInWithMagicLink } from '@/hooks/useAuth'
 
-const GREEN = '#3A6B4F'
 
 export function AuthModal() {
   const setAuthModalOpen = useAppStore((s) => s.setAuthModalOpen)

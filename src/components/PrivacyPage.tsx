@@ -1,6 +1,6 @@
+import { GREEN, WARM, SECONDARY } from '@/lib/brand'
 import logoSrc from '@/assets/logo.png'
 
-const GREEN = '#3A6B4F'
 const p: React.CSSProperties = { margin: '0 0 16px', lineHeight: 1.8 }
 
 export function PrivacyPage({ onBack }: { onBack: () => void }) {

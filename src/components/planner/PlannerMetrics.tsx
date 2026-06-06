@@ -1,7 +1,6 @@
+import { GREEN, WARM, SECONDARY } from '@/lib/brand'
 import { usePlannerData } from '@/hooks/usePlannerData'
 
-const GREEN = '#3A6B4F'
-const WARM  = '#B87333'
 const BLUE  = '#1D4ED8'
 
 function formatDriveTime(hours: number): string {

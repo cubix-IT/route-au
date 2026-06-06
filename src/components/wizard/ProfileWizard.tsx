@@ -1,3 +1,4 @@
+import { GREEN, WARM, SECONDARY } from '@/lib/brand'
 import { useState, useEffect } from 'react'
 import { useAppStore } from '@/store/useAppStore'
 import { useItineraryBuilder } from '@/hooks/useItineraryBuilder'
@@ -11,7 +12,6 @@ import type {
   HikingIntensity, DietaryReq, KidsAge, Coordinate,
 } from '@/types'
 
-const GREEN = '#3A6B4F'
 const season = getCurrentSeason()
 
 // Approximate Victorian sunset hours by month (conservative — when it gets dark)

@@ -1,3 +1,4 @@
+import { GREEN, WARM, SECONDARY } from '@/lib/brand'
 import { useState, useEffect } from 'react'
 import { fetchWikipediaThumb, fetchWikipediaSummary } from '@/lib/overpass'
 import { fetchWeatherForCoord } from '@/api/weather'
@@ -6,8 +7,6 @@ import { useAppStore } from '@/store/useAppStore'
 import { supabase } from '@/lib/supabase'
 import { VICTORIAN_CLUSTERS } from '@/data/victorianClusters.ts'
 
-const GREEN = '#3A6B4F'
-const WARM = '#B87333'
 const PREVIEW_LIMIT = 5
 
 interface SubDest {

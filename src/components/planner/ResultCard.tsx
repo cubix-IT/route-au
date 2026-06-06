@@ -1,7 +1,6 @@
+import { GREEN, WARM, SECONDARY } from '@/lib/brand'
 import { useState } from 'react'
 
-const GREEN = '#3A6B4F'
-const SECONDARY = '#92400E' // warm amber — informational, pairs with forest green brand
 
 export interface ResultCardProps {
   // Identity
@@ -45,7 +44,7 @@ function StarRating({ rating, count }: { rating: number; count?: number }) {
           {i < full ? '★' : (i === full && half) ? '⯨' : '☆'}
         </span>
       ))}
-      {count != null && <span style={{ color: '#9CA3AF', marginLeft: 2 }}>({count.toLocaleString()})</span>}
+      {count != null && <span style={{ color: 'var(--text-muted)', marginLeft: 2 }}>({count.toLocaleString()})</span>}
     </span>
   )
 }
@@ -108,7 +107,7 @@ export function ResultCard({
         <div style={{ flex: 1, minWidth: 0 }}>
           {/* Category label — flat text with dot, clearly not a button */}
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 5, alignItems: 'center' }}>
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 10, fontWeight: 600, color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.07em' }}>
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 10, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.07em' }}>
               <span style={{ width: 6, height: 6, borderRadius: '50%', background: categoryColor, flexShrink: 0, display: 'inline-block' }} />
               {emoji ? `${emoji} ` : ''}{categoryLabel}
             </span>
@@ -119,7 +118,7 @@ export function ResultCard({
               </span>
             )}
             {badges.map((b) => (
-              <span key={b.label} style={{ fontSize: 10, fontWeight: 600, color: '#6B7280', display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+              <span key={b.label} style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-muted)', display: 'inline-flex', alignItems: 'center', gap: 3 }}>
                 <span style={{ width: 5, height: 5, borderRadius: '50%', background: b.color, flexShrink: 0, display: 'inline-block' }} />
                 {b.label}
               </span>
@@ -127,14 +126,14 @@ export function ResultCard({
           </div>
 
           {/* Name */}
-          <div style={{ fontSize: 14, fontWeight: 700, color: '#1C1B1F', marginBottom: 3, lineHeight: 1.3 }}>{name}</div>
+          <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 3, lineHeight: 1.3 }}>{name}</div>
 
           {/* Rating */}
           {rating != null && <div style={{ marginBottom: 3 }}><StarRating rating={rating} count={reviewCount} /></div>}
 
           {/* Description — truncated when collapsed */}
           {!expanded && description && (
-            <div style={{ fontSize: 11.5, color: '#49454F', lineHeight: 1.55 }}>
+            <div style={{ fontSize: 11.5, color: 'var(--text-secondary)', lineHeight: 1.55 }}>
               {description.length > 90 ? description.slice(0, 90) + '…' : description}
             </div>
           )}
@@ -147,15 +146,15 @@ export function ResultCard({
           )}
 
           {/* Duration / address */}
-          {duration && <div style={{ fontSize: 10.5, color: '#9CA3AF', marginTop: 4 }}>⏱ {duration}</div>}
-          {address && !duration && <div style={{ fontSize: 10.5, color: '#9CA3AF', marginTop: 4 }}>📍 {address}</div>}
+          {duration && <div style={{ fontSize: 10.5, color: 'var(--text-muted)', marginTop: 4 }}>⏱ {duration}</div>}
+          {address && !duration && <div style={{ fontSize: 10.5, color: 'var(--text-muted)', marginTop: 4 }}>📍 {address}</div>}
         </div>
 
         {/* Right column: badges + chevron */}
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 5, flexShrink: 0 }}>
           {driveMinutes != null && <DriveTimeBadge minutes={driveMinutes} />}
           {isHiddenGem && (
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, background: '#E8F5EE', border: '1px solid rgba(58,107,79,0.2)', borderRadius: 20, padding: '3px 8px' }}>
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, background: 'var(--green-light)', border: '1px solid rgba(58,107,79,0.2)', borderRadius: 20, padding: '3px 8px' }}>
               <span style={{ fontSize: 10, color: GREEN }}>◆</span>
               <span style={{ fontSize: 9.5, fontWeight: 700, color: GREEN, letterSpacing: '0.02em' }}>Local gem</span>
             </span>
@@ -165,15 +164,15 @@ export function ResultCard({
               style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 13, color: highlighted ? 'var(--green)' : '#C8C4BD', padding: 0, lineHeight: 1 }}
               title="Show on map">📍</button>
           )}
-          <span style={{ fontSize: 12, color: '#9CA3AF', transition: 'transform 0.15s', transform: expanded ? 'rotate(180deg)' : 'none', marginTop: 2 }}>▾</span>
+          <span style={{ fontSize: 12, color: 'var(--text-muted)', transition: 'transform 0.15s', transform: expanded ? 'rotate(180deg)' : 'none', marginTop: 2 }}>▾</span>
         </div>
       </div>
 
       {/* ── Expanded content ── */}
       {expanded && (
         <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid var(--border)', display: 'flex', flexDirection: 'column', gap: 10 }} onClick={(e) => e.stopPropagation()}>
-          {description && <p style={{ fontSize: 12, color: '#374151', lineHeight: 1.65, margin: 0 }}>{description}</p>}
-          {address && <div style={{ fontSize: 11.5, color: '#6B7280' }}>📍 {address}</div>}
+          {description && <p style={{ fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.65, margin: 0 }}>{description}</p>}
+          {address && <div style={{ fontSize: 11.5, color: 'var(--text-muted)' }}>📍 {address}</div>}
           {openStatus && (
             <div style={{ fontSize: 11.5, fontWeight: 600, color: openStatus.isOpen ? '#16A34A' : '#DC2626' }}>
               {openStatus.isOpen ? 'Open now' : `Closed${openStatus.nextOpen ? ` — opens ${openStatus.nextOpen}` : ''}`}
@@ -190,7 +189,7 @@ export function ResultCard({
             <div style={{ display: 'flex', gap: 6, marginLeft: 'auto' }}>
               {phone && (
                 <a href={`tel:${phone}`} title={phone}
-                  style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 36, height: 36, borderRadius: 9, background: '#F0FDF4', border: '1px solid #BBF7D0', color: '#16A34A', textDecoration: 'none', fontSize: 16 }}>
+                  style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 36, height: 36, borderRadius: 9, background: 'var(--green-light)', border: '1px solid #BBF7D0', color: '#16A34A', textDecoration: 'none', fontSize: 16 }}>
                   📞
                 </a>
               )}
@@ -201,7 +200,7 @@ export function ResultCard({
             </div>
             {onAdd && !isAdded && (
               <button onClick={(e) => { e.stopPropagation(); onAdd() }}
-                style={{ padding: '9px 14px', borderRadius: 9, border: `1.5px solid ${GREEN}`, background: '#E8F5EE', color: GREEN, fontSize: 12, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                style={{ padding: '9px 14px', borderRadius: 9, border: `1.5px solid ${GREEN}`, background: 'var(--green-light)', color: GREEN, fontSize: 12, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}>
                 + Plan it
               </button>
             )}
