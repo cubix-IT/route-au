@@ -549,7 +549,9 @@ Only include specific named places/events (not general descriptions). Max 12 ite
         description: item.description,
         duration: null, cost: 'free', lat: itemLat, lng: itemLng, address: null,
         kids_ok: true, is_hidden_gem: false,
-        maps_url: itemLat && itemLng ? `https://maps.google.com/?q=${itemLat},${itemLng}` : null,
+        maps_url: itemLat && itemLng
+          ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(item.name + ', ' + destName)}&ll=${itemLat},${itemLng}`
+          : null,
         website: osmMatch?.tags?.website || null,
         phone: osmMatch?.tags?.phone || null,
         tags: ['wikipedia', item.category], source: 'static',
@@ -674,7 +676,9 @@ async function enrichSubDest(
         slug: elSlug, sub_dest_id: subDestId, name: displayName, category: actCat, emoji: activityEmoji(actCat),
         description: tags.description || null, duration: null, cost: 'free', lat: el.lat, lng: el.lon, address,
         kids_ok: tags.min_age ? parseInt(tags.min_age) <= 5 : true, is_hidden_gem: false,
-        maps_url: el.lat && el.lon ? `https://maps.google.com/?q=${el.lat},${el.lon}` : null,
+        maps_url: el.lat && el.lon
+          ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(displayName + ', ' + name)}&ll=${el.lat},${el.lon}`
+          : null,
         website, phone, tags: Object.keys(tags), source: 'static',
         attributes: { source:'static', website_uri: website, opening_hours_text: tags.opening_hours || null,
           wikipedia: tags.wikipedia || null, wikidata: tags.wikidata || null, quality_score: calcQualityScore(tags, 0) },
