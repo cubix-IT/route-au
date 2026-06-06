@@ -54,6 +54,8 @@ function saveWikiLS(key: string, value: string | null): void {
   } catch { /* */ }
 }
 
+// Clear old cache versions
+try { localStorage.removeItem('ue-wiki-cache-v1') } catch { /* */ }
 try { loadWikiLS() } catch { /* */ }
 
 async function overpassFetch(query: string, timeoutMs = 8000): Promise<any[]> {
