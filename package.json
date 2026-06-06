@@ -9,7 +9,11 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "enrich": "npx tsx --env-file=.env --env-file=.env.local scripts/enrich.ts",
-    "deploy": "vercel --prod --yes && npx tsx scripts/log-deploy.mts"
+    "deploy": "vercel --prod --yes && npx tsx scripts/log-deploy.mts",
+    "db": "npx tsx --env-file=.env --env-file=.env.local scripts/db-query.mts",
+    "db:status": "npx tsx --env-file=.env --env-file=.env.local scripts/db-status.mts",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.106.1",
@@ -26,6 +30,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@playwright/test": "^1.60.0",
     "@tailwindcss/vite": "^4.3.0",
     "@types/node": "^24.12.3",
     "@types/react": "^19.2.14",

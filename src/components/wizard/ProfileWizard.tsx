@@ -1,6 +1,9 @@
 import { GREEN, WARM, SECONDARY } from '@/lib/brand'
 import { useState, useEffect } from 'react'
 import { useAppStore } from '@/store/useAppStore'
+import { useScrollLock } from '@/hooks/useScrollLock'
+
+function ScrollLock() { useScrollLock(); return null }
 import { useItineraryBuilder } from '@/hooks/useItineraryBuilder'
 import { matchDestinations, getNearbySubDests, VICTORIAN_CLUSTERS } from '@/data/victorianClusters.ts'
 import { getCurrentSeason } from '@/utils/season'
@@ -328,6 +331,7 @@ export function ProfileWizard() {
 
   return (
     <div className="wizard-overlay">
+      <ScrollLock />
       <div className="wizard-card animate-fade-up">
 
         {/* M3 Header */}
