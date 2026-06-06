@@ -26,3 +26,4 @@
 {"run_at":"2026-06-06T08:03:02.414Z","completed_at":"2026-06-06T08:06:44.781Z","duration_sec":222,"mode":"slug:albury-wodonga","destinations":1,"upserted":31,"pbf_source":"geofabrik","results":[{"slug":"albury-wodonga","upserted":31}]}
 {"run_at":"2026-06-06T10:01:31.528Z","completed_at":"2026-06-06T10:06:40.209Z","duration_sec":309,"mode":"slug:inverloch","destinations":1,"upserted":29,"pbf_source":"geofabrik","results":[{"slug":"inverloch","upserted":29}]}
 {"run_at":"2026-06-06T10:06:53.291Z","completed_at":"2026-06-06T10:12:24.478Z","duration_sec":331,"mode":"slug:inverloch","destinations":1,"upserted":29,"pbf_source":"geofabrik","results":[{"slug":"inverloch","upserted":29}]}
+{"run_at":"2026-06-06T23:07:15.850Z","completed_at":"2026-06-06T23:12:47.894Z","duration_sec":332,"mode":"slug:mildura","destinations":1,"upserted":41,"pbf_source":"geofabrik","results":[{"slug":"mildura","upserted":41}]}
