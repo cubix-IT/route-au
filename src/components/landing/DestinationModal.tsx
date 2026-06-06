@@ -4,6 +4,7 @@ import { fetchWeatherForCoord } from '@/api/weather'
 import type { Activity } from '@/data/victorianActivities.ts'
 import { useAppStore } from '@/store/useAppStore'
 import { supabase } from '@/lib/supabase'
+import { VICTORIAN_CLUSTERS } from '@/data/victorianClusters.ts'
 
 const GREEN = '#3A6B4F'
 const WARM = '#B87333'
@@ -70,7 +71,9 @@ export function DestinationModal({
   onClose: () => void
 }) {
   const userProfile = useAppStore((s) => s.userProfile)
-  const [heroImg, setHeroImg] = useState<string | null>(null)
+  // Cluster image as immediate fallback — replaced by Wikipedia thumb if available
+  const clusterFallback = VICTORIAN_CLUSTERS.find(c => c.subDests.some(s => s.id === sub.id))?.imageUrl ?? null
+  const [heroImg, setHeroImg] = useState<string | null>(sub.imageUrl ?? clusterFallback)
   const [aiSummary, setAiSummary] = useState<AISummary | null>(null)
   const [summaryLoading, setSummaryLoading] = useState(true)
   const [weather, setWeather] = useState<{ emoji: string; max: number; min: number } | null>(null)
@@ -92,7 +95,7 @@ export function DestinationModal({
     setDbFood([])
     setAiSummary(null)
     setSummaryLoading(true)
-    setHeroImg(null)
+    setHeroImg(sub.imageUrl ?? clusterFallback)
 
     async function load() {
       // 1. Wikipedia thumbnail (fast, good photos)

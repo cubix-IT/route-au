@@ -136,7 +136,8 @@ export function MobilePlanner() {
   const setDisplayedMapPins = useAppStore((s) => s.setDisplayedMapPins)
   const [tab, setTab] = useState<FilterTab>('explore')
   const [catFilter, setCatFilter] = useState('all')
-  const [mapOpen, setMapOpen] = useState(false)
+  const [mapVisible, setMapVisible] = useState(true)
+  const scrollRef = React.useRef<HTMLDivElement>(null)
 
   interface MFuelStop { label: string; station: { name: string; brand: string; address: string; lat: number; lng: number; pricePerLitre: number; distanceKm: number } | null; brandNotFound?: boolean }
   const [fuelStops, setFuelStops] = useState<MFuelStop[]>([])
@@ -295,63 +296,98 @@ export function MobilePlanner() {
   const topCats = [...catCounts.entries()].filter(([c]) => c !== 'family').sort((a, b) => b[1] - a[1]).slice(0, 6).map(([c]) => c)
   const filteredActivities = catFilter === 'all' ? allActivities : allActivities.filter((a) => a.category === catFilter)
 
-  return (
-    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: '#F5F4F1', overflow: 'hidden' }}>
+  const panelExpanded = !mapVisible
 
-      {/* ── Destination header — compact ── */}
-      <div style={{ padding: '10px 12px 0', flexShrink: 0 }}>
-        <div style={{ background: '#fff', borderRadius: 18, padding: '14px 16px', boxShadow: '0 1px 8px rgba(0,0,0,0.07)', border: '1px solid rgba(0,0,0,0.05)' }}>
-          {/* Top row: name + back button */}
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-            <div>
-              <div style={{ fontSize: 22, fontWeight: 900, color: '#1C1B1F', lineHeight: 1.1, letterSpacing: '-0.02em' }}>{d.shortDest}</div>
-              <div style={{ fontSize: 12, color: '#9CA3AF', marginTop: 2 }}>from <span style={{ color: '#6B7280', fontWeight: 600 }}>{d.shortOrigin}</span></div>
+  return (
+    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: '#F5F4F1', overflow: 'hidden', position: 'relative' }}>
+
+      {/* ── Map — visible on arrival, hides when scrolled up ── */}
+      <div style={{
+        flexShrink: 0,
+        height: mapVisible ? '50vh' : 0,
+        overflow: 'hidden',
+        position: 'relative',
+        transition: 'height 0.35s cubic-bezier(0.4, 0, 0.2, 1)',
+      }}>
+        <MapContainer />
+        {/* Destination label + back on map */}
+        <div style={{
+          position: 'absolute', top: 12, left: 12, right: 12,
+          display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start',
+          zIndex: 10, pointerEvents: 'none',
+        }}>
+          <div style={{
+            background: 'rgba(255,255,255,0.92)', backdropFilter: 'blur(10px)',
+            borderRadius: 12, padding: '8px 12px',
+            boxShadow: '0 2px 12px rgba(0,0,0,0.12)',
+          }}>
+            <div style={{ fontSize: 15, fontWeight: 800, color: '#1C1B1F', letterSpacing: '-0.01em' }}>{d.shortDest}</div>
+            <div style={{ fontSize: 11, color: '#9CA3AF' }}>
+              {formatDrive(d.driveHours)} · {d.totalKm} km
             </div>
-            <button onClick={clearItinerary} style={{
-              background: '#F3F4F6', border: 'none', borderRadius: 10,
-              padding: '6px 12px', fontSize: 12, fontWeight: 600, color: '#6B7280', cursor: 'pointer',
-            }}>← Back</button>
           </div>
-          {/* Metric row — inline horizontal */}
-          <div style={{ display: 'flex', gap: 8, overflowX: 'auto' }}>
-            <MMetricPill emoji="🚗" value={formatDrive(d.driveHours)} accent="#3A6B4F" bg="#E8F5EE" />
-            <MMetricPill emoji="📍" value={`${d.totalKm} km`} accent="#1D4ED8" bg="#EFF6FF" />
-            {d.fuelCost && <MMetricPill emoji="⛽" value={d.fuelCost} accent={WARM} bg="#FFF5EB" />}
-            <MMetricPill emoji={d.seasonMeta.emoji} value={d.seasonMeta.label} accent="#4338CA" bg="#EEF2FF" />
-          </div>
+          <button onClick={clearItinerary} style={{
+            pointerEvents: 'all',
+            background: 'rgba(255,255,255,0.92)', backdropFilter: 'blur(10px)',
+            border: 'none', borderRadius: 10, padding: '8px 12px',
+            fontSize: 12, fontWeight: 600, color: '#6B7280', cursor: 'pointer',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+          }}>← Back</button>
         </div>
       </div>
 
-      {/* ── Filter tab bar ── */}
+      {/* ── Bottom sheet panel ── */}
       <div style={{
-        position: 'sticky', top: 0, zIndex: 20, flexShrink: 0,
-        background: 'rgba(245,244,241,0.96)', backdropFilter: 'blur(12px)',
-        borderBottom: '1px solid rgba(0,0,0,0.07)',
-        padding: '10px 12px',
-        display: 'flex', gap: 7, overflowX: 'auto',
+        flex: 1, display: 'flex', flexDirection: 'column',
+        background: '#fff',
+        borderRadius: '20px 20px 0 0',
+        boxShadow: '0 -4px 24px rgba(0,0,0,0.1)',
+        overflow: 'hidden',
+        transition: 'transform 0.35s cubic-bezier(0.4, 0, 0.2, 1)',
+        marginTop: -20, // overlap map slightly for seamless look
+        zIndex: 5,
       }}>
-        {([
-          ['explore', '🗺 Explore'],
-          ...((d.dbFood?.length ?? 0) > 0 ? [['food', '🍽 Food & Drinks']] : []),
-          ['stay', '🏨 Stay'],
-          ...(scheduledPlan.items.length > 0 ? [['plan', `Your Plan (${scheduledPlan.items.length})`]] : []),
-          ...(hasFuel ? [['fuel', '⛽ Fuel']] : []),
-        ] as [FilterTab, string][]).map(([t, label]) => (
-          <button key={t} onClick={() => {
-            setTab(t); setCatFilter('all')
-            if (t === 'fuel' && fuelStops.length === 0) fetchFuel()
-          }} style={{
-            padding: '8px 16px', borderRadius: 20, flexShrink: 0, whiteSpace: 'nowrap',
-            background: tab === t ? '#1C1B1F' : '#fff',
-            color: tab === t ? '#fff' : '#6B7280',
-            border: `1.5px solid ${tab === t ? '#1C1B1F' : 'rgba(0,0,0,0.1)'}`,
-            fontSize: 13, fontWeight: tab === t ? 700 : 500, cursor: 'pointer',
-          }}>{label}</button>
-        ))}
-      </div>
+        {/* Drag handle */}
+        <div style={{ display: 'flex', justifyContent: 'center', padding: '10px 0 4px', flexShrink: 0 }}>
+          <div style={{ width: 36, height: 4, borderRadius: 2, background: '#E0DDD8' }} />
+        </div>
 
-      {/* ── Scrollable content ── */}
-      <div style={{ flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
+        {/* ── Filter tab bar ── */}
+        <div style={{
+          flexShrink: 0, borderBottom: '1px solid rgba(0,0,0,0.07)',
+          padding: '12px 12px 12px',
+          display: 'flex', gap: 8, overflowX: 'auto',
+        }}>
+          {([
+            ['explore', '🗺 Explore'],
+            ...((d.dbFood?.length ?? 0) > 0 ? [['food', '🍽 Food & Drinks']] : []),
+            ['stay', '🏨 Stay'],
+            ...(scheduledPlan.items.length > 0 ? [['plan', `Your Plan (${scheduledPlan.items.length})`]] : []),
+            ...(hasFuel ? [['fuel', '⛽ Fuel']] : []),
+          ] as [FilterTab, string][]).map(([t, label]) => (
+            <button key={t} onClick={() => {
+              setTab(t); setCatFilter('all')
+              if (t === 'fuel' && fuelStops.length === 0) fetchFuel()
+            }} style={{
+              padding: '10px 18px', borderRadius: 24, flexShrink: 0, whiteSpace: 'nowrap',
+              background: tab === t ? '#3A6B4F' : '#fff',
+              color: tab === t ? '#fff' : '#374151',
+              border: `2px solid ${tab === t ? '#3A6B4F' : '#E5E7EB'}`,
+              fontSize: 13, fontWeight: 600, cursor: 'pointer',
+              boxShadow: tab === t ? '0 2px 8px rgba(58,107,79,0.25)' : 'none',
+            }}>{label}</button>
+          ))}
+        </div>
+
+      {/* ── Scrollable content — hides map when scrolled down ── */}
+      <div
+        ref={scrollRef}
+        onScroll={(e) => {
+          const el = e.currentTarget
+          if (el.scrollTop > 40 && mapVisible) setMapVisible(false)
+        }}
+        style={{ flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}
+      >
 
         {/* Hazard alerts */}
         {d.hazards.length > 0 && (
@@ -670,66 +706,21 @@ export function MobilePlanner() {
           </div>
         </div>
       </div>{/* end scroll */}
+      </div>{/* end bottom sheet */}
 
-      {/* ── Map FAB ── */}
-      <button
-        onClick={() => setMapOpen(true)}
-        style={{
-          position: 'fixed', bottom: 24, right: 20, zIndex: 30,
-          width: 56, height: 56, borderRadius: '50%',
-          background: GREEN, border: 'none', color: '#fff',
-          fontSize: 22, cursor: 'pointer',
-          boxShadow: '0 4px 20px rgba(58,107,79,0.45)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-        }}
-        title="View on map"
-      >
-        🗺
-      </button>
-
-      {/* ── Full-screen map modal ── */}
-      {mapOpen && (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 100, background: '#F5F4F1', display: 'flex', flexDirection: 'column' }}>
-          {/* Modal header */}
-          <div style={{
-            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-            padding: '0 16px', height: 56, flexShrink: 0,
-            background: 'rgba(255,255,255,0.9)', backdropFilter: 'blur(12px)',
-            borderBottom: '1px solid rgba(0,0,0,0.07)',
-          }}>
-            <div>
-              <div style={{ fontSize: 15, fontWeight: 800, color: '#1C1C1A', letterSpacing: '-0.02em' }}>{d.shortDest}</div>
-              <div style={{ fontSize: 11, color: '#9CA3AF' }}>Experiences &amp; activities nearby</div>
-            </div>
-            <button onClick={() => setMapOpen(false)} style={{
-              width: 34, height: 34, borderRadius: '50%', border: 'none',
-              background: '#F3F4F6', color: '#1C1C1A', fontSize: 16, cursor: 'pointer',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-            }}>✕</button>
-          </div>
-
-          {/* Map fills remaining space */}
-          <div style={{ flex: 1, position: 'relative' }}>
-            <MapContainer />
-          </div>
-
-          {/* Pin legend */}
-          <div style={{
-            flexShrink: 0, background: '#fff', borderTop: '1px solid rgba(0,0,0,0.07)',
-            padding: '10px 16px 20px', display: 'flex', gap: 16, overflowX: 'auto',
-          }}>
-            {[
-              { emoji: '🍷', label: 'Winery' }, { emoji: '🍺', label: 'Pub/Brewery' },
-              { emoji: '🥃', label: 'Distillery' }, { emoji: '🥾', label: 'Hiking' },
-              { emoji: '👁', label: 'Scenic' }, { emoji: '🏛', label: 'Attraction' },
-            ].map(({ emoji, label }) => (
-              <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 5, flexShrink: 0 }}>
-                <span style={{ fontSize: 14 }}>{emoji}</span>
-                <span style={{ fontSize: 11, color: '#6B7280', fontWeight: 500 }}>{label}</span>
-              </div>
-            ))}
-          </div>
-        </div>
+      {/* ── Map FAB — shows when map is hidden ── */}
+      {!mapVisible && (
+        <button
+          onClick={() => setMapVisible(true)}
+          style={{
+            position: 'absolute', bottom: 24, right: 20, zIndex: 30,
+            width: 52, height: 52, borderRadius: '50%',
+            background: GREEN, border: 'none', color: '#fff',
+            fontSize: 20, cursor: 'pointer',
+            boxShadow: '0 4px 20px rgba(58,107,79,0.45)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}
+        >🗺</button>
       )}
 
     </div>

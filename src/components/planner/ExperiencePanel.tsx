@@ -3,12 +3,14 @@ import { usePlannerData } from '@/hooks/usePlannerData'
 import { useAppStore } from '@/store/useAppStore'
 import { useTrails } from '@/hooks/useTrails'
 import { CORRIDORS } from '@/data/corridors.ts'
+import { VICTORIAN_CLUSTERS } from '@/data/victorianClusters.ts'
 import type { Coordinate } from '@/types'
 import type { LivePOI, AccommodationPOI } from '@/lib/overpass'
 import type { HazardAlert } from '@/lib/vicEmergency'
 import type { Activity } from '@/data/victorianActivities'
 import type { GuardrailWarning } from '@/types'
 import { ResultCard } from './ResultCard'
+import { LoadingScreen } from './LoadingScreen'
 
 const GREEN = '#3A6B4F'
 const WARM  = '#B87333'
@@ -185,6 +187,18 @@ export function ExperiencePanel({ hideTimeline = false }: { hideTimeline?: boole
   const [showAllActivities, setShowAllActivities] = useState(false)
   const [fuelStops, setFuelStops] = useState<FuelStop[]>([])
   const [fuelLoading, setFuelLoading] = useState(false)
+  const [osrmTimedOut, setOsrmTimedOut] = useState(false)
+
+  // Show loading screen until Supabase loaded AND OSRM responded (or 5s timeout)
+  const selectedCorridorId = useAppStore((s) => s.selectedCorridorId)
+  const heroImageUrl = VICTORIAN_CLUSTERS.find(c => c.id === selectedCorridorId)?.imageUrl
+  const isLoading = d.dbLoading || (d.driveMinutes.size === 0 && !osrmTimedOut)
+
+  useEffect(() => {
+    setOsrmTimedOut(false)
+    const t = setTimeout(() => setOsrmTimedOut(true), 5000)
+    return () => clearTimeout(t)
+  }, [d.destId])
 
   const RESULT_LIMIT = 10
 
@@ -336,7 +350,12 @@ export function ExperiencePanel({ hideTimeline = false }: { hideTimeline?: boole
   const showStay  = (filter === 'all' || filter === 'stay')
 
   return (
-    <div ref={panelRef} style={{ flex: 1, overflowY: 'auto', background: '#F5F4F1', display: 'flex', flexDirection: 'column' }}>
+    <div ref={panelRef} style={{ flex: 1, overflowY: 'auto', background: '#F5F4F1', display: 'flex', flexDirection: 'column', position: 'relative' }}>
+
+      {/* Loading screen — shown until Supabase + OSRM ready */}
+      {isLoading && (
+        <LoadingScreen destName={d.destName ?? d.shortDest ?? ''} heroImageUrl={heroImageUrl} />
+      )}
 
       {/* ── Sticky filter tabs ── */}
       <div style={{
