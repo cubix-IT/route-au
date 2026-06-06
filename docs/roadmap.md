@@ -9,23 +9,30 @@
 - PWA (manual service worker — vite-plugin-pwa replaced due to Vite 8 compat)
 - Rebrand: RouteAU → Unplanned Escapes
 
-## Phase 1.5 — Polish (current) ✅
+## Phase 1.5 — Polish ✅
 - [x] Hero redesign: search-first, trust signal, radial vignette for text clarity
-- [x] UI consistency: unified chip/tab spec, green highlight colours, shadow tokens
+- [x] UI consistency: unified chip/tab spec (radius 20, green active, 2px border)
 - [x] M3 animations: card hover lift, tab fade, wizard step transition
+- [x] M3 Expressive wizard: tonal surface, 28dp corners, linear progress bar, pill CTA
+- [x] Generating screen: Victorian landscape SVG animation (4WD + hills + clouds)
 - [x] Card expand/collapse: only one card open at a time
-- [x] Local/nearby split in results (≤20 min = local, >20 min = Also nearby)
+- [x] Local/nearby split in results (≤20 min local, >20 min Also nearby, min 5 shown)
 - [x] Distance from town centre on activity cards
-- [x] Food tab: Cellar Doors / Places to Eat / Pubs + cuisine tag
+- [x] Food tab: Cellar Doors / Places to Eat / Pubs + cuisine tag on card
 - [x] VicEmergency hazard icons on map (fire 🔥 flood 💧 weather ⛈️)
-- [x] Wizard stays open until data loads — no loading screen on results
-- [x] Step counter "Step X of Y" in wizard header
-- [x] Static trails for Brisbane Ranges, Kinglake, Dandenong, Macedon, Plenty Gorge
-- [x] Maps URLs: coord-pin for natural features (not named search)
-- [x] Wikipedia summaries skip disaster/population sentences
-- [x] Libraries filtered from results (not weekend destinations)
+- [x] Wizard stays open until Supabase data ready — no loading screen on results
+- [x] Step counter "Step X of Y" + wizard fixed height throughout
+- [x] Static trails: Brisbane Ranges, Kinglake, Dandenong, Macedon, Plenty Gorge
+- [x] Maps URLs: coord-pin for natural features
+- [x] Wikipedia destination summaries skip disaster/population sentences
+- [x] Libraries filtered from results
+- [x] Privacy page: static CDN file (/privacy), instant load
+- [x] Status page: branded HTML, always renders, 5min CDN cache
+- [x] Shared brand constants (src/lib/brand.ts), radius tokens, colour tokens
+- [x] Scrollbar hidden on horizontal chip rows (mobile)
+- [x] Sub-destination tabs on cluster cards match unified chip spec
 
-## Phase 2 — Auth + Domain
+## Phase 2 — Auth + Domain (next)
 - [ ] **Run migration 006 in Supabase SQL Editor** (`supabase/migrations/006_auth_profiles_trips.sql`)
 - [ ] **Enable Google OAuth in Supabase Dashboard**
 - [ ] **Set Site URL + redirect URLs in Supabase Auth config**
@@ -43,3 +50,4 @@
 - CSP headers in `vercel.json`
 - Parks & conservation reserves map layer
 - OSM attribution in MapLibre canvas (legal requirement)
+- Medium-effort M3 items: radius token sweep across wizard, food grid layout
