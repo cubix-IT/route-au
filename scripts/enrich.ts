@@ -64,6 +64,17 @@ const ACT_TOURISM = new Set(['attraction','museum','artwork','gallery','viewpoin
 const ACT_LEISURE = new Set(['sports_centre','stadium','golf_course','miniature_golf','swimming_pool','marina','picnic_ground','water_park','amusement_arcade'])
 const ACT_AMENITY = new Set(['theatre','cinema','arts_centre','library','marketplace','spa'])
 const CHAIN_BLACKLIST = /\b(mcdonald'?s|hungry jack'?s|kfc|subway|domino'?s|pizza hut|red rooster|oporto|nando'?s|grill'?d|betty'?s burgers|guzman|taco bell|carl'?s jr|burger king|wendy'?s|seven.?eleven|7.?eleven|bp|caltex|shell|ampol|united petroleum|woolworths|coles|aldi|chemist warehouse)\b/i
+
+// Natural features (waterfalls, lookouts, parks) → pin to coordinates; businesses → named search
+const NATURAL_CATS = new Set(['nature','viewpoint','beach','active','wellness'])
+function mapsUrl(name: string, destName: string, lat: number, lon: number, category: string): string {
+  if (NATURAL_CATS.has(category)) {
+    // Pin to exact coordinates with name label — avoids matching wrong nearby business
+    return `https://maps.google.com/maps?q=${lat},${lon}+(${encodeURIComponent(name)})`
+  }
+  // Named search biased to destination coordinates
+  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(name + ', ' + destName)}&ll=${lat},${lon}`
+}
 const CRAFT_TYPES = new Set(['brewery','cider','winery','wine','distillery'])
 
 function osmCategory(tags: Record<string,string>): 'food'|'nature'|'activity'|null {
@@ -677,7 +688,7 @@ async function enrichSubDest(
         description: tags.description || null, duration: null, cost: 'free', lat: el.lat, lng: el.lon, address,
         kids_ok: tags.min_age ? parseInt(tags.min_age) <= 5 : true, is_hidden_gem: false,
         maps_url: el.lat && el.lon
-          ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(displayName + ', ' + name)}&ll=${el.lat},${el.lon}`
+          ? mapsUrl(displayName, name, el.lat, el.lon, actCat)
           : null,
         website, phone, tags: Object.keys(tags), source: 'static',
         attributes: { source:'static', website_uri: website, opening_hours_text: tags.opening_hours || null,
