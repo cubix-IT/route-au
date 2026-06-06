@@ -10,12 +10,6 @@ export default defineConfig({
     react(),
     tailwindcss(),
   ],
-  server: {
-    // Mirror Vercel's clean-URL behaviour for static HTML files
-    rewrites: [
-      { from: '/privacy', to: '/privacy.html' },
-    ],
-  },
   resolve: {
     alias: [
       { find: /^@\//, replacement: path.join(process.cwd(), 'src') + '/' },
