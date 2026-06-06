@@ -137,6 +137,7 @@ export function MobilePlanner() {
   const [tab, setTab] = useState<FilterTab>('explore')
   const [catFilter, setCatFilter] = useState('all')
   const [mapVisible, setMapVisible] = useState(true)
+  const [expandedCardId, setExpandedCardId] = useState<string | null>(null)
   const scrollRef = React.useRef<HTMLDivElement>(null)
 
   interface MFuelStop { label: string; station: { name: string; brand: string; address: string; lat: number; lng: number; pricePerLitre: number; distanceKm: number } | null; brandNotFound?: boolean }
@@ -461,6 +462,8 @@ export function MobilePlanner() {
                             website={act.websiteUri && !act.websiteUri.includes('google.com') ? act.websiteUri : undefined}
                             onAdd={() => d.addActivity({ actId: act.id, actName: act.name, emoji: act.emoji, dayNumber: 1 })}
                             onRemove={() => d.removeActivity(act.id)}
+                            expanded={expandedCardId === act.id}
+                            onExpand={() => setExpandedCardId(expandedCardId === act.id ? null : act.id)}
                           />
                         )
                       }
@@ -608,7 +611,8 @@ export function MobilePlanner() {
                     {drinks.map(f => {
                       const emoji = FOOD_EMOJI[f.category] ?? '🍽️'
                       const cfg = FOOD_COLOR[f.category] ?? { color: '#374151', bg: '#F9FAFB' }
-                      return <ResultCard key={f.food_place_id} name={f.name} categoryLabel={f.category} categoryColor={cfg.color} categoryBg={cfg.bg} emoji={emoji} description={f.description ?? undefined} website={(f.attributes as any)?.website_uri ?? f.website ?? undefined} mapsUrl={f.lat && f.lng ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(f.name + ", " + d.shortDest)}&ll=${f.lat},${f.lng}` : ""} phone={f.phone ?? undefined} driveMinutes={d.driveMinutes.get(f.slug) ?? null} />
+                      const cardId = String(f.food_place_id)
+                      return <ResultCard key={cardId} name={f.name} categoryLabel={f.category} categoryColor={cfg.color} categoryBg={cfg.bg} emoji={emoji} description={f.description ?? undefined} website={(f.attributes as any)?.website_uri ?? f.website ?? undefined} mapsUrl={f.lat && f.lng ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(f.name + ", " + d.shortDest)}&ll=${f.lat},${f.lng}` : ""} phone={f.phone ?? undefined} driveMinutes={d.driveMinutes.get(f.slug) ?? null} expanded={expandedCardId === cardId} onExpand={() => setExpandedCardId(expandedCardId === cardId ? null : cardId)} />
                     })}
                   </>
                 )}
@@ -618,7 +622,8 @@ export function MobilePlanner() {
                     {foods.map(f => {
                       const emoji = FOOD_EMOJI[f.category] ?? '🍽️'
                       const cfg = FOOD_COLOR[f.category] ?? { color: '#374151', bg: '#F9FAFB' }
-                      return <ResultCard key={f.food_place_id} name={f.name} categoryLabel={f.category} categoryColor={cfg.color} categoryBg={cfg.bg} emoji={emoji} description={f.description ?? undefined} website={(f.attributes as any)?.website_uri ?? f.website ?? undefined} mapsUrl={f.lat && f.lng ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(f.name + ", " + d.shortDest)}&ll=${f.lat},${f.lng}` : ""} phone={f.phone ?? undefined} driveMinutes={d.driveMinutes.get(f.slug) ?? null} />
+                      const cardId = String(f.food_place_id)
+                      return <ResultCard key={cardId} name={f.name} categoryLabel={f.category} categoryColor={cfg.color} categoryBg={cfg.bg} emoji={emoji} description={f.description ?? undefined} website={(f.attributes as any)?.website_uri ?? f.website ?? undefined} mapsUrl={f.lat && f.lng ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(f.name + ", " + d.shortDest)}&ll=${f.lat},${f.lng}` : ""} phone={f.phone ?? undefined} driveMinutes={d.driveMinutes.get(f.slug) ?? null} expanded={expandedCardId === cardId} onExpand={() => setExpandedCardId(expandedCardId === cardId ? null : cardId)} />
                     })}
                   </>
                 )}

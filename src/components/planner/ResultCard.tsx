@@ -30,6 +30,9 @@ export interface ResultCardProps {
   onMapPin?: () => void
   // Visual
   highlighted?: boolean
+  // Controlled expand — parent tracks which card is open
+  expanded?: boolean
+  onExpand?: () => void
 }
 
 function StarRating({ rating, count }: { rating: number; count?: number }) {
@@ -68,11 +71,17 @@ export function ResultCard({
   isHiddenGem, isAdded, highlighted,
   mapsUrl, website, phone,
   onAdd, onRemove, onMapPin,
+  expanded: expandedProp, onExpand,
 }: ResultCardProps) {
-  const [expanded, setExpanded] = useState(false)
+  const [localExpanded, setLocalExpanded] = useState(false)
+  const expanded = expandedProp !== undefined ? expandedProp : localExpanded
 
   const handleClick = () => {
-    setExpanded((v) => !v)
+    if (onExpand) {
+      onExpand()
+    } else {
+      setLocalExpanded((v) => !v)
+    }
     if (!expanded && onMapPin) onMapPin()
   }
 

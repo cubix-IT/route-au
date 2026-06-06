@@ -182,11 +182,6 @@
     opacity   var(--mu-duration-short)  ease;
   opacity: 0;
 }
-.mu-input-wrap:focus-within::after {
-  transform: scaleX(1);
-  opacity: 1;
-  animation: mu-line-in var(--mu-duration-medium) var(--mu-ease-decelerate);
-}
 .mu-input-wrap.mu-error::after {
   background: #C0622A;
   transform: scaleX(1);

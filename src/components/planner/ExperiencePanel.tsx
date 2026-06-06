@@ -196,8 +196,7 @@ export function ExperiencePanel({ hideTimeline = false }: { hideTimeline?: boole
 
   const [filter, setFilter] = useState<FilterMode>('all')
   const [actCategoryFilter, setActCategoryFilter] = useState<string>('all')
-  const [expandedActId, setExpandedActId] = useState<string | null>(null)
-  const [_expandedPoiId, setExpandedPoiId] = useState<string | null>(null)
+  const [expandedCardId, setExpandedCardId] = useState<string | null>(null)
   const [showAllAccom, setShowAllAccom] = useState(false)
   const [showAllActivities, setShowAllActivities] = useState(false)
   const [fuelStops, setFuelStops] = useState<FuelStop[]>([])
@@ -340,7 +339,7 @@ export function ExperiencePanel({ hideTimeline = false }: { hideTimeline?: boole
     const el = panelRef.current.querySelector(`[data-poi-id="${selectedPinId}"]`)
     if (el) {
       el.scrollIntoView({ behavior: 'smooth', block: 'center' })
-      setExpandedPoiId(selectedPinId)
+      setExpandedCardId(selectedPinId)
     }
     // Clear after 2s so the blue highlight fades naturally
     const t = setTimeout(() => setSelectedPinId(null), 2000)
@@ -574,6 +573,8 @@ export function ExperiencePanel({ hideTimeline = false }: { hideTimeline?: boole
                       onAdd={() => d.addActivity({ actId: act.id, actName: act.name, emoji: act.emoji, dayNumber: 1 })}
                       onRemove={() => d.removeActivity(act.id)}
                       onMapPin={() => setSelectedPinId(act.id)}
+                      expanded={expandedCardId === act.id}
+                      onExpand={() => setExpandedCardId(expandedCardId === act.id ? null : act.id)}
                     />
                   )
                 }
@@ -702,6 +703,8 @@ export function ExperiencePanel({ hideTimeline = false }: { hideTimeline?: boole
                 phone={f.phone ?? undefined}
                 highlighted={selectedPinId === cardId}
                 onMapPin={() => setSelectedPinId(cardId)}
+                expanded={expandedCardId === cardId}
+                onExpand={() => setExpandedCardId(expandedCardId === cardId ? null : cardId)}
               />
             )
           }
