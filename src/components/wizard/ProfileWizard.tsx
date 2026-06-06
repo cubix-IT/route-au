@@ -333,64 +333,57 @@ export function ProfileWizard() {
         style={isPickStep ? { maxWidth: 640 } : undefined}
       >
 
-        {/* Header */}
-        <div style={{ padding: '16px 20px 0', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexShrink: 0 }}>
-          <div style={{ flex: 1, minWidth: 0 }}>
+        {/* M3 Header */}
+        <div style={{ padding: '20px 20px 0', flexShrink: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+            {/* Step label — M3 Headline Small */}
             <div style={{
               fontFamily: "'Fraunces', Georgia, serif",
-              fontSize: 15, fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-0.02em',
+              fontSize: 22, fontWeight: 700, color: '#002112', letterSpacing: '-0.03em', lineHeight: 1.2,
             }}>
               {!generating ? stepLabels[step] : 'Building your trip…'}
             </div>
-            {/* Step subtitle — #17 */}
-            {!generating && (
-              <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
-                {stepSubtitles[step] ?? ''}
-              </div>
-            )}
-            {generating && (
-              <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>Hang tight</div>
-            )}
+            {/* M3 tonal close button */}
+            <button
+              onClick={() => setWizardOpen(false)}
+              style={{
+                width: 36, height: 36, borderRadius: '50%', border: 'none',
+                background: '#DCE4DB', color: '#3A6B4F',
+                fontSize: 16, cursor: 'pointer', display: 'flex',
+                alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                transition: 'background 150ms ease',
+              }}
+              title="Close"
+            >✕</button>
           </div>
-          {/* Right: progress + step counter + close — #16, #18 */}
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6, flexShrink: 0, marginLeft: 12 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              {/* Step X of Y — #16 */}
-              {!generating && (
-                <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)' }}>
-                  Step {step + 1} of {totalSteps}
-                </span>
-              )}
-              {/* Progress dots */}
-              <div style={{ display: 'flex', gap: 4 }}>
-                {Array.from({ length: totalSteps }).map((_, i) => (
-                  <div key={i} style={{
-                    width: i === step ? 16 : 5, height: 5, borderRadius: 3,
-                    background: i <= step ? GREEN : 'var(--border)',
-                    transition: 'all 0.25s',
-                  }} />
-                ))}
-              </div>
-              {/* Close X — #18 */}
-              <button
-                onClick={() => setWizardOpen(false)}
-                style={{
-                  width: 28, height: 28, borderRadius: '50%', border: 'none',
-                  background: 'var(--bg-muted)', color: 'var(--text-muted)',
-                  fontSize: 14, cursor: 'pointer', display: 'flex',
-                  alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-                }}
-                title="Close"
-              >✕</button>
+
+          {/* Subtitle */}
+          {!generating && (
+            <div style={{ fontSize: 13, color: '#3F4F42', marginBottom: 12, lineHeight: 1.5 }}>
+              {stepSubtitles[step] ?? ''}
             </div>
-          </div>
+          )}
+
+          {/* M3 Linear progress bar */}
+          {!generating && (
+            <div className="wizard-progress-bar">
+              <div className="wizard-progress-fill" style={{ width: `${((step + 1) / totalSteps) * 100}%` }} />
+            </div>
+          )}
+
+          {/* Step counter */}
+          {!generating && (
+            <div style={{ fontSize: 11, fontWeight: 600, color: '#6F7F71', marginTop: 6, letterSpacing: '0.04em' }}>
+              STEP {step + 1} OF {totalSteps}
+            </div>
+          )}
         </div>
 
         {/* Body */}
         <div key={`${step}-${generating}`} className="animate-fade-up" style={{
           flex: 1,
           overflowY: isPickStep ? 'hidden' : 'auto',
-          padding: isPickStep ? '12px 0 0' : '16px 24px',
+          padding: isPickStep ? '12px 0 0' : '20px 20px 8px',
         }}>
           {generating ? (
             <GeneratingScreen step={genStep} messages={msgs} />
@@ -492,24 +485,27 @@ export function ProfileWizard() {
           )}
         </div>
 
-        {/* Footer */}
+        {/* M3 Footer — no border, full-width pill CTA */}
         {!generating && (
-          <div style={{ padding: '12px 24px 20px', borderTop: '1px solid var(--border)', display: 'flex', gap: 10, flexShrink: 0 }}>
+          <div style={{ padding: '12px 20px 24px', display: 'flex', gap: 10, flexShrink: 0 }}>
+            {/* M3 tonal Back button */}
             <button onClick={handleBack} className="mu-btn-ghost" style={{
-              padding: '12px 16px', borderRadius: 10,
-              background: 'var(--bg-muted)', border: '1px solid var(--border)',
-              color: 'var(--text-muted)', fontSize: 13, cursor: 'pointer',
+              height: 56, padding: '0 20px', borderRadius: 28,
+              background: '#DCE4DB', border: 'none',
+              color: '#3A6B4F', fontSize: 14, fontWeight: 600, cursor: 'pointer',
+              flexShrink: 0,
             }}>
               ← Back
             </button>
+            {/* M3 filled pill CTA */}
             <button onClick={handleNext} disabled={!canContinue} className={canContinue ? 'mu-btn-primary' : ''} style={{
-              flex: 1, padding: '12px', borderRadius: 10,
-              background: canContinue ? GREEN : 'var(--bg-muted)',
-              border: canContinue ? 'none' : '1px solid var(--border)',
-              color: canContinue ? '#fff' : 'var(--text-muted)',
-              fontSize: 14, fontWeight: 600,
+              flex: 1, height: 56, borderRadius: 28,
+              background: canContinue ? GREEN : '#C8D8C4',
+              border: 'none',
+              color: canContinue ? '#fff' : '#6F7F71',
+              fontSize: 15, fontWeight: 700, letterSpacing: '-0.01em',
               cursor: canContinue ? 'pointer' : 'not-allowed',
-              transition: 'all 0.15s',
+              transition: 'background 200ms ease, transform 150ms cubic-bezier(0.34,1.4,0.64,1)',
             }}>
               {step === (isPreselected ? 1 : 4) ? 'Build my trip →' : step === 1 && !isPreselected ? 'Show me options →' : 'Continue →'}
             </button>

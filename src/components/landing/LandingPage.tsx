@@ -802,8 +802,8 @@ export function LandingPage() {
             className="mu-browse-link"
             style={{
               background: 'none', border: 'none',
-              color: '#6B7280', fontSize: 14, cursor: 'pointer',
-              textDecoration: 'underline', textDecorationColor: '#D1D5DB',
+              color: '#3F4F42', fontSize: 14, cursor: 'pointer',
+              textDecoration: 'underline', textDecorationColor: '#3F4F42',
               padding: '12px 8px', minHeight: 44,
             }}>
             or browse destinations ↓
