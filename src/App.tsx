@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react'
 import { Toaster } from 'react-hot-toast'
-import { useRegisterSW } from 'virtual:pwa-register/react'
 import { Header } from '@/components/layout/Header'
 import { MapContainer } from '@/components/map/MapContainer'
 import { ProfileWizard } from '@/components/wizard/ProfileWizard'
@@ -40,12 +39,22 @@ function App() {
   useAuth()
   useOfflineSync()
 
-  const { updateServiceWorker } = useRegisterSW({
-    onNeedRefresh() {
-      // Auto-reload — new version available, take it immediately
-      updateServiceWorker(true)
-    },
-  })
+  useEffect(() => {
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/sw.js').then(reg => {
+        reg.addEventListener('updatefound', () => {
+          const next = reg.installing
+          if (!next) return
+          next.addEventListener('statechange', () => {
+            if (next.state === 'installed' && navigator.serviceWorker.controller) {
+              next.postMessage({ type: 'SKIP_WAITING' })
+              window.location.reload()
+            }
+          })
+        })
+      })
+    }
+  }, [])
 
   const isWizardOpen = useAppStore((s) => s.isWizardOpen)
   const isAuthModalOpen = useAppStore((s) => s.isAuthModalOpen)
