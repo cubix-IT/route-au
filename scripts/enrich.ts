@@ -111,6 +111,10 @@ function activityCategory(tags: Record<string,string>, name: string): string {
   if (tags.railway === 'station' || /railway|train station|historic station/.test(n)) return 'history'
   // Historic people, events, sites — catch names like "Ned Kelly's Capture", "Burke & Wills"
   if (tags.historic || /museum|heritage|historic|history|colonial|ruins|memorial|courthouse|gaol|capture|battle|gold rush|explorers?|ned kelly|burke|wills|bushranger/.test(n)) return 'history'
+  // Historic machinery, vehicles, engineering landmarks
+  if (/locomotive|cannon|howitzer|paddlesteam|paddle.?wheel|traction engine|steam engine|big lizzie|heritage.*engine|engine no\.|chaffey engine|lock \d+|weir\b|pumping station|historic.*pump/.test(n)) return 'history'
+  // Public art — sculptures, murals, mosaics, installations
+  if (tags.tourism === 'artwork' || /\bsculpture\b|\bmural\b|\bmosaic\b|\binstallation\b|\bstatue\b(?!.*museum)/.test(n)) return 'art'
   if (tags.tourism === 'gallery' || tags.amenity === 'arts_centre' || /gallery|art centre|art space/.test(n)) return 'art'
   if (tags.amenity === 'marketplace' || /\bmarket\b|farmers market|night market|sunday market/.test(n)) return 'markets'
   if (tags.waterway === 'lake' || tags.waterway === 'reservoir' || /\blake\b|\breservoir\b/.test(n)) return 'nature'
@@ -119,10 +123,12 @@ function activityCategory(tags: Record<string,string>, name: string): string {
   if (/\bgarden\b|botanic|arboretum/.test(n)) return 'nature'
   if (/forest|bush walk|rainforest/.test(n)) return 'nature'
   if (/adventure|zipline|treetop|ropes|rock climb|absei|hik(e|ing)|trail/.test(n)) return 'active'
+  if (/swimming pool|splash park|water park|aquatic centre/.test(n)) return 'active'
   if (tags.leisure === 'sports_centre' || /sports centre|leisure centre/.test(n)) return 'active'
   if (tags.leisure === 'golf_course' || /golf/.test(n)) return 'active'
   if (tags.amenity === 'spa' || tags.leisure === 'spa' || /\bspa\b|wellness|retreat|day spa/.test(n)) return 'relaxation'
   if (tags.leisure === 'stadium' || tags.amenity === 'theatre' || tags.amenity === 'cinema') return 'entertainment'
+  if (/laser.?force|laser.?tag|laser.?skirmish|mini.?golf|go.?kart|escape room|gaming|arcade|bowling|trampoline|inflatable/.test(n)) return 'entertainment'
   if (/winery|cellar door|vineyard|wine tasting|brewery|brewpub|brew house|craft beer|distillery|\bgin\b|whisky|whiskey|spirits/.test(n)) return 'drink'
   // Food-named attractions (cheese factory, dairy, farm shop etc.) → food, not nature
   if (/cheese|dairy|\bfarm\b|cider|olive|honey|chocolate|confection|providore|deli|pantry|smokehouse|preserves/.test(n)) return 'food'
@@ -154,7 +160,7 @@ function natureType(tags: Record<string,string>): string {
 
 // Accommodation tags — these belong in the accommodation table, not activities or food
 const ACCOM_TAGS = new Set(['hotel','motel','guest_house','hostel','apartment','chalet','alpine_hut'])
-const ACCOM_NAME = /\b(hotel|motel|lodge|resort|inn\b|b&b|bed.and.breakfast|caravan park|campground|glamping|retreat|holiday park|motor inn|country club)\b/i
+const ACCOM_NAME = /\b(hotel|motel|lodge|resort|inn\b|b&b|bed.and.breakfast|caravan park|campground|glamping|retreat|holiday park|motor inn|country club|house.?boats?|boat hire|river.*stay|holiday.*cabin|holiday.*cottage)\b/i
 
 function isAccommodation(tags: Record<string,string>): boolean {
   return ACCOM_TAGS.has(tags.tourism) || ACCOM_NAME.test(tags.name || '')
