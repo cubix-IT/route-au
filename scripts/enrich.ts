@@ -65,8 +65,15 @@ const ACT_LEISURE = new Set(['sports_centre','stadium','golf_course','miniature_
 const ACT_AMENITY = new Set(['theatre','cinema','arts_centre','library','marketplace','spa'])
 const CHAIN_BLACKLIST = /\b(mcdonald'?s|hungry jack'?s|kfc|subway|domino'?s|pizza hut|red rooster|oporto|nando'?s|grill'?d|betty'?s burgers|guzman|taco bell|carl'?s jr|burger king|wendy'?s|seven.?eleven|7.?eleven|bp|caltex|shell|ampol|united petroleum|woolworths|coles|aldi|chemist warehouse)\b/i
 
-// Named search biased to destination — no coordinates visible in URL
-function mapsUrl(name: string, destName: string, lat: number, lon: number, _category: string): string {
+// Coord-pin for natural features (OSM has precise coords) — named search shows all nearby spots instead
+function isNaturalFeature(tags: Record<string,string>): boolean {
+  return !!(tags.natural || tags.waterway || tags.boundary || tags.historic ||
+            tags.railway || tags.leisure === 'park' || tags.leisure === 'garden' ||
+            tags.leisure === 'nature_reserve' || tags.tourism === 'viewpoint' ||
+            tags.tourism === 'attraction' || tags.tourism === 'museum' || tags.tourism === 'gallery')
+}
+function mapsUrl(name: string, destName: string, lat: number, lon: number, tags: Record<string,string>): string {
+  if (isNaturalFeature(tags)) return `https://maps.google.com/maps?q=${lat},${lon}+(${encodeURIComponent(name)})`
   return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(name + ', ' + destName)}&ll=${lat},${lon}`
 }
 const CRAFT_TYPES = new Set(['brewery','cider','winery','wine','distillery'])
@@ -555,7 +562,7 @@ Only include specific named places/events (not general descriptions). Max 12 ite
         duration: null, cost: 'free', lat: itemLat, lng: itemLng, address: null,
         kids_ok: true, is_hidden_gem: false,
         maps_url: itemLat && itemLng
-          ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(item.name + ', ' + destName)}&ll=${itemLat},${itemLng}`
+          ? `https://maps.google.com/maps?q=${itemLat},${itemLng}+(${encodeURIComponent(item.name)})`
           : null,
         website: osmMatch?.tags?.website || null,
         phone: osmMatch?.tags?.phone || null,
@@ -682,7 +689,7 @@ async function enrichSubDest(
         description: tags.description || null, duration: null, cost: 'free', lat: el.lat, lng: el.lon, address,
         kids_ok: tags.min_age ? parseInt(tags.min_age) <= 5 : true, is_hidden_gem: false,
         maps_url: el.lat && el.lon
-          ? mapsUrl(displayName, name, el.lat, el.lon, actCat)
+          ? mapsUrl(displayName, name, el.lat, el.lon, tags)
           : null,
         website, phone, tags: Object.keys(tags), source: 'static',
         attributes: { source:'static', website_uri: website, opening_hours_text: tags.opening_hours || null,

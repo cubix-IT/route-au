@@ -63,9 +63,9 @@ export function useTrails(
           return { trail: t as Trail, minDist }
         })
 
-        // Keep trails within ~0.5 degrees (~55km) and sort by proximity
+        // Keep trails within ~0.3 degrees (~33km) and sort by proximity
         const nearby = scored
-          .filter(({ minDist }) => minDist < 0.5)
+          .filter(({ minDist }) => minDist < 0.3)
           .sort((a, b) => a.minDist - b.minDist)
           .slice(0, 5)
           .map(({ trail }) => trail)

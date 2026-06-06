@@ -42,6 +42,118 @@ const TRAILS = [
   { slug: 'you-yangs-mountain-bike-park',  name: 'You Yangs Mountain Bike Park',   type: 'mtb',   region: 'Geelong',            url: 'https://discover.data.vic.gov.au/dataset/0b139f62-1f00-4bad-8a79-c23340ad40ba/resource/aecc589d-da3d-4884-aab8-a5d09c46af82/download/you_yangs_mountain_bike_park.kml' },
 ] as const
 
+// ── Manually curated trails not on data.vic.gov.au ───────────────────────────
+// These are upserted directly with hardcoded waypoints (no KML fetch needed).
+
+const STATIC_TRAILS = [
+  {
+    slug: 'brisbane-ranges-burchell-trail',
+    name: 'Burchell Trail',
+    type: 'walk' as const,
+    region: 'Brisbane Ranges',
+    distance_km: 11,
+    kml_url: 'https://www.parks.vic.gov.au/places-to-see/parks/brisbane-ranges-national-park/things-to-do/walking',
+    waypoints: [
+      { name: 'Stony Creek Trailhead', description: 'Main trailhead with parking area near Stony Creek picnic ground.', lat: -37.862, lng: 144.238 },
+      { name: 'Anakie Gorge', description: 'Rocky gorge with seasonal creek and diverse birdlife through Brisbane Ranges.', lat: -37.872, lng: 144.232 },
+      { name: 'Riddells Creek Lookout', description: 'Elevated views over the Brisbane Ranges and surrounding farmland.', lat: -37.858, lng: 144.225 },
+    ],
+    route_coords: [
+      [144.238, -37.862], [144.235, -37.864], [144.232, -37.868],
+      [144.232, -37.872], [144.228, -37.875], [144.225, -37.870],
+      [144.225, -37.858], [144.230, -37.855], [144.238, -37.862],
+    ] as [number, number][],
+  },
+  {
+    slug: 'brisbane-ranges-anakie-gorge-walk',
+    name: 'Anakie Gorge Walk',
+    type: 'walk' as const,
+    region: 'Brisbane Ranges',
+    distance_km: 8.5,
+    kml_url: 'https://www.parks.vic.gov.au/places-to-see/parks/brisbane-ranges-national-park/things-to-do/walking',
+    waypoints: [
+      { name: 'Anakie Gorge Picnic Area', description: 'Start of the walk with picnic facilities and car parking.', lat: -37.874, lng: 144.231 },
+      { name: 'Gorge Circuit', description: 'Loop through the rocky gorge with native orchids and grey kangaroos.', lat: -37.878, lng: 144.228 },
+      { name: 'Scrubby Creek', description: 'Seasonal waterhole attracting wildlife including echidnas and wallabies.', lat: -37.882, lng: 144.235 },
+    ],
+    route_coords: [
+      [144.231, -37.874], [144.228, -37.878], [144.224, -37.881],
+      [144.228, -37.885], [144.235, -37.882], [144.237, -37.878],
+      [144.233, -37.875], [144.231, -37.874],
+    ] as [number, number][],
+  },
+  {
+    slug: 'dandenong-ranges-kokoda-track',
+    name: 'Kokoda Track Memorial Walk',
+    type: 'walk' as const,
+    region: 'Dandenong Ranges',
+    distance_km: 10,
+    kml_url: 'https://www.parks.vic.gov.au/places-to-see/parks/dandenong-ranges-national-park/things-to-do/walking',
+    waypoints: [
+      { name: 'Ferny Creek Start', description: 'Start near Ferny Creek with access through tall mountain ash forest.', lat: -37.892, lng: 145.353 },
+      { name: 'Sherbrooke Forest', description: 'Dense temperate rainforest famous for superb lyrebird calls.', lat: -37.905, lng: 145.357 },
+      { name: 'Sherbrooke Falls', description: 'Cascading waterfall hidden in ferny gullies — best after rain.', lat: -37.912, lng: 145.362 },
+    ],
+    route_coords: [
+      [145.353, -37.892], [145.355, -37.898], [145.357, -37.905],
+      [145.360, -37.910], [145.362, -37.912], [145.358, -37.908],
+      [145.355, -37.902], [145.353, -37.892],
+    ] as [number, number][],
+  },
+  {
+    slug: 'macedon-camels-hump-walk',
+    name: 'Camels Hump Walk',
+    type: 'walk' as const,
+    region: 'Macedon Ranges',
+    distance_km: 3.5,
+    kml_url: 'https://www.parks.vic.gov.au/places-to-see/parks/mount-macedon-regional-park/things-to-do/walking',
+    waypoints: [
+      { name: 'Mount Macedon Summit Car Park', description: 'Start from the summit area with views over Port Phillip Bay on clear days.', lat: -37.373, lng: 144.574 },
+      { name: 'Camels Hump Summit', description: 'Rocky volcanic summit at 1010m with 360° views over the Macedon Ranges.', lat: -37.378, lng: 144.568 },
+      { name: 'Rock Face', description: 'Distinctive granite outcrops popular with rock climbers and walkers.', lat: -37.382, lng: 144.565 },
+    ],
+    route_coords: [
+      [144.574, -37.373], [144.571, -37.376], [144.568, -37.378],
+      [144.565, -37.382], [144.568, -37.385], [144.572, -37.381],
+      [144.574, -37.373],
+    ] as [number, number][],
+  },
+  {
+    slug: 'kinglake-mason-falls-walk',
+    name: 'Mason Falls Walk',
+    type: 'walk' as const,
+    region: 'Kinglake',
+    distance_km: 2,
+    kml_url: 'https://www.parks.vic.gov.au/places-to-see/parks/kinglake-national-park/things-to-do/walking',
+    waypoints: [
+      { name: 'Mason Falls Picnic Area', description: 'Car park and picnic ground — short walk to the waterfall.', lat: -37.516, lng: 145.366 },
+      { name: 'Mason Falls', description: 'Picturesque 15m waterfall cascading into a fern-lined pool in Kinglake National Park.', lat: -37.519, lng: 145.363 },
+    ],
+    route_coords: [
+      [145.366, -37.516], [145.364, -37.517], [145.363, -37.519],
+      [145.364, -37.517], [145.366, -37.516],
+    ] as [number, number][],
+  },
+  {
+    slug: 'plenty-gorge-diamond-creek-walk',
+    name: 'Diamond Creek to Yarrambat Walk',
+    type: 'walk' as const,
+    region: 'Melbourne North',
+    distance_km: 7,
+    kml_url: 'https://www.parks.vic.gov.au/places-to-see/parks/plenty-gorge-parklands/things-to-do/walking',
+    waypoints: [
+      { name: 'Diamond Creek Entry', description: 'Entrance to Plenty Gorge Parklands with car parking off Diamond Creek Road.', lat: -37.645, lng: 145.088 },
+      { name: 'Plenty River Gorge', description: 'Deep basalt gorge carved by the Plenty River with cliffs up to 30m high.', lat: -37.655, lng: 145.078 },
+      { name: 'Yarrambat Park', description: 'Peaceful parkland at the northern end of the gorge walk.', lat: -37.641, lng: 145.075 },
+    ],
+    route_coords: [
+      [145.088, -37.645], [145.083, -37.649], [145.078, -37.655],
+      [145.074, -37.650], [145.075, -37.641], [145.081, -37.640],
+      [145.088, -37.645],
+    ] as [number, number][],
+  },
+]
+
 // ── KML parser ────────────────────────────────────────────────────────────────
 
 interface Waypoint { name: string; description: string; lat: number; lng: number }
@@ -138,6 +250,31 @@ export async function loadTrails(forceAll = false): Promise<{ updated: number; s
       console.error(`[trails] error for ${trail.slug}:`, err)
       errors++
     }
+  }
+
+  // Upsert static trails (no KML fetch — waypoints hardcoded)
+  for (const trail of STATIC_TRAILS) {
+    const staticHash = `static-${trail.slug}`
+    if (!forceAll && existingHash[trail.slug] === staticHash) {
+      console.log(`[trails] ${trail.slug} static — skipping`)
+      skipped++
+      continue
+    }
+    const { error } = await db.from('trails').upsert({
+      slug: trail.slug,
+      name: trail.name,
+      type: trail.type,
+      region: trail.region,
+      kml_url: trail.kml_url,
+      content_hash: staticHash,
+      waypoints: trail.waypoints,
+      route_coords: trail.route_coords,
+      distance_km: trail.distance_km,
+      last_fetched_at: new Date().toISOString(),
+    }, { onConflict: 'slug' })
+    if (error) { console.error(`[trails] static upsert error for ${trail.slug}:`, error); errors++; continue }
+    console.log(`[trails] ${trail.slug} static — upserted`)
+    updated++
   }
 
   console.log(`[trails] done — ${updated} updated, ${skipped} skipped, ${errors} errors`)
