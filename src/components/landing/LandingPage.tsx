@@ -649,6 +649,11 @@ function SeasonalWatercolour({ season }: { season: string }) {
         backdropFilter: 'blur(8px) saturate(0.9)',
         WebkitBackdropFilter: 'blur(8px) saturate(0.9)',
       }} />
+      {/* Centre vignette — ensures text is always readable regardless of season colour */}
+      <div style={{
+        position: 'absolute', inset: 0,
+        background: 'radial-gradient(ellipse 70% 80% at 50% 45%, rgba(255,255,255,0.82) 0%, rgba(255,255,255,0.40) 55%, transparent 80%)',
+      }} />
     </div>
   )
 }
@@ -746,72 +751,66 @@ export function LandingPage() {
 
       {/* ── Hero ──────────────────────────── */}
       <section style={{
-        padding: '72px 24px 60px',
+        padding: 'clamp(56px, 10vw, 96px) 24px clamp(48px, 8vw, 88px)',
         textAlign: 'center',
         position: 'relative',
         borderBottom: '1px solid var(--border)',
         background: 'var(--bg-base)',
       }}>
         <SeasonalWatercolour season={season} />
-        <div style={{ position: 'relative', zIndex: 10 }}>
-        <h1 style={{
-          fontFamily: "'Fraunces', Georgia, serif",
-          fontSize: 'clamp(24px, 4vw, 46px)',
-          fontWeight: 700, letterSpacing: '-0.03em', lineHeight: 1.3,
-          color: '#1C1C1A', maxWidth: 800, margin: '0 auto 28px',
-        }}>
-          <span style={{
-            color: GREEN,
-            textShadow: '0 0 20px rgba(255,255,255,1), 0 0 40px rgba(255,255,255,0.9), 0 0 60px rgba(255,255,255,0.7)',
-          }}>Have you seen...</span>{' '}{highlight}
-        </h1>
+        <div style={{ position: 'relative', zIndex: 10, maxWidth: 680, margin: '0 auto' }}>
 
-        <p style={{
-          fontSize: 'clamp(16px, 1.8vw, 19px)',
-          color: '#4A4A4A', lineHeight: 1.6,
-          maxWidth: 480, margin: '0 auto 32px',
-        }}>
-          Explore what Victoria has to offer.
-        </p>
+          {/* Kicker */}
+          <p style={{
+            fontSize: 13, fontWeight: 600, letterSpacing: '0.08em',
+            textTransform: 'uppercase', color: GREEN,
+            margin: '0 0 20px',
+          }}>
+            Victorian weekend getaways
+          </p>
 
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12, width: '100%' }}>
-          <div style={{ width: '100%', position: 'relative', zIndex: 20 }}>
+          {/* H1 — 3–4× body size, charcoal near-black */}
+          <h1 style={{
+            fontFamily: "'Fraunces', Georgia, serif",
+            fontSize: 'clamp(32px, 5vw, 56px)',
+            fontWeight: 700, letterSpacing: '-0.03em', lineHeight: 1.15,
+            color: '#1A1A1A',
+            margin: '0 0 24px',
+          }}>
+            <span style={{
+              color: GREEN,
+              textShadow: '0 0 20px rgba(255,255,255,1), 0 0 40px rgba(255,255,255,0.9)',
+            }}>Have you seen...</span>{' '}{highlight}
+          </h1>
+
+          {/* Subheadline — body ~16px (H1 ÷ 3) */}
+          <p style={{
+            fontSize: 'clamp(15px, 1.6vw, 18px)',
+            color: '#4A4A4A', lineHeight: 1.65, fontWeight: 400,
+            maxWidth: 460, margin: '0 auto 48px',
+          }}>
+            Find your next Victorian escape — local food, nature, and stays, planned in 30 seconds.
+          </p>
+
+          {/* Search — visual centre, primary action */}
+          <div style={{ width: '100%', position: 'relative', zIndex: 20, marginBottom: 20 }}>
             <HeroSearchToggle onSearch={handleSearch} />
           </div>
+
+          {/* Ghost secondary — text link, doesn't compete */}
           <button
             onClick={() => document.getElementById('clusters')?.scrollIntoView({ behavior: 'smooth' })}
             className="mu-browse-link"
             style={{
               background: 'none', border: 'none',
-              color: '#8C8A87', fontSize: 13, cursor: 'pointer',
-              textDecoration: 'underline', textDecorationColor: 'var(--border)',
+              color: '#6B7280', fontSize: 14, cursor: 'pointer',
+              textDecoration: 'underline', textDecorationColor: '#D1D5DB',
               padding: '4px 8px',
             }}>
             or browse destinations ↓
           </button>
-        </div>
 
-        {/* Value prop chips */}
-        <div style={{ display: 'flex', gap: 10, justifyContent: 'center', marginTop: 40, flexWrap: 'wrap' }}>
-          {[
-            { icon: '⚡', text: 'Plan in 30 seconds' },
-            { icon: '🗺', text: 'Real road routes' },
-            { icon: '☕', text: 'Local food & stays' },
-            { icon: '🇦🇺', text: 'Victoria only' },
-          ].map(({ icon, text }) => (
-            <div key={text} style={{
-              display: 'inline-flex', alignItems: 'center', gap: 6,
-              padding: '6px 14px', borderRadius: 20,
-              background: 'rgba(255,255,255,0.7)', backdropFilter: 'blur(6px)',
-              border: '1px solid rgba(0,0,0,0.08)',
-              fontSize: 12, fontWeight: 600, color: '#4A4948',
-            }}>
-              <span>{icon}</span>
-              <span>{text}</span>
-            </div>
-          ))}
         </div>
-        </div>{/* end z-index wrapper */}
       </section>
 
       {/* ── Cluster cards grid ────────────── */}
