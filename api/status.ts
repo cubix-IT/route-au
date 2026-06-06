@@ -213,6 +213,7 @@ ${Object.entries(byCluster).sort(([a],[b]) => a.localeCompare(b)).map(([cluster,
 
 </body></html>`
 
-  res.setHeader('Content-Type', 'text/html')
+  res.setHeader('Content-Type', 'text/html; charset=utf-8')
+  res.setHeader('Cache-Control', 's-maxage=300, stale-while-revalidate=60')
   return res.status(200).send(html)
 }
