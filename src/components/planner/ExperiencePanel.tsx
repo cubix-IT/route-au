@@ -16,15 +16,16 @@ const WARM  = '#B87333'
 // Build a Google Maps URL that opens pinned to exact coordinates when available.
 // Coordinate-based URLs open the right location on the map immediately.
 // Coordinate pin link — always opens at the exact location, no Google Place ID needed
-function safeMapsUrl(mapsUrl: string | undefined | null, name: string, lat?: number | null, lng?: number | null): string {
-  if (lat && lng) return `https://maps.google.com/?q=${lat},${lng}`
-  if (mapsUrl && mapsUrl.includes('query_place_id=')) return mapsUrl
-  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(name + ' Victoria')}`
+// Named search biased to coordinates — shows place name in Google Maps, not raw coordinates
+function coordMapsUrl(name: string, lat?: number | null, lng?: number | null, destName?: string): string {
+  const q = encodeURIComponent(name + (destName ? `, ${destName}` : ''))
+  if (lat && lng) return `https://www.google.com/maps/search/?api=1&query=${q}&ll=${lat},${lng}`
+  return `https://www.google.com/maps/search/?api=1&query=${q}`
 }
 
-function coordMapsUrl(name: string, lat?: number | null, lng?: number | null): string {
-  if (lat && lng) return `https://maps.google.com/?q=${lat},${lng}`
-  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(name + ' Victoria')}`
+function safeMapsUrl(mapsUrl: string | undefined | null, name: string, lat?: number | null, lng?: number | null, destName?: string): string {
+  if (mapsUrl && (mapsUrl.includes('query_place_id=') || mapsUrl.includes('maps/search') || mapsUrl.includes('maps?q='))) return mapsUrl
+  return coordMapsUrl(name, lat, lng, destName)
 }
 
 // ── Category tag config ────────────────────────────────────────────────────────
@@ -418,7 +419,7 @@ export function ExperiencePanel({ hideTimeline = false }: { hideTimeline?: boole
               cost: (a.cost as Activity['cost']) || 'free',
               kidsOk: a.kids_ok,
               isHiddenGem: a.is_hidden_gem,
-              mapsUrl: safeMapsUrl(a.maps_url, a.name, a.lat, a.lng),
+              mapsUrl: safeMapsUrl(a.maps_url, a.name, a.lat, a.lng, d.shortDest),
               tags: a.tags ?? [],
               websiteUri: aAttr.website_uri as string | undefined,
               phone: (a as any).phone as string | undefined,
@@ -436,7 +437,7 @@ export function ExperiencePanel({ hideTimeline = false }: { hideTimeline?: boole
             cost: 'free' as Activity['cost'],
             kidsOk: true,
             isHiddenGem: false,
-            mapsUrl: coordMapsUrl(n.name, n.lat, n.lng),
+            mapsUrl: coordMapsUrl(n.name, n.lat, n.lng, d.shortDest),
             tags: [n.type],
           }))
 
@@ -631,7 +632,7 @@ export function ExperiencePanel({ hideTimeline = false }: { hideTimeline?: boole
             const emoji = FOOD_CAT_EMOJI[f.category] ?? '🍽️'
             const cfg = FOOD_CAT_COLOR[f.category] ?? { color: '#374151', bg: '#F9FAFB' }
             const website = attr.website_uri ?? f.website ?? undefined
-            const mapsUrl = coordMapsUrl(f.name, f.lat, f.lng)
+            const mapsUrl = coordMapsUrl(f.name, f.lat, f.lng, d.shortDest)
             const driveMin = d.driveMinutes.get(f.slug) ?? null
             const cardId = String(f.food_place_id)
             return (
@@ -825,7 +826,7 @@ export function ExperiencePanel({ hideTimeline = false }: { hideTimeline?: boole
                         emoji={cfg.emoji}
                         description={poi.description}
                         address={poi.address}
-                        mapsUrl={coordMapsUrl(poi.name, poi.lat, poi.lng)}
+                        mapsUrl={coordMapsUrl(poi.name, poi.lat, poi.lng, d.shortDest)}
                         website={websiteUrl}
                         highlighted={selectedPinId === poi.id}
                         onMapPin={() => setSelectedPinId(poi.id)}
@@ -1153,7 +1154,7 @@ function ActivityCard({ act, expanded, highlighted, onToggle, isAdded, onAdd, on
 function AccommodationGridCard({ poi }: { poi: AccommodationPOI; destName?: string }) {
   const cfg = ACCOM_POI_CFG[poi.type]
   const attr = (poi as unknown as { attributes?: Record<string, unknown> }).attributes ?? {}
-  const mapsUrl = coordMapsUrl(poi.name, poi.lat, poi.lng)
+  const mapsUrl = coordMapsUrl(poi.name, poi.lat, poi.lng, d.shortDest)
   const websiteUri = attr.website_uri as string | undefined
   const websiteUrl = websiteUri || poi.website || null
 

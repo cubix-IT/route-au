@@ -572,7 +572,7 @@ export function MobilePlanner() {
                     {drinks.map(f => {
                       const emoji = FOOD_EMOJI[f.category] ?? '🍽️'
                       const cfg = FOOD_COLOR[f.category] ?? { color: '#374151', bg: '#F9FAFB' }
-                      return <ResultCard key={f.food_place_id} name={f.name} categoryLabel={f.category} categoryColor={cfg.color} categoryBg={cfg.bg} emoji={emoji} description={f.description ?? undefined} website={(f.attributes as any)?.website_uri ?? f.website ?? undefined} mapsUrl={`https://maps.google.com/?q=${f.lat},${f.lng}`} phone={f.phone ?? undefined} driveMinutes={d.driveMinutes.get(f.slug) ?? null} />
+                      return <ResultCard key={f.food_place_id} name={f.name} categoryLabel={f.category} categoryColor={cfg.color} categoryBg={cfg.bg} emoji={emoji} description={f.description ?? undefined} website={(f.attributes as any)?.website_uri ?? f.website ?? undefined} mapsUrl={f.lat && f.lng ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(f.name + ", " + d.shortDest)}&ll=${f.lat},${f.lng}` : ""} phone={f.phone ?? undefined} driveMinutes={d.driveMinutes.get(f.slug) ?? null} />
                     })}
                   </>
                 )}
@@ -582,7 +582,7 @@ export function MobilePlanner() {
                     {foods.map(f => {
                       const emoji = FOOD_EMOJI[f.category] ?? '🍽️'
                       const cfg = FOOD_COLOR[f.category] ?? { color: '#374151', bg: '#F9FAFB' }
-                      return <ResultCard key={f.food_place_id} name={f.name} categoryLabel={f.category} categoryColor={cfg.color} categoryBg={cfg.bg} emoji={emoji} description={f.description ?? undefined} website={(f.attributes as any)?.website_uri ?? f.website ?? undefined} mapsUrl={`https://maps.google.com/?q=${f.lat},${f.lng}`} phone={f.phone ?? undefined} driveMinutes={d.driveMinutes.get(f.slug) ?? null} />
+                      return <ResultCard key={f.food_place_id} name={f.name} categoryLabel={f.category} categoryColor={cfg.color} categoryBg={cfg.bg} emoji={emoji} description={f.description ?? undefined} website={(f.attributes as any)?.website_uri ?? f.website ?? undefined} mapsUrl={f.lat && f.lng ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(f.name + ", " + d.shortDest)}&ll=${f.lat},${f.lng}` : ""} phone={f.phone ?? undefined} driveMinutes={d.driveMinutes.get(f.slug) ?? null} />
                     })}
                   </>
                 )}
@@ -602,7 +602,7 @@ export function MobilePlanner() {
               const ACCOM_LABEL: Record<string, string> = { hotel: 'Hotel', motel: 'Motel', campsite: 'Campsite', caravan_park: 'Caravan Park', hostel: 'Hostel', cabin: 'Cabin', guest_house: 'Guest House' }
               const emoji = ACCOM_EMOJI[a.type] ?? '🏨'
               const label = ACCOM_LABEL[a.type] ?? a.type
-              const mapsUrl = a.lat && a.lng ? `https://maps.google.com/?q=${a.lat},${a.lng}` : undefined
+              const mapsUrl = a.lat && a.lng ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(a.name + ', ' + d.shortDest)}&ll=${a.lat},${a.lng}` : undefined
               return (
                 <div key={a.id} style={{ background: '#fff', borderRadius: 16, border: '1px solid rgba(0,0,0,0.07)', padding: '14px 16px', boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
                   <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>

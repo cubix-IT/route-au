@@ -16,6 +16,20 @@ npm run enrich -- --slug healesville  # single destination
 
 **Never use `vercel --prod` directly** — bypasses the `deploy_log` table in Supabase.
 
+## 🚫 NON-NEGOTIABLE RULES
+
+- **NO raw coordinate URLs in Maps links — ever.** `https://maps.google.com/?q=-37.8,145.2` is FORBIDDEN.
+  - Natural features (waterfalls, lookouts, parks): `https://maps.google.com/maps?q=LAT,LNG+(Name)`
+  - Businesses/venues: `https://www.google.com/maps/search/?api=1&query=Name%2C+Dest&ll=LAT,LNG`
+  - Use the `mapsUrl()` helper in `scripts/enrich.ts` and `coordMapsUrl()` in `ExperiencePanel.tsx`
+  - After every enrichment run, verify zero coord-only URLs in DB
+
+- **NO paid APIs without Raj explicitly approving** — Google Places caused A$1,992 bill May 2026.
+
+- **Never use `vercel --prod` directly** — bypasses the `deploy_log` table.
+
+- **Issue lifecycle** — In Progress → work → UAT → Raj signoff → Deploy → Close. Never close before deploy.
+
 ## ⚠️ Vercel Config Requirements
 - **Node.js version must be 22.x** (set in Vercel dashboard → Build & Deployment)
 - Node 24 causes rolldown to fail with `UNLOADABLE_DEPENDENCY` on `src/data/` files
