@@ -1,59 +1,51 @@
-# Enrichment Cron
+# Enrichment
 
-Daily job that keeps destination data fresh. File: `api/cron/enrich.ts`
+Local script (Geofabrik PBF) + monthly cron. File: `scripts/enrich.ts`
 
-## Schedule
-`0 1 * * *` UTC = **11am AEST** — runs daily, 8 destinations per run.
-All 139 destinations cycle every ~17 days.
-
-## What it does per destination
-1. Stamps `enriched_at` immediately (moves dest to end of queue regardless of outcome)
-2. Fetches POIs from Overpass API (tiered radius: 2km / 10km / 20km by distance from Melbourne)
-3. Fetches VHR heritage buildings from Victorian Heritage Database API
-4. Fetches Wikipedia descriptions for items with `wikipedia` OSM tag (up to 5)
-5. Fetches Wikipedia pageviews for quality scoring (up to 10 items)
-6. Generates AI descriptions via Claude Haiku for items with no description
-7. Upserts to `activities`, `food_places`, `nature_spots` tables
-
-## Hard limits / stop conditions
-| Source | Limit | Action |
-|---|---|---|
-| Overpass | 9,000 calls/day | Stop entire run |
-| Overpass | Query >10s (3 consecutive) | Stop entire run |
-| Overpass | HTTP 429 | Try next mirror, then stop |
-| Supabase DB | 450MB estimated | Stop entire run |
-| Wikipedia | HTTP 429 | Skip remaining Wikipedia calls this run |
-
-## Manual trigger
+## Run commands
 ```bash
-curl -X POST "https://unplanned-escapes.vercel.app/api/cron/enrich?force=1&limit=8"
-# force=1 ignores enriched_at staleness check
-# limit=N overrides batch size (max 10)
+npm run enrich                        # 8 stale destinations
+npm run enrich -- --all               # all 130 destinations
+npm run enrich -- --slug healesville  # single destination
+npm run enrich -- --force             # ignore staleness
+npm run enrich -- --no-push           # dry run (no git commit)
 ```
 
-## Check status
-```bash
-curl https://unplanned-escapes.vercel.app/api/status
-```
+## Architecture: Wikipedia-first, OSM-as-supplement
 
-## OSM category → activity category mapping
-- `tourism=viewpoint` → `viewpoint 🌄`
-- `historic=*` / `railway=station` → `history 🏛️`
-- VHD heritage places → `history 🏛️`
-- `natural=hot_spring` / `amenity=spa` → `wellness ♨️`
-- `craft=brewery` → `brewery 🍺`
-- `craft=winery` / `tourism=winery` → `winery 🍷`
-- `craft=distillery` → `distillery 🥃`
-- See `activityCategory()` in enrich.ts for full mapping
+1. **Wikipedia discovery** — fetch Tourism/Recreation/Heritage sections from the destination's Wikipedia article, use Claude Haiku to extract named attractions as structured data (`name`, `category`, `description`)
+2. **Geocoding** — for each Wikipedia attraction, check OSM PBF first (name match), then Photon geocoder. Drop items with no coordinates.
+3. **OSM supplement** — bounding-box scan of Geofabrik PBF for POIs Wikipedia missed (cafes, pubs, wineries, natural features). Deduplicated against Wikipedia finds by name.
+4. **VHD heritage** — Victorian Heritage Database API for historic buildings
+5. **Description fill** — Wikipedia extract for items with `tags.wikipedia`; Claude Haiku for everything else. Prompt: visitor experience, never population/dates.
+6. **Quality gate** — activities must have description >20 chars; nature spots need description OR `tags.wikipedia` (filled by step 5)
 
-## Quality scoring (0–100)
-- Wikipedia monthly pageviews: up to 55 points
-- Has wikipedia OSM tag: +20
-- Has wikidata OSM tag: +15
-- VHD heritage baseline: 40 (officially significant)
-- `tourism=attraction`: +10
-- Has website: +5
+## Data sources
+| Source | Used for |
+|---|---|
+| Geofabrik PBF (Geofabrik.de) | All POI discovery — no rate limits |
+| Wikipedia REST API | Destination summaries + item descriptions |
+| Claude Haiku | Descriptions for items without Wikipedia (~$0.003/destination) |
+| Victorian Heritage Database | Heritage buildings with VHR numbers |
+| Photon (Komoot) | Geocoding Wikipedia-found attractions |
 
-## Email notifications
-Sent at end of each full cycle (all 139 destinations done) or if stopped early.
-Configured via `RESEND_API_KEY` in Vercel env.
+## Quality filters (what gets excluded)
+- `amenity=library` — not weekend destinations
+- Zoo/sanctuary sub-enclosure labels (Dingo1, Koala, etc.)
+- Accommodation (belongs in `accommodation` table)
+- Chain businesses (McDonald's, Coles, BP, etc.)
+- Items with no description after Wikipedia + Haiku fill
+- Wikipedia attractions with no geocoded coordinates (can't pin them)
+- Food (cafes/bakeries) without Wikipedia tag — tourist-notable only
+
+## Destination summary (About section)
+- Fetched from Wikipedia via `fetchWikipediaSummary()` in `src/lib/overpass.ts`
+- Picks the first visitor-relevant sentence — skips population, founding dates, disasters, compass directions
+- Cached in localStorage `ue-wiki-cache-v2` with 24h TTL
+
+## Schedule (GitHub Actions)
+`.github/workflows/enrich.yml` — weekly Sunday 2am AEST when laptop is off.
+Requires secrets: `VITE_SUPABASE_URL`, `SUPABASE_SERVICE_KEY`, `ANTHROPIC_API_KEY`
+
+## Run log
+`logs/enrich-runs.jsonl` — appended and committed after each run. Fields: `run_at`, `completed_at`, `duration_sec`, `mode`, `destinations`, `upserted`, `pbf_source`, `results[]`.
