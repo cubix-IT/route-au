@@ -130,12 +130,12 @@ async function fetchDestinationFromDB(
   const cLng = destCoord?.lng ?? (subDest as any).lng
 
   // Bounding box size:
-  // - Urban Melbourne (within 0.5° of CBD): 0.08° ≈ 8km
-  // - Regional Victoria: 0.13° ≈ 14km — tight enough to exclude far stations/suburbs
-  //   (OSRM 45-min filter refines further after load)
+  // - Inner Melbourne suburbs (<0.2° of CBD, e.g. Williamstown, Richmond, Brunswick): 0.05° ≈ 5km
+  // - Outer Melbourne (<0.5° of CBD): 0.08° ≈ 8km
+  // - Regional Victoria: 0.13° ≈ 14km
   const MELB_CBD_LAT = -37.814, MELB_CBD_LNG = 144.963
   const distFromCBD = Math.abs(cLat - MELB_CBD_LAT) + Math.abs(cLng - MELB_CBD_LNG)
-  const DELTA = distFromCBD < 0.5 ? 0.08 : 0.13
+  const DELTA = distFromCBD < 0.2 ? 0.05 : distFromCBD < 0.5 ? 0.08 : 0.13
   const latMin = cLat - DELTA, latMax = cLat + DELTA
   const lngMin = cLng - DELTA, lngMax = cLng + DELTA
 
@@ -375,7 +375,13 @@ export function usePlannerData() {
     const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLng/2)**2
     return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a))
   }
-  const MAX_HAVERSINE_KM = 15
+  const MAX_HAVERSINE_KM = destCoord
+    ? (() => {
+        const MELB_CBD_LAT = -37.814, MELB_CBD_LNG = 144.963
+        const d = Math.abs(destCoord.lat - MELB_CBD_LAT) + Math.abs(destCoord.lng - MELB_CBD_LNG)
+        return d < 0.2 ? 5 : d < 0.5 ? 10 : 15  // inner Melbourne 5km, outer 10km, regional 15km
+      })()
+    : 15
 
   const openActivities = useMemo(() => {
     const byStatus = dbActivities.filter((a) => {
