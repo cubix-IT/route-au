@@ -246,7 +246,7 @@ export function PrivacyPage({ onBack }: { onBack: () => void }) {
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <section style={{ marginBottom: 52 }}>
-      <h2 style={{ fontFamily: "'Fraunces', Georgia, serif", fontSize: 22, fontWeight: 700, letterSpacing: '-0.02em', color: '#1C1C1A', marginBottom: 18, borderBottom: '1px solid #E8E6E2', paddingBottom: 12 }}>
+      <h2 style={{ fontFamily: "'Fraunces', Georgia, serif", fontSize: 22, fontWeight: 700, letterSpacing: '-0.02em', color: '#002112', marginBottom: 18, borderBottom: '2px solid #B7EDCA', paddingBottom: 12 }}>
         {title}
       </h2>
       <div style={{ fontSize: 15, lineHeight: 1.8, color: '#3A3835' }}>
@@ -274,7 +274,7 @@ function SourceEntry({ name, url, what, licence, licenceUrl, attribution }: {
   licence: string; licenceUrl: string; attribution?: string
 }) {
   return (
-    <div style={{ background: '#fff', borderRadius: 12, border: '1px solid #E8E6E2', padding: '16px 20px' }}>
+    <div style={{ background: '#F2F5F1', borderRadius: 16, border: 'none', padding: '16px 20px' }}>
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, marginBottom: 6, flexWrap: 'wrap' }}>
         <a href={url} target="_blank" rel="noopener noreferrer" style={{ fontWeight: 700, fontSize: 14, color: GREEN, textDecoration: 'none' }}>
           {name} ↗

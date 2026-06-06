@@ -113,28 +113,28 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 <title>Unplanned Escapes — Status</title>
 <style>
   * { box-sizing: border-box }
-  body { font-family: -apple-system, sans-serif; background: #F8F7F4; color: #1C1C1A; margin: 0; padding: 20px }
-  h1 { font-size: 20px; font-weight: 700; margin: 0 0 2px }
-  .sub { color: #6B7280; font-size: 12px; margin: 0 0 20px }
-  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px; margin-bottom: 20px }
-  .card { background: #fff; border: 1px solid #E5E7EB; border-radius: 10px; padding: 14px }
-  .card-title { font-size: 11px; font-weight: 700; color: #6B7280; text-transform: uppercase; letter-spacing: .06em; margin-bottom: 8px }
-  .big { font-size: 24px; font-weight: 700 }
-  .stat { font-size: 12px; color: #6B7280; margin-top: 4px }
-  h2 { font-size: 14px; font-weight: 700; margin: 20px 0 10px }
-  .job-row { display: flex; align-items: center; background: #fff; border: 1px solid #E5E7EB; border-radius: 8px; padding: 10px 14px; margin-bottom: 6px; gap: 10px }
-  .job-name { font-size: 13px; font-weight: 600; flex: 1 }
-  .job-meta { font-size: 11px; color: #6B7280 }
-  .cluster-title { font-size: 12px; font-weight: 700; color: #6B7280; text-transform: uppercase; letter-spacing: .06em; margin: 14px 0 6px }
+  body { font-family: -apple-system, sans-serif; background: #F2F5F1; color: #002112; margin: 0; padding: 24px; max-width: 1100px; margin: 0 auto }
+  h1 { font-size: 22px; font-weight: 700; margin: 0 0 2px; color: #002112 }
+  .sub { color: #6F7F71; font-size: 12px; margin: 0 0 24px }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; margin-bottom: 24px }
+  .card { background: #ECF0EB; border-radius: 16px; padding: 16px }
+  .card-title { font-size: 11px; font-weight: 700; color: #6F7F71; text-transform: uppercase; letter-spacing: .06em; margin-bottom: 8px }
+  .big { font-size: 26px; font-weight: 700; color: #002112 }
+  .stat { font-size: 12px; color: #6F7F71; margin-top: 4px }
+  h2 { font-size: 13px; font-weight: 700; margin: 24px 0 10px; color: #3A6B4F; text-transform: uppercase; letter-spacing: 0.06em }
+  .job-row { display: flex; align-items: center; background: #ECF0EB; border-radius: 12px; padding: 12px 16px; margin-bottom: 6px; gap: 10px }
+  .job-name { font-size: 13px; font-weight: 600; flex: 1; color: #002112 }
+  .job-meta { font-size: 11px; color: #6F7F71 }
+  .cluster-title { font-size: 11px; font-weight: 700; color: #3A6B4F; text-transform: uppercase; letter-spacing: .06em; margin: 16px 0 6px }
   .dest-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 4px; margin-bottom: 4px }
-  .dest-chip { display: flex; align-items: center; background: #fff; border: 1px solid #E5E7EB; border-radius: 6px; padding: 5px 8px; font-size: 11px }
-  .dest-name { flex: 1; font-weight: 500 }
-  .dest-age { color: #9CA3AF; font-size: 10px }
+  .dest-chip { display: flex; align-items: center; background: #ECF0EB; border-radius: 8px; padding: 6px 10px; font-size: 11px }
+  .dest-name { flex: 1; font-weight: 500; color: #002112 }
+  .dest-age { color: #6F7F71; font-size: 10px }
 </style>
 </head><body>
 
-<h1>Unplanned Escapes</h1>
-<p class="sub">Status · ${aest(now.toISOString())} AEST</p>
+<h1>Unplanned Escapes — Status</h1>
+<p class="sub">Last checked: ${aest(now.toISOString())} AEST · <a href="/" style="color:#3A6B4F">← Back to app</a></p>
 
 <div class="grid">
   <div class="card">
