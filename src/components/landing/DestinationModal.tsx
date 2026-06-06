@@ -454,7 +454,7 @@ export function DestinationModal({
                   ))}
                 </div>
               )}
-              <div style={{ padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <div style={{ padding: '12px 16px', display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 8, alignItems: 'start' }}>
                 {dbLoading && <LoadingSkeleton />}
                 {!dbLoading && filteredActs.length === 0 && <Empty text="No activities found for this filter." />}
                 {filteredActs.map((a) => {
@@ -509,7 +509,7 @@ export function DestinationModal({
                   ))}
                 </div>
               )}
-              <div style={{ padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <div style={{ padding: '12px 16px', display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 8, alignItems: 'start' }}>
                 {dbLoading && <LoadingSkeleton />}
                 {!dbLoading && filteredFood.length === 0 && <Empty text="No food places found for this filter." />}
                 {[...drinkVenues, ...eatVenues].map((f) => {
@@ -620,14 +620,14 @@ function FilterChip({ label, active, onClick }: { label: string; active: boolean
 
 function LoadingSkeleton() {
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-      {[1, 2, 3].map((i) => <div key={i} className="ai-skeleton-line" style={{ height: 72, borderRadius: 12 }} />)}
-    </div>
+    <>
+      {[1, 2, 3, 4].map((i) => <div key={i} className="ai-skeleton-line" style={{ height: 120, borderRadius: 12 }} />)}
+    </>
   )
 }
 
 function Empty({ text }: { text: string }) {
-  return <div style={{ textAlign: 'center', padding: 32, color: 'var(--text-muted)', fontSize: 13 }}>{text}</div>
+  return <div style={{ gridColumn: '1 / -1', textAlign: 'center', padding: 32, color: 'var(--text-muted)', fontSize: 13 }}>{text}</div>
 }
 
 function OverviewSection({ title, count, loading, onShowAll, children }: { title: string; count: number; loading: boolean; onShowAll: () => void; children: React.ReactNode }) {
