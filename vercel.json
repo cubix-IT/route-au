@@ -1,6 +1,7 @@
 {
   "alias": ["unplanned-escapes.vercel.app"],
   "rewrites": [
+    { "source": "/privacy",   "destination": "/privacy.html" },
     { "source": "/changelog", "destination": "/api/changelog" },
     { "source": "/api/(.*)", "destination": "/api/$1" }
   ],
