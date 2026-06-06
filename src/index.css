@@ -140,7 +140,8 @@ html, body, #root {
   border-radius: 28px;
   width: 100%;
   max-width: 560px;
-  max-height: 92vh;
+  /* Fixed height throughout — no resizing between steps */
+  height: min(680px, 92vh);
   overflow: hidden;
   display: flex;
   flex-direction: column;

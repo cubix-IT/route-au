@@ -793,7 +793,7 @@ export function LandingPage() {
             fontSize: 13, color: '#6B7280', margin: '0 0 16px',
             letterSpacing: '0.01em',
           }}>
-            130 Victorian destinations · Free to plan · No account needed
+            130 Victorian destinations · Free to plan
           </p>
 
           {/* Ghost secondary — min 44px tap target for mobile */}

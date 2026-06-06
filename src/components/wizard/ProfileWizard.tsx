@@ -328,10 +328,7 @@ export function ProfileWizard() {
 
   return (
     <div className="wizard-overlay">
-      <div
-        className="wizard-card animate-fade-up"
-        style={isPickStep ? { maxWidth: 640 } : undefined}
-      >
+      <div className="wizard-card animate-fade-up">
 
         {/* M3 Header */}
         <div style={{ padding: '20px 20px 0', flexShrink: 0 }}>
@@ -383,7 +380,7 @@ export function ProfileWizard() {
         <div key={`${step}-${generating}`} className="animate-fade-up" style={{
           flex: 1,
           overflowY: isPickStep ? 'hidden' : 'auto',
-          padding: isPickStep ? '12px 0 0' : '20px 20px 8px',
+          padding: isPickStep ? '8px 0 0' : '20px 20px 8px',
         }}>
           {generating ? (
             <GeneratingScreen step={genStep} messages={msgs} />
@@ -590,8 +587,8 @@ function StepHowFarAndWho({
       <div>
         <Label>Day trip or staying overnight?</Label>
         <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
-          {([['day', '☀️', 'Day trip', 'Back before dinner'], ['multiday', '🌙', 'Overnight+', 'Stay a night or two']] as const).map(
-            ([type, emoji, label, desc]) => (
+          {([['day', 'Day trip', 'Back before dinner'], ['multiday', 'Overnight+', 'Stay a night or two']] as const).map(
+            ([type, label, desc]) => (
               <button key={type} onClick={() => setTripType(type)} style={{
                 flex: 1, padding: '14px 10px', borderRadius: 12,
                 background: tripType === type ? 'var(--green-light)' : 'var(--bg-muted)',
@@ -600,7 +597,6 @@ function StepHowFarAndWho({
                 cursor: 'pointer', transition: 'all 0.15s',
                 display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
               }}>
-                <span style={{ fontSize: 22 }}>{emoji}</span>
                 <span style={{ fontSize: 13, fontWeight: 700 }}>{label}</span>
                 <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{desc}</span>
               </button>
@@ -614,20 +610,17 @@ function StepHowFarAndWho({
         <Label>Who's coming?</Label>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 10 }}>
           {([
-            ['solo', '🧍', 'Solo', 'Just me'],
-            ['couple', '👫', 'Couple', 'Two of us'],
-            ['family', '👨‍👩‍👧', 'Family', 'Kids included'],
-            ['group', '🎉', 'Group', 'The crew'],
-          ] as const).map(([type, emoji, label, desc]) => (
+            ['solo', 'Solo', 'Just me'],
+            ['couple', 'Couple', 'Two of us'],
+            ['family', 'Family', 'Kids included'],
+            ['group', 'Group', 'The crew'],
+          ] as const).map(([type, label, desc]) => (
             <div key={type}
               className={`option-card ${crewType === type ? 'selected' : ''}`}
               onClick={() => setCrewType(type)}
-              style={{ flexDirection: 'row', padding: '12px', gap: 10, alignItems: 'center' }}>
-              <span style={{ fontSize: 24, flexShrink: 0 }}>{emoji}</span>
-              <div style={{ textAlign: 'left' }}>
-                <div style={{ fontWeight: 700, fontSize: 13, color: 'var(--text-primary)' }}>{label}</div>
-                <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{desc}</div>
-              </div>
+              style={{ flexDirection: 'column', padding: '14px 12px', gap: 4 }}>
+              <div style={{ fontWeight: 700, fontSize: 13, color: 'var(--text-primary)' }}>{label}</div>
+              <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{desc}</div>
             </div>
           ))}
         </div>
@@ -640,21 +633,20 @@ function StepHowFarAndWho({
           {hasKids && (
             <div style={{ marginTop: 14, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
               {([
-                ['toddler', '🍼', 'Toddlers', 'Under 5'],
-                ['school',  '🎒', 'Primary school', '6–12'],
-                ['teen',    '🎧', 'Teenagers', '13+'],
-                ['mixed',   '👶🧒','Mixed ages', 'All of the above'],
-              ] as const).map(([age, emoji, label, desc]) => (
+                ['toddler', 'Toddlers', 'Under 5'],
+                ['school',  'Primary school', '6–12'],
+                ['teen',    'Teenagers', '13+'],
+                ['mixed',   'Mixed ages', 'All of the above'],
+              ] as const).map(([age, label, desc]) => (
                 <div key={age}
                   onClick={() => setKidsAge(age)}
                   style={{
                     display: 'flex', alignItems: 'center', gap: 8,
-                    padding: '10px', borderRadius: 10, cursor: 'pointer',
-                    background: kidsAge === age ? 'var(--green-light)' : '#fff',
-                    border: `1.5px solid ${kidsAge === age ? 'var(--border-active)' : 'var(--border)'}`,
+                    padding: '10px 12px', borderRadius: 10, cursor: 'pointer',
+                    background: kidsAge === age ? 'var(--green-light)' : '#ECF0EB',
+                    border: `1.5px solid ${kidsAge === age ? 'var(--border-active)' : 'transparent'}`,
                     transition: 'all 0.15s',
                   }}>
-                  <span style={{ fontSize: 18 }}>{emoji}</span>
                   <div>
                     <div style={{ fontSize: 12, fontWeight: 600, color: kidsAge === age ? GREEN : 'var(--text-primary)' }}>{label}</div>
                     <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>{desc}</div>
@@ -736,8 +728,7 @@ function StepInterests({ interests, toggleInterest, hasKids, kidsAge }: {
                 filter: selected ? 'none' : 'brightness(0.82) saturate(0.85)',
               }}
             >
-              <span style={{ fontSize: 26 }}>{i.emoji}</span>
-              <span style={{ fontSize: 11, fontWeight: 700, textAlign: 'center', lineHeight: 1.3, color: '#fff', textShadow: '0 1px 4px rgba(0,0,0,0.7)' }}>{i.label}</span>
+              <span style={{ fontSize: 12, fontWeight: 700, textAlign: 'center', lineHeight: 1.3, color: '#fff', textShadow: '0 1px 4px rgba(0,0,0,0.5)' }}>{i.label}</span>
               {selected && (
                 <div style={{ position: 'absolute', top: 6, right: 6, width: 18, height: 18, borderRadius: '50%', background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, color: GREEN, fontWeight: 900 }}>✓</div>
               )}
@@ -1041,7 +1032,7 @@ function StepPickDest({ suggestions, picked, onPick }: {
                   fontSize: 10, fontWeight: 700, color: '#fff',
                   background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(6px)',
                   padding: '3px 9px', borderRadius: 20,
-                }}>🚗 {previewDriveLabel}</span>
+                }}>🗺 {previewDriveLabel}</span>
                 {preview.matchReasons.length > 0 && (
                   <span style={{
                     fontSize: 10, fontWeight: 700, color: '#fff',
@@ -1346,8 +1337,7 @@ function StepVehicle({
           {vehicles.map((v) => (
             <div key={v.type} className={`option-card ${vehicleType === v.type ? 'selected' : ''}`}
               onClick={() => setVehicleType(v.type)}
-              style={{ flexDirection: 'row', padding: '10px 14px', gap: 8, flexShrink: 0 }}>
-              <span style={{ fontSize: 20 }}>{v.emoji}</span>
+              style={{ flexDirection: 'row', padding: '10px 16px', gap: 0, flexShrink: 0 }}>
               <span style={{ fontSize: 13, fontWeight: 600 }}>{v.label}</span>
             </div>
           ))}
@@ -1602,7 +1592,7 @@ function StepPlanningDetails({
         <div>
           <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 2 }}>Heading to</div>
           <div style={{ fontSize: 16, fontWeight: 700, color: GREEN }}>📍 {preselectedDest.destName}</div>
-          <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 3 }}>🚗 ~{driveLabel}</div>
+          <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 3 }}>~{driveLabel}</div>
         </div>
         <button onClick={onClearPreselect} style={{
           background: 'none', border: 'none', color: 'var(--text-muted)',
@@ -1614,17 +1604,16 @@ function StepPlanningDetails({
       <div>
         <Label>How long?</Label>
         <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
-          {([['day', '☀️', 'Day trip'], ['multiday', '🌙', 'Overnight+']] as const).map(
-            ([type, emoji, label]) => (
+          {([['day', 'Day trip'], ['multiday', 'Overnight+']] as const).map(
+            ([type, label]) => (
               <button key={type} onClick={() => setTripType(type)} style={{
                 flex: 1, padding: '12px', borderRadius: 10,
                 background: tripType === type ? 'var(--green-light)' : 'var(--bg-muted)',
                 border: `1.5px solid ${tripType === type ? 'var(--border-active)' : 'var(--border)'}`,
                 color: tripType === type ? GREEN : 'var(--text-muted)',
                 fontSize: 13, fontWeight: 600, cursor: 'pointer', transition: 'all 0.15s',
-                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
               }}>
-                {emoji} {label}
+                {label}
               </button>
             )
           )}
@@ -1653,16 +1642,12 @@ function StepPlanningDetails({
       <div>
         <Label>Who's coming?</Label>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 10 }}>
-          {([
-            ['solo', '🧍', 'Solo'], ['couple', '👫', 'Couple'],
-            ['family', '👨‍👩‍👧', 'Family'], ['group', '🎉', 'Group'],
-          ] as const).map(([type, emoji, label]) => (
+          {(['solo', 'couple', 'family', 'group'] as const).map((type) => (
             <div key={type}
               className={`option-card ${crewType === type ? 'selected' : ''}`}
               onClick={() => setCrewType(type)}
-              style={{ flexDirection: 'row', padding: '10px 12px', gap: 8, alignItems: 'center' }}>
-              <span style={{ fontSize: 20 }}>{emoji}</span>
-              <span style={{ fontSize: 13, fontWeight: 600 }}>{label}</span>
+              style={{ flexDirection: 'row', padding: '10px 12px', gap: 0 }}>
+              <span style={{ fontSize: 13, fontWeight: 600, textTransform: 'capitalize' }}>{type}</span>
             </div>
           ))}
         </div>
@@ -1697,7 +1682,7 @@ function StepPlanningDetails({
 
 function GeneratingScreen({ step, messages }: { step: number; messages: string[] }) {
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: 260, gap: 24 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flex: 1, gap: 24 }}>
       <div style={{ position: 'relative', width: 60, height: 60 }}>
         <svg className="spin-slow" viewBox="0 0 60 60" fill="none" style={{ position: 'absolute', inset: 0 }}>
           <circle cx="30" cy="30" r="26" stroke="var(--green-light)" strokeWidth="3" />
