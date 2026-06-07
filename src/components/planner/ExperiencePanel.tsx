@@ -1,8 +1,9 @@
 import { GREEN, WARM, SECONDARY } from '@/lib/brand'
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { usePlannerData } from '@/hooks/usePlannerData'
 import { useAppStore } from '@/store/useAppStore'
 import { useTrails } from '@/hooks/useTrails'
+import { useWeather } from '@/hooks/useWeather'
 import { CORRIDORS } from '@/data/corridors.ts'
 import { VICTORIAN_CLUSTERS } from '@/data/victorianClusters.ts'
 import type { Coordinate } from '@/types'
@@ -80,7 +81,7 @@ const ACCOM_POI_CFG: Record<AccommodationPOI['type'], { emoji: string; label: st
   guest_house:  { emoji: '🏡', label: 'Guest House', color: '#059669', bg: '#ECFDF5' },
 }
 
-type FilterMode = 'all' | 'activities' | 'food' | 'stay' | 'fuel' | 'trails'
+type FilterMode = 'overview' | 'activities' | 'food' | 'stay' | 'fuel' | 'trails'
 
 interface FuelStop {
   coord: { lat: number; lng: number }
@@ -193,7 +194,7 @@ export function ExperiencePanel({ hideTimeline = false }: { hideTimeline?: boole
   const setSelectedPinId = useAppStore((s) => s.setSelectedPinId)
   const panelRef = useRef<HTMLDivElement>(null)
 
-  const [filter, setFilter] = useState<FilterMode>('all')
+  const [filter, setFilter] = useState<FilterMode>('overview')
   const [actCategoryFilter, setActCategoryFilter] = useState<string>('all')
   const [expandedCardId, setExpandedCardId] = useState<string | null>(null)
   const [showAllAccom, setShowAllAccom] = useState(false)
@@ -215,8 +216,21 @@ export function ExperiencePanel({ hideTimeline = false }: { hideTimeline?: boole
     caravan_park: '🚐', hostel: '🛏️', guest_house: '🏡',
   }
 
+  // Weather for overview tab
+  const weather = useWeather(destCoord)
+  const startDate = useAppStore((s) => s.activeItinerary?.start_date ?? '')
+  const tripDayForecast = useMemo(() => {
+    if (!weather || !startDate) return weather?.forecast[0] ?? null
+    return weather.forecast.find((f) => f.date === startDate) ?? weather.forecast[0] ?? null
+  }, [weather, startDate])
+  // Hours 6am–9pm only
+  const dayHours = useMemo(() =>
+    (tripDayForecast?.hours ?? []).filter((h) => h.hour >= 6 && h.hour <= 21),
+    [tripDayForecast]
+  )
+
   const syncMapPins = useCallback((_f: FilterMode, _pois: LivePOI[], stops?: FuelStop[]) => {
-    if (_f === 'all') {
+    if (_f === 'overview') {
       // Default view — no POI pins, just destination centred
       setDisplayedMapPins([])
       return
@@ -348,7 +362,7 @@ export function ExperiencePanel({ hideTimeline = false }: { hideTimeline?: boole
   if (!d.activeItinerary) return null
 
   const addedActIds = new Set(d.addedActivities.map((a) => a.actId))
-  const showStay  = (filter === 'all' || filter === 'stay')
+  const showStay  = filter === 'stay'
 
   return (
     <div ref={panelRef} style={{ flex: 1, overflowY: 'auto', background: '#F5F4F1', display: 'flex', flexDirection: 'column', position: 'relative' }}>
@@ -363,12 +377,12 @@ export function ExperiencePanel({ hideTimeline = false }: { hideTimeline?: boole
         flexShrink: 0,
       }}>
         {(([
-          ['all',        'All'],
-          ['activities', '🗺 Things to Do'],
-          ...((d.dbFood?.length ?? 0) > 0 ? [['food', '🍽 Food & Drinks']] : []),
-          ...(trails.length > 0 ? [['trails', '🥾 Trails']] : []),
-          ['stay', '🏨 Stay'],
-          ...(d.vehicleProfile && d.vehicleProfile.fuel_type !== 'Electric' && !(d.vehicleProfile as unknown as { skip_fuel?: boolean }).skip_fuel ? [['fuel', '⛽ Fuel']] : []),
+          ['overview',   'Overview'],
+          ['activities', 'Things to Do'],
+          ...((d.dbFood?.length ?? 0) > 0 ? [['food', 'Food & Drinks']] : []),
+          ...(trails.length > 0 ? [['trails', 'Trails']] : []),
+          ['stay', 'Stay'],
+          ...(d.vehicleProfile && d.vehicleProfile.fuel_type !== 'Electric' && !(d.vehicleProfile as unknown as { skip_fuel?: boolean }).skip_fuel ? [['fuel', 'Fuel']] : []),
         ]) as [string, string][]).map(([f, label]) => (
           <button key={f} onClick={() => handleFilterChange(f as FilterMode)} style={{
             padding: '6px 14px', borderRadius: 20, flexShrink: 0,
@@ -398,22 +412,164 @@ export function ExperiencePanel({ hideTimeline = false }: { hideTimeline?: boole
       {/* ── Content — keyed so fade-up plays on filter change ── */}
       <div key={filter} className="animate-fade-up" style={{ padding: '0 0 32px', flex: 1 }}>
 
-        {/* Guardrail alerts */}
+        {/* Guardrail + hazard alerts — shown on all tabs */}
         {(d.activeItinerary.all_warnings?.length ?? 0) > 0 && (
           <div style={{ padding: '12px 16px 0', display: 'flex', flexDirection: 'column', gap: 6 }}>
             {d.activeItinerary.all_warnings.map((w) => <AdvisoryBanner key={w.id} warning={w} />)}
           </div>
         )}
-
-        {/* Hazard alerts */}
         {d.hazards.length > 0 && (
           <div style={{ padding: '12px 16px 0', display: 'flex', flexDirection: 'column', gap: 6 }}>
             {d.hazards.slice(0, 2).map((h) => <HazardBanner key={h.id} alert={h} />)}
           </div>
         )}
 
+        {/* ── OVERVIEW tab ── */}
+        {filter === 'overview' && (() => {
+          // Activity category counts for tiles
+          const allDbActs = [
+            ...d.dbActivities,
+            ...d.dbNature.map((n) => ({ ...n, activity_id: n.nature_spot_id, category: n.type ?? 'nature' })),
+          ]
+          const catCounts = new Map<string, number>()
+          allDbActs.forEach((a) => {
+            const c = (a as { category?: string }).category ?? 'nature'
+            catCounts.set(c, (catCounts.get(c) ?? 0) + 1)
+          })
+          const topCats = [...catCounts.entries()].filter(([c]) => c !== 'family').sort((a, b) => b[1] - a[1]).slice(0, 6).map(([c]) => c)
+
+          const foodCountByCat = (d.dbFood ?? []).reduce<Record<string, number>>((acc, f) => {
+            acc[f.category] = (acc[f.category] ?? 0) + 1; return acc
+          }, {})
+          const foodCats = [...new Set((d.dbFood ?? []).map(f => f.category))].sort((a, b) => {
+            const order = ['Winery', 'Brewery', 'Distillery', 'Pub', 'Restaurant', 'Cafe', 'Bakery']
+            return order.indexOf(a) - order.indexOf(b)
+          })
+          const FOOD_COLOR: Record<string, { color: string; bg: string }> = {
+            Winery: { color: '#7E22CE', bg: '#FAF5FF' }, Brewery: { color: '#92400E', bg: '#FEF3C7' },
+            Distillery: { color: '#374151', bg: '#F3F4F6' }, Pub: { color: '#1D4ED8', bg: '#EFF6FF' },
+            Restaurant: { color: '#B45309', bg: '#FFFBEB' }, Cafe: { color: '#0369A1', bg: '#E0F2FE' },
+            Bakery: { color: '#047857', bg: '#ECFDF5' },
+          }
+          const accomCount = d.accommodationPOIs?.length ?? 0
+
+          const sectionHead = (label: string, count: number) => (
+            <div style={{ fontSize: 11, fontWeight: 700, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 12 }}>
+              {label} <span style={{ fontWeight: 800, color: '#6B7280' }}>· {count}</span>
+            </div>
+          )
+
+          return (
+            <div style={{ padding: '16px 16px 32px', display: 'flex', flexDirection: 'column', gap: 20 }}>
+
+              {/* ── Hourly weather strip ── */}
+              {dayHours.length > 0 && (
+                <div style={{ background: '#fff', borderRadius: 18, border: '1px solid rgba(0,0,0,0.07)', padding: '16px 18px', boxShadow: '0 1px 4px rgba(0,0,0,0.05)' }}>
+                  <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 14 }}>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+                      Weather on your trip day
+                    </div>
+                    {tripDayForecast && (
+                      <div style={{ fontSize: 12, color: '#6B7280', fontWeight: 500 }}>
+                        {tripDayForecast.maxTemp}° / {tripDayForecast.minTemp}° · {tripDayForecast.label}
+                      </div>
+                    )}
+                  </div>
+                  <div style={{ display: 'flex', gap: 6, overflowX: 'auto', scrollbarWidth: 'none', paddingBottom: 2 }}>
+                    {dayHours.map((h) => {
+                      const label = h.hour === 0 ? '12am' : h.hour < 12 ? `${h.hour}am` : h.hour === 12 ? '12pm' : `${h.hour - 12}pm`
+                      const isNow = new Date().getHours() === h.hour && startDate === new Date().toISOString().split('T')[0]
+                      return (
+                        <div key={h.hour} style={{
+                          display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5,
+                          minWidth: 50, padding: '10px 6px', borderRadius: 12, flexShrink: 0,
+                          background: isNow ? '#DCF0E4' : 'transparent',
+                          border: isNow ? `1px solid ${GREEN}33` : '1px solid transparent',
+                        }}>
+                          <span style={{ fontSize: 10, fontWeight: isNow ? 700 : 500, color: isNow ? GREEN : '#9CA3AF' }}>{label}</span>
+                          <span style={{ fontSize: 20 }}>{h.emoji}</span>
+                          <span style={{ fontSize: 13, fontWeight: 700, color: '#1C1B1F' }}>{h.temp}°</span>
+                          {h.precipProb > 20 && (
+                            <span style={{ fontSize: 9, fontWeight: 600, color: '#3B82F6' }}>{h.precipProb}%</span>
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* ── Things to Do tiles ── */}
+              {topCats.length > 0 && (
+                <div style={{ background: '#fff', borderRadius: 18, border: '1px solid rgba(0,0,0,0.07)', padding: '16px 18px', boxShadow: '0 1px 4px rgba(0,0,0,0.05)' }}>
+                  {sectionHead('Things to Do', allDbActs.length)}
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
+                    {topCats.map((cat) => {
+                      const tag = CAT_TAG[cat] ?? { label: cat, color: '#374151', bg: '#F3F4F6' }
+                      const emoji = CAT_EMOJI_MAP[cat] ?? '📍'
+                      return (
+                        <button key={cat} onClick={() => handleFilterChange('activities')} style={{
+                          borderRadius: 14, border: 'none', background: tag.bg, cursor: 'pointer',
+                          padding: '14px 12px', textAlign: 'left',
+                          boxShadow: `inset 0 0 0 1.5px ${tag.color}33`,
+                          position: 'relative', overflow: 'hidden',
+                        }}>
+                          <div style={{ fontSize: 24, marginBottom: 6 }}>{emoji}</div>
+                          <div style={{ fontSize: 13, fontWeight: 700, color: tag.color, lineHeight: 1.2 }}>{tag.label}</div>
+                          <div style={{ position: 'absolute', top: 8, right: 8, background: tag.color, color: '#fff', borderRadius: 8, padding: '2px 7px', fontSize: 11, fontWeight: 800 }}>{catCounts.get(cat)}</div>
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* ── Food & Drinks tiles ── */}
+              {foodCats.length > 0 && (
+                <div style={{ background: '#fff', borderRadius: 18, border: '1px solid rgba(0,0,0,0.07)', padding: '16px 18px', boxShadow: '0 1px 4px rgba(0,0,0,0.05)' }}>
+                  {sectionHead('Food & Drinks', (d.dbFood ?? []).length)}
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
+                    {foodCats.map((cat) => {
+                      const fc = FOOD_COLOR[cat] ?? { color: '#374151', bg: '#F3F4F6' }
+                      const emoji = CAT_EMOJI_MAP[cat] ?? '🍴'
+                      return (
+                        <button key={cat} onClick={() => handleFilterChange('food')} style={{
+                          borderRadius: 14, border: 'none', background: fc.bg, cursor: 'pointer',
+                          padding: '14px 12px', textAlign: 'left',
+                          boxShadow: `inset 0 0 0 1.5px ${fc.color}33`,
+                          position: 'relative', overflow: 'hidden',
+                        }}>
+                          <div style={{ fontSize: 24, marginBottom: 6 }}>{emoji}</div>
+                          <div style={{ fontSize: 13, fontWeight: 700, color: fc.color, lineHeight: 1.2 }}>{cat}</div>
+                          <div style={{ position: 'absolute', top: 8, right: 8, background: fc.color, color: '#fff', borderRadius: 8, padding: '2px 7px', fontSize: 11, fontWeight: 800 }}>{foodCountByCat[cat]}</div>
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* ── Stay card ── */}
+              {accomCount > 0 && (
+                <button onClick={() => handleFilterChange('stay')} style={{
+                  background: '#fff', borderRadius: 18, border: '1px solid rgba(0,0,0,0.07)',
+                  padding: '16px 18px', boxShadow: '0 1px 4px rgba(0,0,0,0.05)',
+                  width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                  cursor: 'pointer', textAlign: 'left',
+                }}>
+                  <div>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 4 }}>Stay</div>
+                    <div style={{ fontSize: 15, fontWeight: 700, color: '#1C1B1F' }}>{accomCount} places nearby</div>
+                  </div>
+                  <span style={{ fontSize: 22, color: '#C4C4C4', fontWeight: 300 }}>›</span>
+                </button>
+              )}
+            </div>
+          )
+        })()}
+
         {/* ── Things to Do (activities + nature merged, category filter chips) ── */}
-        {(filter === 'all' || filter === 'activities') && (() => {
+        {(filter === 'activities') && (() => {
           // Combine: static curated + Supabase dbActivities + dbNature
           const NATURE_EMOJI: Record<string, string> = {
             hiking: '🥾', viewpoint: '🌄', beach: '🏖️', waterfall: '💧',
@@ -630,7 +786,7 @@ export function ExperiencePanel({ hideTimeline = false }: { hideTimeline?: boole
 
 
         {/* ── Food & Drinks ── */}
-        {(filter === 'all' || filter === 'food') && (() => {
+        {(filter === 'food') && (() => {
           const allFoods = d.dbFood ?? []
           if (allFoods.length === 0) return null
 
@@ -770,7 +926,7 @@ export function ExperiencePanel({ hideTimeline = false }: { hideTimeline?: boole
                   </>
                 )}
 
-                {filter === 'all' && allFoods.length > totalShown && (
+                {filter === 'food' && allFoods.length > totalShown && (
                   <button onClick={() => handleFilterChange('food')} style={{
                     width: '100%', padding: '9px', borderRadius: 9,
                     border: '1px dashed var(--border)', background: 'none',
@@ -785,7 +941,7 @@ export function ExperiencePanel({ hideTimeline = false }: { hideTimeline?: boole
         })()}
 
         {/* ── Trails ── */}
-        {trails.length > 0 && (filter === 'all' || filter === 'trails' || (hikingSelected && filter === 'activities')) && (
+        {trails.length > 0 && (filter === 'trails' || (hikingSelected && filter === 'activities')) && (
           <SectionBlock id="section-trails" title="Trails" icon="🥾" count={trails.length} loading={false} empty={false}>
             <div style={{ padding: '0 16px', display: 'flex', flexDirection: 'column', gap: 10 }}>
               {trails.map((trail) => {
@@ -817,7 +973,7 @@ export function ExperiencePanel({ hideTimeline = false }: { hideTimeline?: boole
                       </div>
                       <a
                         href={coordMapsUrl(trail.name, trail.waypoints?.[0]?.lat, trail.waypoints?.[0]?.lng)}
-                        target="_blank" rel="noopener noreferrer"
+                       
                         style={{ flexShrink: 0, fontSize: 12, fontWeight: 600, color: GREEN, textDecoration: 'none', padding: '4px 10px', border: `1px solid ${GREEN}`, borderRadius: 8 }}
                       >
                         Maps →
@@ -839,7 +995,7 @@ export function ExperiencePanel({ hideTimeline = false }: { hideTimeline?: boole
                     {/* Parks Victoria link */}
                     <a
                       href={`https://www.parks.vic.gov.au/search#stq=${encodeURIComponent(trail.name)}`}
-                      target="_blank" rel="noopener noreferrer"
+                     
                       style={{ fontSize: 11, color: 'var(--text-muted)', textDecoration: 'underline' }}
                     >
                       Check closures & conditions at Parks Victoria →
@@ -848,7 +1004,7 @@ export function ExperiencePanel({ hideTimeline = false }: { hideTimeline?: boole
                 )
               })}
               <p style={{ fontSize: 11, color: 'var(--text-muted)', margin: '4px 0 8px', lineHeight: 1.6 }}>
-                Trail data © <a href="https://www.data.vic.gov.au" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--text-muted)' }}>data.vic.gov.au</a> (CC BY 4.0)
+                Trail data © <a href="https://www.data.vic.gov.au" style={{ color: 'var(--text-muted)' }}>data.vic.gov.au</a> (CC BY 4.0)
               </p>
             </div>
           </SectionBlock>
@@ -907,7 +1063,7 @@ export function ExperiencePanel({ hideTimeline = false }: { hideTimeline?: boole
         })()}
 
         {/* Day stepper — hidden in 3-col wide layout */}
-        {!hideTimeline && (filter === 'all' || filter === 'activities') && <VerticalStepper d={d} />}
+        {!hideTimeline && (filter === 'activities') && <VerticalStepper d={d} />}
 
         {/* ── Fuel Stops ── */}
         {filter === 'fuel' && (
@@ -947,7 +1103,7 @@ export function ExperiencePanel({ hideTimeline = false }: { hideTimeline?: boole
                         </div>
                         <a
                           href={coordMapsUrl(stop.station.brand + ' ' + stop.station.address, stop.station.lat, stop.station.lng)}
-                          target="_blank" rel="noopener noreferrer"
+                         
                           style={{ fontSize: 11, fontWeight: 700, color: '#fff', background: '#16A34A', padding: '7px 11px', borderRadius: 9, textDecoration: 'none', flexShrink: 0 }}
                         >Maps ↗</a>
                       </div>
@@ -967,10 +1123,10 @@ export function ExperiencePanel({ hideTimeline = false }: { hideTimeline?: boole
         {/* ── Footer ── */}
         <div style={{ padding: '24px 16px 20px', borderTop: '1px solid var(--border)', marginTop: 8, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>Data © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--text-muted)' }}>OpenStreetMap</a> (ODbL) · Tiles © <a href="https://carto.com/attributions" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--text-muted)' }}>CARTO</a> · Content © <a href="https://en.wikipedia.org" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--text-muted)' }}>Wikipedia</a> (CC BY-SA) · Heritage © <a href="https://vhd.heritagecouncil.vic.gov.au" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--text-muted)' }}>Heritage Council Vic</a> (CC BY 4.0)</span>
+            <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>Data © <a href="https://www.openstreetmap.org/copyright" style={{ color: 'var(--text-muted)' }}>OpenStreetMap</a> (ODbL) · Tiles © <a href="https://carto.com/attributions" style={{ color: 'var(--text-muted)' }}>CARTO</a> · Content © <a href="https://en.wikipedia.org" style={{ color: 'var(--text-muted)' }}>Wikipedia</a> (CC BY-SA) · Heritage © <a href="https://vhd.heritagecouncil.vic.gov.au" style={{ color: 'var(--text-muted)' }}>Heritage Council Vic</a> (CC BY 4.0)</span>
           </div>
           <div style={{ display: 'flex', gap: 12 }}>
-            <a href="/privacy" target="_blank" rel="noopener noreferrer" style={{ fontSize: 11, color: 'var(--text-muted)', textDecoration: 'none', fontWeight: 500 }}>Privacy & Attribution</a>
+            <a href="/privacy" style={{ fontSize: 11, color: 'var(--text-muted)', textDecoration: 'none', fontWeight: 500 }}>Privacy & Attribution</a>
             <a href="mailto:support@cubixit.com.au" style={{ fontSize: 11, color: 'var(--text-muted)', textDecoration: 'none', fontWeight: 500 }}>Feedback</a>
           </div>
         </div>
@@ -1037,18 +1193,18 @@ function PlaceCard({ emoji, name, categoryLabel, categoryColor, categoryBg, desc
       {/* Action buttons — always visible */}
       <div style={{ display: 'flex', gap: 5, marginTop: 10 }} onClick={(e) => e.stopPropagation()}>
         {website && (
-          <a href={website.startsWith('http') ? website : `https://${website}`} target="_blank" rel="noopener noreferrer" style={{
+          <a href={website.startsWith('http') ? website : `https://${website}`} style={{
             flex: 1, padding: '6px 0', borderRadius: 7, background: '#3A6B4F', color: '#fff',
             fontSize: 11, fontWeight: 600, textDecoration: 'none', textAlign: 'center',
           }}>Web ↗</a>
         )}
         {phone && expanded && (
-          <a href={`tel:${phone}`} target="_blank" rel="noopener noreferrer" style={{
+          <a href={`tel:${phone}`} style={{
             padding: '6px 10px', borderRadius: 7, background: 'var(--green-light)', border: '1px solid #BBF7D0',
             fontSize: 11, fontWeight: 600, color: '#16A34A', textDecoration: 'none',
           }}>📞</a>
         )}
-        <a href={mapsUrl} target="_blank" rel="noopener noreferrer" style={{
+        <a href={mapsUrl} style={{
           flex: 1, padding: '6px 0', borderRadius: 7, textAlign: 'center',
           background: 'var(--bg-muted)', border: '1px solid var(--border)',
           fontSize: 11, fontWeight: 600, color: 'var(--text-primary)', textDecoration: 'none',
@@ -1168,7 +1324,7 @@ function ActivityCard({ act, expanded, highlighted, onToggle, isAdded, onAdd, on
           )}
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
             {websiteUrl && (
-              <a href={websiteUrl} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()}
+              <a href={websiteUrl} onClick={(e) => e.stopPropagation()}
                 style={{ padding: '9px 14px', borderRadius: 9, background: '#F8F7F4', border: '1px solid var(--border)', color: 'var(--text-secondary)', fontSize: 12, fontWeight: 700, textDecoration: 'none', whiteSpace: 'nowrap' }}>
                 Website ↗
               </a>
@@ -1181,7 +1337,7 @@ function ActivityCard({ act, expanded, highlighted, onToggle, isAdded, onAdd, on
                   📞
                 </a>
               )}
-              <a href={mapsUrl} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()}
+              <a href={mapsUrl} onClick={(e) => e.stopPropagation()}
                 title="Open in Google Maps"
                 style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 36, height: 36, borderRadius: 9, background: '#1C1B1F', color: '#fff', textDecoration: 'none', fontSize: 16 }}>
                 📍
@@ -1248,18 +1404,18 @@ function AccommodationGridCard({ poi }: { poi: AccommodationPOI; destName?: stri
       {/* Buttons */}
       <div style={{ display: 'flex', gap: 6, marginTop: 2 }}>
         {websiteUrl ? (
-          <a href={websiteUrl} target="_blank" rel="noopener noreferrer"
+          <a href={websiteUrl}
             style={{ flex: 1, textAlign: 'center', padding: '7px 10px', borderRadius: 8, background: '#3A6B4F', color: '#fff', fontSize: 11.5, fontWeight: 700, textDecoration: 'none' }}>
             Website ↗
           </a>
         ) : (
           <a href={`https://www.google.com/search?q=${encodeURIComponent(poi.name + ' ' + (poi.address ?? 'Victoria Australia'))}`}
-            target="_blank" rel="noopener noreferrer"
+           
             style={{ flex: 1, textAlign: 'center', padding: '7px 10px', borderRadius: 8, background: '#F8F7F4', border: '1px solid var(--border)', color: 'var(--text-secondary)', fontSize: 11.5, fontWeight: 700, textDecoration: 'none' }}>
             Search ↗
           </a>
         )}
-        <a href={mapsUrl} target="_blank" rel="noopener noreferrer"
+        <a href={mapsUrl}
           style={{ flex: 1, textAlign: 'center', padding: '7px 10px', borderRadius: 8, background: '#1C1B1F', color: '#fff', fontSize: 11.5, fontWeight: 700, textDecoration: 'none' }}>
           Maps ↗
         </a>
@@ -1306,7 +1462,7 @@ function HazardBanner({ alert }: { alert: HazardAlert }) {
         <div style={{ fontSize: 11, color: 'var(--text-secondary)', lineHeight: 1.4 }}>{alert.title}</div>
       </div>
       {alert.url && (
-        <a href={alert.url} target="_blank" rel="noopener noreferrer" style={{ fontSize: 10, fontWeight: 700, color, textDecoration: 'none', flexShrink: 0 }}>Details ↗</a>
+        <a href={alert.url} style={{ fontSize: 10, fontWeight: 700, color, textDecoration: 'none', flexShrink: 0 }}>Details ↗</a>
       )}
     </div>
   )

@@ -382,18 +382,6 @@ function ExploreTab() {
 
       {/* Content */}
       <div style={{ flex: 1, overflowY: 'auto', padding: '12px 12px' }}>
-        {/* Wikipedia fact */}
-        {wikiSummary && (
-          <div style={{
-            padding: '10px 13px', borderRadius: 9, marginBottom: 12,
-            background: '#F0F4F1', border: '1px solid rgba(58,107,79,0.15)',
-          }}>
-            <div style={{ fontSize: 10, fontWeight: 700, color: GREEN_EXPLORE, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 4 }}>
-              About {destName.split('&')[0].trim()}
-            </div>
-            <p style={{ fontSize: 12.5, color: '#4A4948', lineHeight: 1.65, margin: 0 }}>{wikiSummary}</p>
-          </div>
-        )}
 
         {/* Curated static activities */}
         {visible.length > 0 && (

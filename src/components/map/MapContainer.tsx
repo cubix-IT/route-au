@@ -132,7 +132,11 @@ export function MapContainer() {
 
       el.addEventListener('click', (e) => {
         e.stopPropagation()
-        marker.togglePopup()
+        // Close all other popups first
+        poiMarkersRef.current.forEach(({ marker: m }) => {
+          if (m !== marker && m.getPopup()?.isOpen()) m.togglePopup()
+        })
+        if (!marker.getPopup()?.isOpen()) marker.togglePopup()
         setSelectedPinId(pin.id)
         highlightMarker(inner)
       })
@@ -155,7 +159,10 @@ export function MapContainer() {
     // Highlight the marker
     highlightMarker(entry.el)
 
-    // Fly to it and open popup
+    // Close all other popups, fly to selected, open its popup
+    poiMarkersRef.current.forEach(({ marker: m }) => {
+      if (m !== entry.marker && m.getPopup()?.isOpen()) m.togglePopup()
+    })
     map.flyTo({ center: [entry.marker.getLngLat().lng, entry.marker.getLngLat().lat], zoom: Math.max(map.getZoom(), 14), duration: 500 })
     if (!entry.marker.getPopup()?.isOpen()) entry.marker.togglePopup()
   }, [selectedPinId])

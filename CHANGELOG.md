@@ -1,5 +1,10 @@
 # Changelog
 
+## 8 June 2026 (817cbf1)
+
+- **Wizard UI polish, theme/recommendation engine, map marker fix**
+  - Wizard crew selector forced to single row (inline button, no CSS class override)
+
 ## 8 June 2026 (7f788a9)
 
 - **fix: Map POI marker jumps to top-left on click** — MapLibre sets marker position via `transform: translate(...)` on the root element. `highlightMarker()` was overwriting that with `scale(1.35)`, snapping marker to 0,0. Fix: inner wrapper div holds all visual styles; scale applies to inner only. Popup open changed to `marker.togglePopup()` for correct LngLat anchoring. (closes #76)

@@ -8,7 +8,6 @@ import { ProfileWizard } from '@/components/wizard/ProfileWizard'
 import { LandingPage } from '@/components/landing/LandingPage'
 import { ExperiencePanel } from '@/components/planner/ExperiencePanel'
 import { MobilePlanner } from '@/components/planner/MobilePlanner'
-import { PlannerMetrics } from '@/components/planner/PlannerMetrics'
 import { TripSummaryPanel } from '@/components/planner/TripSummaryPanel'
 import { useOfflineSync } from '@/hooks/useOfflineSync'
 import { useAuth } from '@/hooks/useAuth'
@@ -111,7 +110,6 @@ function App() {
                   <MapContainer />
                 </div>
                 <TripSummaryPanel />
-                <PlannerMetrics />
               </div>
 
             </div>
@@ -140,7 +138,6 @@ function App() {
                   <MapContainer />
                 </div>
                 <TripSummaryPanel />
-                <PlannerMetrics />
               </div>
             </div>
           </div>

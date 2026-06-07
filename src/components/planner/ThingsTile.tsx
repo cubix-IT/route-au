@@ -105,21 +105,6 @@ export function ThingsTile() {
           </div>
         ) : (
           <>
-            {/* Wikipedia snippet */}
-            {wikiSummary && (
-              <div style={{
-                padding: '8px 10px', borderRadius: 8, marginBottom: 6,
-                background: '#F5FAF7', border: '1px solid rgba(58,107,79,0.12)',
-              }}>
-                <div style={{ fontSize: 9.5, fontWeight: 700, color: GREEN, textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 3 }}>
-                  About
-                </div>
-                <p style={{ fontSize: 11, color: 'var(--text-secondary)', lineHeight: 1.6, margin: 0 }}>
-                  {wikiSummary.length > 160 ? wikiSummary.slice(0, 160) + '…' : wikiSummary}
-                </p>
-              </div>
-            )}
-
             {/* Curated activities */}
             {curatedTop.length > 0 && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 6 }}>

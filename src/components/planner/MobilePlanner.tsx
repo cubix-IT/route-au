@@ -694,7 +694,7 @@ export function MobilePlanner() {
                         </div>
                         <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
                           {item.mapsUrl && (
-                            <a href={item.mapsUrl} target="_blank" rel="noopener noreferrer"
+                            <a href={item.mapsUrl}
                               style={{ fontSize: 11, fontWeight: 700, color: '#fff', background: '#1C1B1F', padding: '6px 12px', borderRadius: 100, textDecoration: 'none' }}>Maps ↗</a>
                           )}
                           <button onClick={() => item.isDining ? d.removeDiningStop(item.id) : d.removeActivity(item.id)}
@@ -801,7 +801,7 @@ export function MobilePlanner() {
                       <div style={{ fontSize: 11, color: '#9CA3AF', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{label}</div>
                       {a.description && <div style={{ fontSize: 12, color: '#374151', lineHeight: 1.5, marginTop: 4 }}>{a.description}</div>}
                     </div>
-                    {mapsUrl && <a href={mapsUrl} target="_blank" rel="noopener noreferrer" style={{ fontSize: 11, fontWeight: 700, color: '#fff', background: '#3A6B4F', padding: '6px 10px', borderRadius: 8, textDecoration: 'none', flexShrink: 0, alignSelf: 'center' }}>Maps ↗</a>}
+                    {mapsUrl && <a href={mapsUrl} style={{ fontSize: 11, fontWeight: 700, color: '#fff', background: '#3A6B4F', padding: '6px 10px', borderRadius: 8, textDecoration: 'none', flexShrink: 0, alignSelf: 'center' }}>Maps ↗</a>}
                   </div>
                 </div>
               )
@@ -837,7 +837,7 @@ export function MobilePlanner() {
                       <div style={{ fontSize: 11, color: '#9CA3AF', marginTop: 2 }}>{stop.station.distanceKm} km away</div>
                     </div>
                     <a href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(stop.station.brand + ' ' + stop.station.address)}`}
-                      target="_blank" rel="noopener noreferrer"
+                     
                       style={{ fontSize: 11, fontWeight: 700, color: '#fff', background: '#16A34A', padding: '7px 11px', borderRadius: 9, textDecoration: 'none', flexShrink: 0 }}>Maps ↗</a>
                   </div>
                 ) : (
@@ -852,9 +852,9 @@ export function MobilePlanner() {
 
         {/* Footer */}
         <div style={{ padding: '20px 16px', borderTop: '1px solid rgba(0,0,0,0.07)', marginTop: 8, textAlign: 'center' }}>
-          <div style={{ fontSize: 11, color: '#9CA3AF', marginBottom: 6 }}>Data © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer" style={{ color: '#9CA3AF' }}>OpenStreetMap</a> (ODbL) · Heritage © <a href="https://vhd.heritagecouncil.vic.gov.au" target="_blank" rel="noopener noreferrer" style={{ color: '#9CA3AF' }}>Heritage Council Vic</a> (CC BY 4.0)</div>
+          <div style={{ fontSize: 11, color: '#9CA3AF', marginBottom: 6 }}>Data © <a href="https://www.openstreetmap.org/copyright" style={{ color: '#9CA3AF' }}>OpenStreetMap</a> (ODbL) · Heritage © <a href="https://vhd.heritagecouncil.vic.gov.au" style={{ color: '#9CA3AF' }}>Heritage Council Vic</a> (CC BY 4.0)</div>
           <div style={{ display: 'flex', justifyContent: 'center', gap: 16 }}>
-            <a href="/privacy" target="_blank" rel="noopener noreferrer" style={{ fontSize: 11, color: '#9CA3AF', textDecoration: 'none', fontWeight: 500 }}>Privacy & Attribution</a>
+            <a href="/privacy" style={{ fontSize: 11, color: '#9CA3AF', textDecoration: 'none', fontWeight: 500 }}>Privacy & Attribution</a>
             <a href="mailto:support@cubixit.com.au" style={{ fontSize: 11, color: '#9CA3AF', textDecoration: 'none', fontWeight: 500 }}>Feedback</a>
           </div>
         </div>
@@ -900,7 +900,7 @@ function MHazardBanner({ alert }: { alert: HazardAlert }) {
         <div style={{ fontSize: 11, color, fontWeight: 600 }}>{alert.distanceKm} km from {alert.distanceKm < 50 ? 'your destination' : 'the area'}</div>
       </div>
       {alert.url && (
-        <a href={alert.url} target="_blank" rel="noopener noreferrer" style={{ fontSize: 12, fontWeight: 700, color, textDecoration: 'none', whiteSpace: 'nowrap', padding: '6px 12px', border: `1.5px solid ${border}`, borderRadius: 100, background: '#fff', flexShrink: 0 }}>
+        <a href={alert.url} style={{ fontSize: 12, fontWeight: 700, color, textDecoration: 'none', whiteSpace: 'nowrap', padding: '6px 12px', border: `1.5px solid ${border}`, borderRadius: 100, background: '#fff', flexShrink: 0 }}>
           Details ↗
         </a>
       )}
@@ -961,9 +961,9 @@ function MActivityCard({ act, isAdded, onAdd, onRemove }: {
       )}
       <div style={{ display: 'flex', gap: 8, flexWrap: 'nowrap' }}>
         {websiteUrl && (
-          <a href={websiteUrl} target="_blank" rel="noopener noreferrer" style={{ fontSize: 12, fontWeight: 700, color: '#374151', background: '#F5F4F1', border: '1px solid rgba(0,0,0,0.1)', padding: '9px 14px', borderRadius: 100, textDecoration: 'none', whiteSpace: 'nowrap' }}>Website</a>
+          <a href={websiteUrl} style={{ fontSize: 12, fontWeight: 700, color: '#374151', background: '#F5F4F1', border: '1px solid rgba(0,0,0,0.1)', padding: '9px 14px', borderRadius: 100, textDecoration: 'none', whiteSpace: 'nowrap' }}>Website</a>
         )}
-        <a href={mapsUrl} target="_blank" rel="noopener noreferrer" style={{ fontSize: 12, fontWeight: 700, color: '#fff', background: '#1C1B1F', padding: '9px 16px', borderRadius: 100, textDecoration: 'none', whiteSpace: 'nowrap' }}>Open in Maps</a>
+        <a href={mapsUrl} style={{ fontSize: 12, fontWeight: 700, color: '#fff', background: '#1C1B1F', padding: '9px 16px', borderRadius: 100, textDecoration: 'none', whiteSpace: 'nowrap' }}>Open in Maps</a>
         {onAdd && !isAdded && (
           <button onClick={onAdd} style={{ fontSize: 12, fontWeight: 700, color: GREEN, background: '#E8F5EE', border: `1.5px solid rgba(58,107,79,0.4)`, padding: '9px 14px', borderRadius: 100, cursor: 'pointer', whiteSpace: 'nowrap' }}>+ Plan it</button>
         )}
@@ -991,8 +991,8 @@ function MFoodCard({ f, emoji, cfg }: { f: import('@/hooks/usePlannerData').DbFo
         </div>
       </div>
       <div style={{ display: 'flex', gap: 7, marginTop: 12 }}>
-        {mapsUrl && <a href={mapsUrl} target="_blank" rel="noopener noreferrer" style={{ fontSize: 12, fontWeight: 700, color: '#fff', background: '#1C1B1F', padding: '8px 14px', borderRadius: 100, textDecoration: 'none', whiteSpace: 'nowrap' }}>Open in Maps</a>}
-        {website && <a href={website.startsWith('http') ? website : `https://${website}`} target="_blank" rel="noopener noreferrer" style={{ fontSize: 12, fontWeight: 700, color: '#374151', background: '#F5F4F1', border: '1px solid rgba(0,0,0,0.1)', padding: '8px 14px', borderRadius: 100, textDecoration: 'none', whiteSpace: 'nowrap' }}>Website</a>}
+        {mapsUrl && <a href={mapsUrl} style={{ fontSize: 12, fontWeight: 700, color: '#fff', background: '#1C1B1F', padding: '8px 14px', borderRadius: 100, textDecoration: 'none', whiteSpace: 'nowrap' }}>Open in Maps</a>}
+        {website && <a href={website.startsWith('http') ? website : `https://${website}`} style={{ fontSize: 12, fontWeight: 700, color: '#374151', background: '#F5F4F1', border: '1px solid rgba(0,0,0,0.1)', padding: '8px 14px', borderRadius: 100, textDecoration: 'none', whiteSpace: 'nowrap' }}>Website</a>}
       </div>
     </div>
   )
@@ -1009,7 +1009,7 @@ function MPoiCard({ poi }: { poi: LivePOI }) {
         {poi.routeLength && <div style={{ fontSize: 12.5, color: '#6B7280' }}>{poi.routeLength}</div>}
       </div>
       {poi.website && (
-        <a href={poi.website.startsWith('http') ? poi.website : `https://${poi.website}`} target="_blank" rel="noopener noreferrer" style={{ fontSize: 13, fontWeight: 700, color: '#4285F4', textDecoration: 'none', flexShrink: 0 }}>Site ↗</a>
+        <a href={poi.website.startsWith('http') ? poi.website : `https://${poi.website}`} style={{ fontSize: 13, fontWeight: 700, color: '#4285F4', textDecoration: 'none', flexShrink: 0 }}>Site ↗</a>
       )}
     </div>
   )

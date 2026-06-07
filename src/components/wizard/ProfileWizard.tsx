@@ -115,6 +115,7 @@ export function ProfileWizard() {
     setUserProfile, setVehicleProfile, setTripPlanState, setMapView,
     preselectedDest, setPreselectedDest,
   } = useAppStore()
+  const originName = useAppStore((s) => s.originName)
   const { buildItinerary } = useItineraryBuilder()
 
   // Wizard starts at 0 always; 3-step discovery or 2-step planning
@@ -442,7 +443,14 @@ export function ProfileWizard() {
           padding: isPickStep ? '8px 0 0' : '20px 20px 8px',
         }}>
           {generating ? (
-            <GeneratingScreen step={genStep} messages={msgs} />
+            <GeneratingScreen
+              step={genStep} messages={msgs}
+              destName={effectiveDest?.name ?? ''}
+              originName={originName ?? ''}
+              crewType={crewType}
+              startDate={startDate}
+              tripType={tripType}
+            />
           ) : isPreselected ? (
             <>
               {step === 0 && (
@@ -592,93 +600,54 @@ function StepHowFarAndWho({
       : `${Math.floor(maxDriveHours)}h ${Math.round((maxDriveHours % 1) * 60)}m`
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
-      <div>
-        <h2 style={{ fontSize: 20, fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-0.5px', marginBottom: 4 }}>
-          Let's find your getaway
-        </h2>
-        <p style={{ fontSize: 13, color: 'var(--text-muted)' }}>
-          We'll suggest the best spots based on your answers.
-        </p>
-      </div>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
 
-      {/* Drive time — the hero question */}
-      <div style={{
-        padding: '20px',
-        borderRadius: 14,
-        background: 'var(--green-light)',
-        border: '1px solid var(--border-active)',
-      }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 14 }}>
-          <Label>Max distance from home — how far will you travel?</Label>
-          <span style={{ fontSize: 22, fontWeight: 800, color: GREEN, letterSpacing: '-0.04em', fontFamily: "'Fraunces', Georgia, serif", minWidth: 80, textAlign: 'right' }}>
+      {/* Drive time */}
+      <div style={{ padding: '14px 16px', borderRadius: 14, background: 'var(--green-light)', border: '1px solid var(--border-active)' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 10 }}>
+          <Label>How far will you travel?</Label>
+          <span style={{ fontSize: 20, fontWeight: 800, color: GREEN, letterSpacing: '-0.04em', fontFamily: "'Fraunces', Georgia, serif", minWidth: 70, textAlign: 'right' }}>
             {driveLabel}
           </span>
         </div>
-        <input
-          type="range" min={0.75} max={4} step={0.25} value={maxDriveHours}
-          onChange={(e) => setMaxDriveHours(Math.round(Number(e.target.value) * 4) / 4)}
-          style={{ width: '100%', accentColor: GREEN }}
-        />
-        {/* Tick marks aligned to slider range 0.75–4 (step 0.25) */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'var(--text-muted)', marginTop: 6 }}>
-          <span>45 min</span>
-          <span>1.5 hrs</span>
-          <span>2.5 hrs</span>
-          <span>4 hrs</span>
-        </div>
-        <div style={{ marginTop: 12, fontSize: 12, color: GREEN, fontWeight: 600 }}>
+        <DriveSlider value={maxDriveHours} onChange={setMaxDriveHours} />
+        <div style={{ fontSize: 11, color: GREEN, fontWeight: 600 }}>
           {matching} destinations within reach
         </div>
       </div>
 
-      {/* Day / Overnight */}
-      <div>
-        <Label>Day trip or staying overnight?</Label>
-        <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
-          {([['day', 'Day trip', 'Back before dinner'], ['multiday', 'Overnight+', 'Stay a night or two']] as const).map(
-            ([type, label, desc]) => (
+      {/* Day / Overnight + Who in one row */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+        <div>
+          <Label>Trip type</Label>
+          <div style={{ display: 'flex', gap: 6, marginTop: 7 }}>
+            {([['day', 'Day trip'], ['multiday', 'Overnight+']] as const).map(([type, label]) => (
               <button key={type} onClick={() => setTripType(type)} style={{
-                flex: 1, padding: '14px 10px', borderRadius: 12,
-                background: tripType === type ? 'var(--green-light)' : 'var(--bg-muted)',
-                border: `1.5px solid ${tripType === type ? 'var(--border-active)' : 'var(--border)'}`,
-                color: tripType === type ? GREEN : 'var(--text-muted)',
-                cursor: 'pointer', transition: 'all 0.15s',
-                display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
-              }}>
-                <span style={{ fontSize: 13, fontWeight: 700 }}>{label}</span>
-                <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{desc}</span>
-              </button>
-            )
-          )}
-        </div>
-      </div>
-
-      {/* Who's coming */}
-      <div>
-        <Label>Who's coming?</Label>
-        <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
-          {([
-            ['solo', 'Solo'],
-            ['couple', 'Couple'],
-            ['family', 'Family'],
-            ['group', 'Group'],
-          ] as const).map(([type, label]) => (
-            <button key={type}
-              onClick={() => setCrewType(type)}
-              style={{
-                flex: 1, minWidth: 0,
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                padding: '14px 4px', borderRadius: 16,
-                background: crewType === type ? '#B7EDCA' : '#ECF0EB',
+                flex: 1, padding: '10px 6px', borderRadius: 12, fontSize: 12,
+                background: tripType === type ? '#B7EDCA' : '#ECF0EB',
                 border: 'none', cursor: 'pointer',
-                boxShadow: crewType === type ? '0 4px 20px rgba(58,107,79,0.25)' : 'none',
-                transition: 'background 0.2s',
-                fontWeight: 700, fontSize: 13, color: 'var(--text-primary)',
-              }}>
-              {label}
-            </button>
-          ))}
+                boxShadow: tripType === type ? '0 4px 16px rgba(58,107,79,0.2)' : 'none',
+                fontWeight: 700, color: 'var(--text-primary)',
+              }}>{label}</button>
+            ))}
+          </div>
+        </div>
+        <div>
+          <Label>Who's coming?</Label>
+          <div style={{ display: 'flex', gap: 6, marginTop: 7 }}>
+            {(['Solo', 'Couple', 'Family', 'Group'] as const).map((label) => {
+              const type = label.toLowerCase() as CrewType
+              return (
+                <button key={type} onClick={() => setCrewType(type)} style={{
+                  flex: 1, minWidth: 0, padding: '10px 2px', borderRadius: 12, fontSize: 11,
+                  background: crewType === type ? '#B7EDCA' : '#ECF0EB',
+                  border: 'none', cursor: 'pointer',
+                  boxShadow: crewType === type ? '0 4px 16px rgba(58,107,79,0.2)' : 'none',
+                  fontWeight: 700, color: 'var(--text-primary)',
+                }}>{label}</button>
+              )
+            })}
+          </div>
         </div>
       </div>
 
@@ -686,26 +655,22 @@ function StepHowFarAndWho({
       {showKids && (
         <div>
           <Label>Any kids coming?</Label>
-          <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+          <div style={{ display: 'flex', gap: 6, marginTop: 7 }}>
             {([['yes', 'Yes, kids!'], ['no', 'Adults only']] as const).map(([val, label]) => {
               const sel = val === 'yes' ? hasKids : !hasKids
               return (
                 <button key={val} onClick={() => setHasKids(val === 'yes')} style={{
-                  flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  padding: '14px 4px', borderRadius: 16,
+                  flex: 1, padding: '10px 4px', borderRadius: 12,
                   background: sel ? '#B7EDCA' : '#ECF0EB',
                   border: 'none', cursor: 'pointer',
-                  boxShadow: sel ? '0 4px 20px rgba(58,107,79,0.25)' : 'none',
-                  transition: 'background 0.2s',
-                  fontWeight: 700, fontSize: 13, color: 'var(--text-primary)',
-                }}>
-                  {label}
-                </button>
+                  boxShadow: sel ? '0 4px 16px rgba(58,107,79,0.2)' : 'none',
+                  fontWeight: 700, fontSize: 12, color: 'var(--text-primary)',
+                }}>{label}</button>
               )
             })}
           </div>
           {hasKids && (
-            <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+            <div style={{ display: 'flex', gap: 6, marginTop: 7 }}>
               {([
                 ['toddler', 'Toddlers', 'Under 5'],
                 ['school',  'Primary', '6–12'],
@@ -714,13 +679,12 @@ function StepHowFarAndWho({
               ] as const).map(([age, label, desc]) => (
                 <button key={age} onClick={() => setKidsAge(age)} style={{
                   flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center',
-                  gap: 3, padding: '12px 4px', borderRadius: 14,
+                  gap: 2, padding: '10px 4px', borderRadius: 12,
                   background: kidsAge === age ? '#B7EDCA' : '#ECF0EB',
                   border: 'none', cursor: 'pointer',
-                  boxShadow: kidsAge === age ? '0 4px 16px rgba(58,107,79,0.2)' : 'none',
-                  transition: 'background 0.2s',
+                  boxShadow: kidsAge === age ? '0 4px 12px rgba(58,107,79,0.18)' : 'none',
                 }}>
-                  <span style={{ fontWeight: 700, fontSize: 12, color: 'var(--text-primary)' }}>{label}</span>
+                  <span style={{ fontWeight: 700, fontSize: 11, color: 'var(--text-primary)' }}>{label}</span>
                   <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>{desc}</span>
                 </button>
               ))}
@@ -732,7 +696,7 @@ function StepHowFarAndWho({
       {/* When are you going? */}
       <div>
         <Label>When are you going?</Label>
-        <div style={{ marginTop: 10 }}>
+        <div style={{ marginTop: 7 }}>
           <DateDayStrip
             value={startDate}
             onChange={setStartDate}
@@ -743,7 +707,7 @@ function StepHowFarAndWho({
         </div>
       </div>
 
-      {/* Departure time — collected here so it's not repeated later */}
+      {/* Departure time */}
       {departureHour !== undefined && setDepartureHour && (
         <DepartureTimePicker departureHour={departureHour} setDepartureHour={setDepartureHour} tripDate={startDate} />
       )}
@@ -1555,54 +1519,61 @@ function StepSummary({ effectiveDest, startDate, endDate, tripType, crewType, ve
   const fmtDate = (iso: string) =>
     new Date(iso + 'T00:00:00').toLocaleDateString('en-AU', { weekday: 'short', day: 'numeric', month: 'short' })
 
-  const crewEmoji = ({ solo: '🧍', couple: '👫', family: '👨‍👩‍👧', group: '🎉' } as Record<string, string>)[crewType] ?? '👥'
   const vehicleLabel = ({ Sedan: 'Sedan', AWD: 'SUV / AWD', HighClearance4WD: '4WD', '4WD_WithCaravan': 'Van / Caravan', Electric: 'Electric' } as Record<string, string>)[vehicleType] ?? vehicleType
-  const vehicleEmoji = ({ Sedan: '🚗', AWD: '🚙', HighClearance4WD: '🛻', '4WD_WithCaravan': '🚐', Electric: '⚡' } as Record<string, string>)[vehicleType] ?? '🚗'
   const fuelLabel = ({ Unleaded95: 'Unleaded 95', Unleaded98: 'Unleaded 98', Diesel: 'Diesel', Electric: 'Electric' } as Record<string, string>)[fuelType] ?? fuelType
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
       <div>
-        <h2 style={{ fontSize: 20, fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-0.5px', marginBottom: 4 }}>
-          Your trip at a glance
+        <h2 style={{ fontSize: 20, fontWeight: 800, color: 'var(--text-primary)', letterSpacing: '-0.03em', marginBottom: 4 }}>
+          Review your trip
         </h2>
-        <p style={{ fontSize: 13, color: 'var(--text-muted)' }}>Everything looks great — ready to build your itinerary?</p>
+        <p style={{ fontSize: 13, color: 'var(--text-muted)' }}>Everything look right? Hit the button to build your itinerary.</p>
       </div>
 
-      {/* Trip summary card */}
-      <div style={{ borderRadius: 14, border: '1px solid var(--border-active)', background: 'var(--green-light)', padding: '16px 18px', display: 'flex', flexDirection: 'column', gap: 14 }}>
-        <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
-          <span style={{ fontSize: 28 }}>📍</span>
-          <div>
-            <div style={{ fontSize: 17, fontWeight: 700, color: GREEN }}>{effectiveDest?.name ?? '—'}</div>
-            <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>{originName} → {effectiveDest?.name} · ~{estKm} km one way</div>
-          </div>
+      {/* Destination hero */}
+      <div style={{
+        borderRadius: 16, background: '#ECF0EB',
+        padding: '18px 20px',
+      }}>
+        <div style={{ fontSize: 10, fontWeight: 700, color: GREEN, textTransform: 'uppercase', letterSpacing: '0.09em', marginBottom: 6 }}>
+          Destination
         </div>
+        <div style={{ fontSize: 20, fontWeight: 900, color: '#1C1B1F', letterSpacing: '-0.025em', lineHeight: 1.15 }}>
+          {effectiveDest?.name ?? '—'}
+        </div>
+        <div style={{ fontSize: 12, color: '#6B7280', marginTop: 4 }}>
+          from {originName} · ~{estKm} km one way
+        </div>
+      </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-          <SummaryRow icon="📅" label="Date" value={startDate ? fmtDate(startDate) : 'Not set'} />
-          {tripType === 'multiday' && endDate && <SummaryRow icon="🔚" label="Return" value={fmtDate(endDate)} />}
-          <SummaryRow icon={crewEmoji} label="Crew" value={{ solo: 'Just you', couple: 'Two of you', family: 'Family', group: 'Group' }[crewType] ?? crewType} />
-          <SummaryRow icon={vehicleEmoji} label="Vehicle" value={vehicleLabel} />
-          {vehicleType !== 'Electric' && <SummaryRow icon="⛽" label="Fuel" value={fuelLabel} />}
-          <SummaryRow icon="🛣️" label="Est. round trip" value={`~${estKmRound} km`} />
-        </div>
+      {/* Stats grid */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+        <SummaryTile label="Date" value={startDate ? fmtDate(startDate) : 'Not set'} />
+        {tripType === 'multiday' && endDate
+          ? <SummaryTile label="Return" value={fmtDate(endDate)} />
+          : <SummaryTile label="Trip type" value={tripType === 'day' ? 'Day trip' : 'Overnight+'} />
+        }
+        <SummaryTile label="Crew" value={{ solo: 'Solo', couple: 'Couple', family: 'Family', group: 'Group' }[crewType] ?? crewType} />
+        <SummaryTile label="Vehicle" value={vehicleLabel} />
+        {vehicleType !== 'Electric' && <SummaryTile label="Fuel type" value={fuelLabel} />}
+        <SummaryTile label="Est. round trip" value={`~${estKmRound} km`} />
       </div>
 
       {/* Fuel stops */}
       {skipFuel ? (
-        <div style={{ textAlign: 'center', padding: '14px', background: 'var(--bg-muted)', borderRadius: 12, color: 'var(--text-muted)', fontSize: 13 }}>
-          ⛽ Fuel preferences skipped — fill up wherever suits you
+        <div style={{ padding: '12px 16px', background: 'var(--bg-muted)', borderRadius: 12, color: 'var(--text-muted)', fontSize: 13 }}>
+          Fuel preferences skipped — fill up wherever suits you
         </div>
       ) : vehicleType === 'Electric' ? (
-        <div style={{ textAlign: 'center', padding: '16px', background: 'var(--bg-muted)', borderRadius: 12, color: 'var(--text-muted)', fontSize: 13 }}>
-          ⚡ No fuel stops needed for your electric vehicle
+        <div style={{ padding: '12px 16px', background: 'var(--bg-muted)', borderRadius: 12, color: 'var(--text-muted)', fontSize: 13 }}>
+          No fuel stops needed for your electric vehicle
         </div>
       ) : (
         <div>
-          <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-            ⛽ Cheapest fuel near your route
-            {estCost !== null && <span style={{ color: GREEN, fontWeight: 700 }}>· Est. cost ~${estCost}</span>}
+          <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
+            Fuel near your route
+            {estCost !== null && <span style={{ color: GREEN, fontWeight: 700, textTransform: 'none', letterSpacing: 0, fontSize: 12 }}>· Est. ~${estCost}</span>}
           </div>
           {loadingFuel ? (
             <div style={{ textAlign: 'center', padding: 14, color: 'var(--text-muted)', fontSize: 12 }}>Finding stations near your route…</div>
@@ -1642,14 +1613,52 @@ function StepSummary({ effectiveDest, startDate, endDate, tripType, crewType, ve
   )
 }
 
-function SummaryRow({ icon, label, value }: { icon: string; label: string; value: string }) {
+function SummaryRow({ label, value }: { label: string; value: string }) {
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-      <span style={{ fontSize: 14, flexShrink: 0, lineHeight: 1 }}>{icon}</span>
-      <div>
-        <div style={{ fontSize: 10, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em', fontWeight: 600 }}>{label}</div>
-        <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-primary)' }}>{value}</div>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+      <div style={{ fontSize: 9.5, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.07em', fontWeight: 700 }}>{label}</div>
+      <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-0.01em' }}>{value}</div>
+    </div>
+  )
+}
+
+function SummaryTile({ label, value }: { label: string; value: string }) {
+  return (
+    <div style={{
+      padding: '12px 14px', borderRadius: 14,
+      background: '#ECF0EB',
+      display: 'flex', flexDirection: 'column', gap: 3,
+    }}>
+      <div style={{ fontSize: 9.5, fontWeight: 700, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.07em' }}>{label}</div>
+      <div style={{ fontSize: 14, fontWeight: 800, color: '#1C1B1F', letterSpacing: '-0.02em' }}>{value}</div>
+    </div>
+  )
+}
+
+const DRIVE_MIN = 0.75, DRIVE_MAX = 4
+
+function DriveSlider({ value, onChange }: { value: number; onChange: (v: number) => void }) {
+  const pct = (value - DRIVE_MIN) / (DRIVE_MAX - DRIVE_MIN)
+
+  return (
+    <div style={{ position: 'relative', userSelect: 'none', margin: '8px 0 4px' }}>
+      {/* Visual track */}
+      <div style={{ position: 'relative', height: 4, borderRadius: 2, background: `rgba(58,107,79,0.18)` }}>
+        <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: `${pct * 100}%`, background: GREEN, borderRadius: 2 }} />
+        <div style={{
+          position: 'absolute', top: '50%', left: `${pct * 100}%`,
+          transform: 'translate(-50%, -50%)',
+          width: 20, height: 20, borderRadius: '50%',
+          background: GREEN, boxShadow: '0 2px 8px rgba(58,107,79,0.4)',
+          pointerEvents: 'none', zIndex: 2,
+        }} />
       </div>
+      {/* Native input sits invisibly over the track */}
+      <input
+        type="range" min={DRIVE_MIN} max={DRIVE_MAX} step={0.25} value={value}
+        onChange={(e) => onChange(Math.round(Number(e.target.value) * 4) / 4)}
+        style={{ position: 'absolute', inset: '-8px 0', width: '100%', opacity: 0, cursor: 'pointer', zIndex: 3, margin: 0 }}
+      />
     </div>
   )
 }
@@ -1808,136 +1817,109 @@ function StepPlanningDetails({
 
 // ── Generating screen ─────────────────────────────────────────────
 
-function GeneratingScreen({ step, messages }: { step: number; messages: string[] }) {
+function GeneratingScreen({ step, messages, destName, originName, crewType, startDate, tripType }: {
+  step: number; messages: string[]
+  destName: string; originName: string
+  crewType: CrewType; startDate: string; tripType: TripType
+}) {
   const progress = ((step + 1) / messages.length) * 100
+
+  const crewLabel: Record<CrewType, string> = { solo: 'Solo', couple: 'Couple', family: 'Family', group: 'Group' }
+  const tripLabel = tripType === 'day' ? 'Day trip' : 'Overnight'
+  const dateLabel = startDate
+    ? new Date(startDate + 'T00:00:00').toLocaleDateString('en-AU', { weekday: 'short', day: 'numeric', month: 'short' })
+    : null
 
   return (
     <div style={{
-      display: 'flex', flexDirection: 'column', alignItems: 'center',
-      justifyContent: 'center', flex: 1, padding: '24px 28px', gap: 0,
-      minHeight: 0,
+      display: 'flex', flexDirection: 'column',
+      flex: 1, padding: '28px 28px 24px', gap: 24, minHeight: 0,
     }}>
-      {/* Victorian landscape SVG */}
-      <div style={{ width: '100%', maxWidth: 340, borderRadius: 24, overflow: 'hidden', marginBottom: 28 }}>
-        <svg viewBox="0 0 380 160" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ display: 'block', width: '100%' }}>
-          <defs>
-            <style>{`
-              @keyframes drive { from { transform: translateX(-90px) } to { transform: translateX(420px) } }
-              @keyframes cloud1 { from { transform: translateX(0) } to { transform: translateX(-200px) } }
-              @keyframes cloud2 { from { transform: translateX(60px) } to { transform: translateX(-200px) } }
-              @keyframes treeSway { 0%,100% { transform: rotate(-1deg) } 50% { transform: rotate(1.5deg) } }
-              @keyframes dustPuff { 0% { opacity: 0.6; transform: translateX(0) scale(1) } 100% { opacity: 0; transform: translateX(-18px) scale(2.5) } }
-              .car { animation: drive 3.2s cubic-bezier(0.4,0,0.6,1) infinite }
-              .cloud1 { animation: cloud1 18s linear infinite }
-              .cloud2 { animation: cloud2 26s linear infinite }
-              .tree1 { animation: treeSway 2.8s ease-in-out infinite; transform-origin: 310px 128px }
-              .tree2 { animation: treeSway 3.4s ease-in-out infinite 0.6s; transform-origin: 330px 128px }
-              .dust { animation: dustPuff 0.6s ease-out infinite; transform-origin: 8px 138px }
-            `}</style>
-          </defs>
-          <rect width="380" height="160" fill="#C8E6D8"/>
-          <g className="cloud1">
-            <ellipse cx="80" cy="38" rx="28" ry="12" fill="white" opacity="0.7"/>
-            <ellipse cx="100" cy="32" rx="18" ry="11" fill="white" opacity="0.7"/>
-            <ellipse cx="60" cy="34" rx="16" ry="9" fill="white" opacity="0.7"/>
-          </g>
-          <g className="cloud2">
-            <ellipse cx="280" cy="28" rx="22" ry="10" fill="white" opacity="0.5"/>
-            <ellipse cx="296" cy="23" rx="14" ry="9" fill="white" opacity="0.5"/>
-          </g>
-          <path d="M0 100 Q60 60 120 80 Q180 55 240 75 Q300 50 380 70 L380 160 L0 160Z" fill="#4A8C65" opacity="0.5"/>
-          <path d="M0 115 Q50 85 110 100 Q170 78 230 95 Q290 70 380 90 L380 160 L0 160Z" fill="#3A6B4F" opacity="0.7"/>
-          <path d="M0 130 Q95 118 190 128 Q285 115 380 125 L380 160 L0 160Z" fill="#2D5440"/>
-          <path d="M0 140 Q190 132 380 138 L380 145 Q190 137 0 145Z" fill="#1A3D2B" opacity="0.6"/>
-          <rect x="40" y="141" width="30" height="2" rx="1" fill="#B7EDCA" opacity="0.5"/>
-          <rect x="120" y="140" width="30" height="2" rx="1" fill="#B7EDCA" opacity="0.5"/>
-          <rect x="200" y="141" width="30" height="2" rx="1" fill="#B7EDCA" opacity="0.5"/>
-          <rect x="280" y="140" width="30" height="2" rx="1" fill="#B7EDCA" opacity="0.5"/>
-          <g className="tree1">
-            <rect x="308" y="110" width="4" height="18" fill="#1A3D2B"/>
-            <ellipse cx="310" cy="104" rx="10" ry="12" fill="#2D5440"/>
-          </g>
-          <g className="tree2">
-            <rect x="328" y="108" width="4" height="20" fill="#1A3D2B"/>
-            <ellipse cx="330" cy="102" rx="8" ry="10" fill="#3A6B4F"/>
-          </g>
-          <g>
-            <rect x="348" y="112" width="3" height="16" fill="#1A3D2B"/>
-            <ellipse cx="349.5" cy="107" rx="7" ry="9" fill="#2D5440"/>
-          </g>
-          <g className="car">
-            <g className="dust"><ellipse cx="8" cy="138" rx="5" ry="3" fill="#B7EDCA" opacity="0.5"/></g>
-            <rect x="14" y="124" width="52" height="18" rx="5" fill="#B87333"/>
-            <rect x="22" y="114" width="34" height="12" rx="4" fill="#92400E"/>
-            <rect x="25" y="116" width="13" height="8" rx="2" fill="#C8E6D8" opacity="0.8"/>
-            <rect x="41" y="116" width="12" height="8" rx="2" fill="#C8E6D8" opacity="0.8"/>
-            <rect x="22" y="113" width="34" height="2" rx="1" fill="#6B3A1F"/>
-            <rect x="26" y="111" width="4" height="3" rx="0.5" fill="#6B3A1F"/>
-            <rect x="34" y="111" width="4" height="3" rx="0.5" fill="#6B3A1F"/>
-            <rect x="42" y="111" width="4" height="3" rx="0.5" fill="#6B3A1F"/>
-            <circle cx="26" cy="142" r="8" fill="#1A1A1A"/>
-            <circle cx="26" cy="142" r="4" fill="#3A3A3A"/>
-            <circle cx="54" cy="142" r="8" fill="#1A1A1A"/>
-            <circle cx="54" cy="142" r="4" fill="#3A3A3A"/>
-            <rect x="65" y="128" width="4" height="5" rx="1" fill="#FEF3C7" opacity="0.9"/>
-          </g>
-        </svg>
-      </div>
-
-      {/* Current message */}
-      <div style={{ textAlign: 'center', marginBottom: 24 }}>
-        <div style={{ fontFamily: "'Fraunces', Georgia, serif", fontSize: 20, fontWeight: 700, color: '#002112', letterSpacing: '-0.02em', marginBottom: 6 }}>
-          Unplanned <span style={{ color: GREEN }}>Escapes</span>
-        </div>
-        <div style={{ fontSize: 14, color: '#3F4F42', fontWeight: 500 }}>{messages[step]}</div>
-      </div>
-
-      {/* M3 wave linear progress indicator */}
-      <div style={{ width: '100%', maxWidth: 320, marginBottom: 24 }}>
+      {/* Destination hero card */}
+      <div style={{
+        borderRadius: 20, background: '#DCF0E4',
+        padding: '20px 22px',
+        position: 'relative', overflow: 'hidden',
+      }}>
+        {/* Subtle radial glow */}
         <div style={{
-          width: '100%', height: 4, borderRadius: 2,
-          background: '#C8D8C4', overflow: 'hidden', position: 'relative',
-        }}>
+          position: 'absolute', top: -40, right: -40,
+          width: 160, height: 160, borderRadius: '50%',
+          background: `radial-gradient(circle, ${GREEN}28 0%, transparent 70%)`,
+          pointerEvents: 'none',
+        }} />
+        <div style={{ fontSize: 10, fontWeight: 700, color: GREEN, textTransform: 'uppercase', letterSpacing: '0.09em', marginBottom: 8 }}>
+          Your escape
+        </div>
+        <div style={{ fontSize: 26, fontWeight: 900, color: '#1C1B1F', letterSpacing: '-0.03em', lineHeight: 1.1, marginBottom: 4 }}>
+          {destName}
+        </div>
+        <div style={{ fontSize: 12, color: '#4B7A60', marginBottom: 14 }}>
+          from {originName}
+        </div>
+        {/* Trip context chips */}
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+          {dateLabel && (
+            <span style={{ padding: '4px 10px', borderRadius: 20, fontSize: 11, fontWeight: 600, background: 'rgba(255,255,255,0.7)', color: '#1C1B1F' }}>
+              {dateLabel}
+            </span>
+          )}
+          <span style={{ padding: '4px 10px', borderRadius: 20, fontSize: 11, fontWeight: 600, background: 'rgba(255,255,255,0.7)', color: '#1C1B1F' }}>
+            {crewLabel[crewType]}
+          </span>
+          <span style={{ padding: '4px 10px', borderRadius: 20, fontSize: 11, fontWeight: 600, background: 'rgba(255,255,255,0.7)', color: '#1C1B1F' }}>
+            {tripLabel}
+          </span>
+        </div>
+      </div>
+
+      {/* Progress + step list */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 16, flex: 1, justifyContent: 'center' }}>
+        {/* Current step label */}
+        <div style={{ fontSize: 14, fontWeight: 500, color: '#6B7280' }}>
+          {messages[step]}
+        </div>
+
+        {/* M3 determinate linear progress */}
+        <div style={{ width: '100%', height: 4, borderRadius: 2, background: `${GREEN}22`, overflow: 'hidden', position: 'relative' }}>
           <div style={{
             position: 'absolute', top: 0, left: 0, height: '100%',
-            width: `${progress}%`,
-            background: GREEN,
-            borderRadius: 2,
-            transition: 'width 0.45s cubic-bezier(0.4, 0, 0.2, 1)',
-          }} />
-          {/* Wave shimmer on the leading edge */}
-          <div style={{
-            position: 'absolute', top: 0, left: `${progress}%`,
-            height: '100%', width: 40,
-            background: `linear-gradient(90deg, ${GREEN} 0%, transparent 100%)`,
-            opacity: 0.4,
-            animation: 'waveShimmer 1.2s ease-in-out infinite',
-            transform: 'translateX(-20px)',
+            width: `${progress}%`, background: GREEN, borderRadius: 2,
+            transition: 'width 0.5s cubic-bezier(0.4, 0, 0.2, 1)',
           }} />
         </div>
-        <style>{`@keyframes waveShimmer { 0%,100% { opacity: 0.3 } 50% { opacity: 0.7 } }`}</style>
-      </div>
 
-      {/* Step list */}
-      <div style={{ width: '100%', maxWidth: 300, display: 'flex', flexDirection: 'column', gap: 10 }}>
-        {messages.map((msg, i) => (
-          <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <div style={{
-              width: 20, height: 20, borderRadius: '50%', flexShrink: 0,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: 11, fontWeight: 700, color: 'white',
-              background: i < step ? GREEN : i === step ? WARM : '#DCE4DB',
-              transition: 'background 0.3s',
-            }}>
-              {i < step ? '✓' : i === step ? '' : ''}
-            </div>
-            <span style={{
-              fontSize: 13, fontWeight: i === step ? 600 : 400,
-              color: i < step ? GREEN : i === step ? '#002112' : '#9CA3AF',
-              transition: 'color 0.3s',
-            }}>{msg}</span>
-          </div>
-        ))}
+        {/* Step list */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {messages.map((msg, i) => {
+            const done = i < step
+            const active = i === step
+            return (
+              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <div style={{
+                  width: 22, height: 22, borderRadius: '50%', flexShrink: 0,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  background: done ? '#DCF0E4' : active ? GREEN : '#ECF0EB',
+                  transition: 'background 0.3s',
+                }}>
+                  {done
+                    ? <svg width="11" height="11" viewBox="0 0 12 12" fill="none"><path d="M2 6l3 3 5-5" stroke={GREEN} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                    : active
+                    ? <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#fff' }} />
+                    : <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#C5CAC4' }} />
+                  }
+                </div>
+                <span style={{
+                  fontSize: 13, fontWeight: active ? 600 : 400,
+                  color: done ? GREEN : active ? '#1C1B1F' : '#9CA3AF',
+                  transition: 'color 0.3s',
+                }}>
+                  {msg}
+                </span>
+              </div>
+            )
+          })}
+        </div>
       </div>
     </div>
   )
