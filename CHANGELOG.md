@@ -1,5 +1,16 @@
 # Changelog
 
+## 8 June 2026 (7f788a9)
+
+- **fix: Map POI marker jumps to top-left on click** — MapLibre sets marker position via `transform: translate(...)` on the root element. `highlightMarker()` was overwriting that with `scale(1.35)`, snapping marker to 0,0. Fix: inner wrapper div holds all visual styles; scale applies to inner only. Popup open changed to `marker.togglePopup()` for correct LngLat anchoring. (closes #76)
+- **feat: Wizard crew selector — single row** — Replaced `option-card` CSS class (which had overriding padding) with fully inline `<button>` elements. Fixed in both the standard and preselect wizard flows. (closes #77)
+- **feat: Kids section — M3 tonal style** — Yes kids / Adults only as tonal card buttons; age chips with label + desc, no emojis. (closes #77)
+- **feat: Calendar — desktop horizontal tile layout** — 5 days shown; each tile has day/date/month on left, weather + temp on right; `flexDirection: mobile ? 'column' : 'row'`. (closes #77)
+- **feat: Recommendation engine — DB-count gating** — Wizard fetches live DB row counts before computing suggestions; destinations with 0 confirmed records excluded from Recommended; DB count boosts score so most-stocked destinations rank highest. (closes #78)
+- **feat: Seasonal alpine themes** — Alpine resorts switch to Skiing/Snow in winter, Hiking/Nature otherwise. Bright and Marysville similarly season-aware. (closes #78)
+- **feat: Enrichment — tourist-accurate POI filtering** — Local sports clubs and gyms permanently blocked; tourist-accessible recreation (bowling, pools, mini golf, escape rooms) preserved; golf clubs kept in `active`. (closes #79)
+- **script: sync-themes.mts** — Derives top-3 static themes per destination from actual DB category counts. (closes #78)
+
 ## 7 June 2026 (3451d14)
 
 - **DX skills — cost check, mapcheck, issue-sync**
