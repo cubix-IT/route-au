@@ -38,3 +38,4 @@
 {"run_at":"2026-06-07T21:48:35.286Z","completed_at":"2026-06-07T21:53:19.769Z","duration_sec":284,"mode":"slug:warburton","destinations":1,"upserted":51,"pbf_source":"geofabrik","results":[{"slug":"warburton","upserted":51}]}
 {"run_at":"2026-06-07T21:56:56.815Z","completed_at":"2026-06-07T22:02:16.139Z","duration_sec":319,"mode":"slug:halls-gap","destinations":1,"upserted":37,"pbf_source":"geofabrik","results":[{"slug":"halls-gap","upserted":37}]}
 {"run_at":"2026-06-07T21:56:56.700Z","completed_at":"2026-06-07T22:02:19.645Z","duration_sec":323,"mode":"slug:warburton","destinations":1,"upserted":51,"pbf_source":"geofabrik","results":[{"slug":"warburton","upserted":51}]}
+{"run_at":"2026-06-07T22:00:02.703Z","completed_at":"2026-06-07T22:06:17.761Z","duration_sec":375,"mode":"slug:bendigo-town","destinations":1,"upserted":110,"pbf_source":"geofabrik","results":[{"slug":"bendigo-town","upserted":110}]}
