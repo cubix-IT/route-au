@@ -1004,7 +1004,7 @@ export function ExperiencePanel({ hideTimeline = false }: { hideTimeline?: boole
                 )
               })}
               <p style={{ fontSize: 11, color: 'var(--text-muted)', margin: '4px 0 8px', lineHeight: 1.6 }}>
-                Trail data © <a href="https://www.data.vic.gov.au" style={{ color: 'var(--text-muted)' }}>data.vic.gov.au</a> (CC BY 4.0)
+                Trail data © <a href="https://www.data.vic.gov.au" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--text-muted)' }}>data.vic.gov.au</a> (CC BY 4.0)
               </p>
             </div>
           </SectionBlock>

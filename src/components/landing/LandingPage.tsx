@@ -870,15 +870,15 @@ export function LandingPage() {
           {/* Attribution row */}
           <div style={{ marginBottom: 16, fontSize: 11.5, color: 'rgba(255,255,255,0.5)', lineHeight: 1.7 }}>
             Map data ©{' '}
-            <a href="https://www.openstreetmap.org/copyright" className="mu-footer-link" style={{ color: 'rgba(255,255,255,0.75)' }}>OpenStreetMap contributors</a>
+            <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer" className="mu-footer-link" style={{ color: 'rgba(255,255,255,0.75)' }}>OpenStreetMap contributors</a>
             {' '}(ODbL) · Map tiles ©{' '}
-            <a href="https://carto.com/attributions" className="mu-footer-link" style={{ color: 'rgba(255,255,255,0.75)' }}>CARTO</a>
+            <a href="https://carto.com/attributions" target="_blank" rel="noopener noreferrer" className="mu-footer-link" style={{ color: 'rgba(255,255,255,0.75)' }}>CARTO</a>
             {' '}· Destination content ©{' '}
-            <a href="https://en.wikipedia.org" className="mu-footer-link" style={{ color: 'rgba(255,255,255,0.75)' }}>Wikipedia contributors</a>
-            {' '}(CC BY-SA) · Trail data © <a href="https://www.data.vic.gov.au" className="mu-footer-link" style={{ color: 'rgba(255,255,255,0.75)' }}>DataVic</a>
+            <a href="https://en.wikipedia.org" target="_blank" rel="noopener noreferrer" className="mu-footer-link" style={{ color: 'rgba(255,255,255,0.75)' }}>Wikipedia contributors</a>
+            {' '}(CC BY-SA) · Trail data © <a href="https://www.data.vic.gov.au" target="_blank" rel="noopener noreferrer" className="mu-footer-link" style={{ color: 'rgba(255,255,255,0.75)' }}>DataVic</a>
             {' '}(CC BY 4.0) · Heritage data © <a href="https://vhd.heritagecouncil.vic.gov.au" className="mu-footer-link" style={{ color: 'rgba(255,255,255,0.75)' }}>Heritage Council Victoria</a>
             {' '}(CC BY 4.0) · Fuel data © State of Victoria · Weather by{' '}
-            <a href="https://api.met.no" className="mu-footer-link" style={{ color: 'rgba(255,255,255,0.75)' }}>MET Norway</a>
+            <a href="https://api.met.no" target="_blank" rel="noopener noreferrer" className="mu-footer-link" style={{ color: 'rgba(255,255,255,0.75)' }}>MET Norway</a>
           </div>
           {/* Bottom row */}
           <div style={{ borderTop: '1px solid rgba(255,255,255,0.12)', paddingTop: 14, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
