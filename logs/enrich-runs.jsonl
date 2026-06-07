@@ -32,3 +32,4 @@
 {"run_at":"2026-06-07T21:24:16.093Z","completed_at":"2026-06-07T21:28:14.196Z","duration_sec":238,"mode":"slug:rawson","destinations":1,"upserted":28,"pbf_source":"geofabrik","results":[{"slug":"rawson","upserted":28}]}
 {"run_at":"2026-06-07T21:29:19.471Z","completed_at":"2026-06-07T21:34:04.407Z","duration_sec":285,"mode":"slug:fish-creek","destinations":1,"upserted":21,"pbf_source":"geofabrik","results":[{"slug":"fish-creek","upserted":21}]}
 {"run_at":"2026-06-07T21:29:19.490Z","completed_at":"2026-06-07T21:34:05.808Z","duration_sec":286,"mode":"slug:stawell","destinations":1,"upserted":58,"pbf_source":"geofabrik","results":[{"slug":"stawell","upserted":58}]}
+{"run_at":"2026-06-07T21:34:21.175Z","completed_at":"2026-06-07T21:39:04.926Z","duration_sec":284,"mode":"slug:port-fairy-town","destinations":1,"upserted":56,"pbf_source":"geofabrik","results":[{"slug":"port-fairy-town","upserted":56}]}
