@@ -30,3 +30,4 @@
 {"run_at":"2026-06-06T23:12:56.164Z","completed_at":"2026-06-06T23:16:19.855Z","duration_sec":204,"mode":"slug:mildura","destinations":1,"upserted":38,"pbf_source":"geofabrik","results":[{"slug":"mildura","upserted":38}]}
 {"run_at":"2026-06-06T23:17:02.171Z","completed_at":"2026-06-06T23:20:27.847Z","duration_sec":206,"mode":"slug:mildura","destinations":1,"upserted":41,"pbf_source":"geofabrik","results":[{"slug":"mildura","upserted":41}]}
 {"run_at":"2026-06-07T21:24:16.093Z","completed_at":"2026-06-07T21:28:14.196Z","duration_sec":238,"mode":"slug:rawson","destinations":1,"upserted":28,"pbf_source":"geofabrik","results":[{"slug":"rawson","upserted":28}]}
+{"run_at":"2026-06-07T21:29:19.471Z","completed_at":"2026-06-07T21:34:04.407Z","duration_sec":285,"mode":"slug:fish-creek","destinations":1,"upserted":21,"pbf_source":"geofabrik","results":[{"slug":"fish-creek","upserted":21}]}
