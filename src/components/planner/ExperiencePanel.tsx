@@ -503,7 +503,7 @@ export function ExperiencePanel({ hideTimeline = false }: { hideTimeline?: boole
               {topCats.length > 0 && (
                 <div style={{ background: '#fff', borderRadius: 18, border: '1px solid rgba(0,0,0,0.07)', padding: '16px 18px', boxShadow: '0 1px 4px rgba(0,0,0,0.05)' }}>
                   {sectionHead('Things to Do', allDbActs.length)}
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 10 }}>
                     {topCats.map((cat) => {
                       const tag = CAT_TAG[cat] ?? { label: cat, color: '#374151', bg: '#F3F4F6' }
                       const emoji = CAT_EMOJI_MAP[cat] ?? '📍'
@@ -528,7 +528,7 @@ export function ExperiencePanel({ hideTimeline = false }: { hideTimeline?: boole
               {foodCats.length > 0 && (
                 <div style={{ background: '#fff', borderRadius: 18, border: '1px solid rgba(0,0,0,0.07)', padding: '16px 18px', boxShadow: '0 1px 4px rgba(0,0,0,0.05)' }}>
                   {sectionHead('Food & Drinks', (d.dbFood ?? []).length)}
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 10 }}>
                     {foodCats.map((cat) => {
                       const fc = FOOD_COLOR[cat] ?? { color: '#374151', bg: '#F3F4F6' }
                       const emoji = CAT_EMOJI_MAP[cat] ?? '🍴'
