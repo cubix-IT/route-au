@@ -61,7 +61,13 @@ const NATURE_NATURAL  = new Set(['peak','beach','waterfall','hot_spring','cliff'
 const NATURE_LEISURE  = new Set(['nature_reserve','common','pitch','dog_park'])
 const NATURE_BOUNDARY = new Set(['national_park','protected_area'])
 const ACT_TOURISM = new Set(['attraction','museum','artwork','gallery','viewpoint','theme_park','zoo','aquarium','alpine_hut'])
-const ACT_LEISURE = new Set(['sports_centre','stadium','golf_course','miniature_golf','swimming_pool','marina','picnic_ground','water_park','amusement_arcade'])
+// Only tourist-accessible leisure — local sports clubs/facilities excluded entirely
+const ACT_LEISURE = new Set(['miniature_golf','marina','picnic_ground','water_park','amusement_arcade','climbing','sports_centre'])
+// Local member-only clubs tourists cannot join — never collect these
+const LOCAL_CLUB_BLACKLIST = /\b(tennis club|cricket club|football club|netball club|soccer club|rugby club|hockey club|basketball club|squash club|racing club|harness racing|greyhound|rifle range|gun club|pistol club|judo club|martial arts|gymnastics club|volleyball club|recreation reserve|sporting reserve|recreation club|sports ground|racecourse|raceway|swim(?:ming)? club|surf club)\b/i
+const NON_TOURIST_BLACKLIST = /\b(gym|gymnasium|fitness centre|health club|yoga|pilates|crossfit|personal training|swimming lessons|aquamoves|physiotherapy|chiropractic)\b/i
+// Tourist-accessible recreation — keep these (public entry, pay-and-play)
+const TOURIST_RECREATION = /\b(bowling alley|tenpin|ten.?pin|lawn bowls|barefoot bowls|aquatic centre|swimming pool|splash park|water park|mini.?golf|go.?kart|laser.?tag|escape room|trampoline|indoor climb)\b/i
 const ACT_AMENITY = new Set(['theatre','cinema','arts_centre','library','marketplace','spa'])
 const CHAIN_BLACKLIST = /\b(mcdonald'?s|hungry jack'?s|kfc|subway|domino'?s|pizza hut|red rooster|oporto|nando'?s|grill'?d|betty'?s burgers|guzman|taco bell|carl'?s jr|burger king|wendy'?s|seven.?eleven|7.?eleven|bp|caltex|shell|ampol|united petroleum|woolworths|coles|aldi|chemist warehouse)\b/i
 
@@ -101,8 +107,6 @@ function osmCategory(tags: Record<string,string>): 'food'|'nature'|'activity'|nu
 
 function activityCategory(tags: Record<string,string>, name: string): string {
   const n = name.toLowerCase()
-  // Peaks = hiking, not viewpoints (you hike to a peak)
-  if (tags.natural === 'peak' || /\bpeak\b|summit/.test(n))              return 'active'
   if (tags.tourism === 'viewpoint' || /lookout|viewpoint|scenic overlook|panorama/.test(n)) return 'viewpoint'
   if (tags.natural === 'waterfall' || /waterfall|falls(?!.?creek)/.test(n)) return 'nature'
   if (tags.natural === 'beach' || tags.leisure === 'beach_resort' || /\bbeach\b|\bcoast\b/.test(n)) return 'beach'
@@ -122,13 +126,26 @@ function activityCategory(tags: Record<string,string>, name: string): string {
   if (tags.leisure === 'nature_reserve' || tags.boundary === 'national_park' || /national park|state park|nature reserve/.test(n)) return 'nature'
   if (/\bgarden\b|botanic|arboretum/.test(n)) return 'nature'
   if (/forest|bush walk|rainforest/.test(n)) return 'nature'
-  if (/adventure|zipline|treetop|ropes|rock climb|absei|hik(e|ing)|trail/.test(n)) return 'active'
-  if (/swimming pool|splash park|water park|aquatic centre/.test(n)) return 'active'
-  if (tags.leisure === 'sports_centre' || /sports centre|leisure centre/.test(n)) return 'active'
+  // True adventure / outdoor experiences
+  if (tags.sport === 'climbing' || tags.sport === 'via_ferrata' || /rock climb|absei|via ferrata|ropes course|rockwire/.test(n)) return 'active'
+  if (tags.sport === 'paragliding' || tags.sport === 'hang_gliding' || /paraglid|hang.?glid|skydiv|hot.?air balloon/.test(n)) return 'active'
+  if (tags.sport === 'canoe' || tags.sport === 'kayak' || /kayak|canoe|white.?water|river sled|rafting/.test(n)) return 'active'
+  if (/mountain.?bik|mtb|dirt jump|bmx park|treetop|zipline|adventure park|ropes|absei|abseil/.test(n)) return 'active'
+  if (/horse.?rid|equestrian|trail.?rid/.test(n)) return 'active'
+  if (tags.sport === 'skiing' || tags.sport === 'snowboard' || /\bski\b|snowboard|toboggan|snow play|snow tubing/.test(n)) return 'active'
+  if (/adventure|hik(e|ing)|bushwalk/.test(n)) return 'active'
+  if (tags.natural === 'peak' || /\bpeak\b|summit/.test(n)) return 'active'
+  // Sports & recreation (not adventure)
+  if (/swimming pool|splash park|water park|aquatic centre/.test(n)) return 'sports'
+  if (tags.leisure === 'sports_centre' || /sports centre|leisure centre/.test(n)) return 'sports'
+  if (tags.leisure === 'golf_course' || /golf/.test(n)) return 'sports'
+  if (/bowling|tennis|netball|football|cricket|basketball|squash|racquet|bowls club|racing club|harness|greyhound|pistol club/.test(n)) return 'sports'
   if (tags.leisure === 'golf_course' || /golf/.test(n)) return 'active'
   if (tags.amenity === 'spa' || tags.leisure === 'spa' || /\bspa\b|wellness|retreat|day spa/.test(n)) return 'relaxation'
   if (tags.leisure === 'stadium' || tags.amenity === 'theatre' || tags.amenity === 'cinema') return 'entertainment'
-  if (/laser.?force|laser.?tag|laser.?skirmish|mini.?golf|go.?kart|escape room|gaming|arcade|bowling|trampoline|inflatable/.test(n)) return 'entertainment'
+  if (/laser.?force|laser.?tag|laser.?skirmish|mini.?golf|go.?kart|escape room|gaming|arcade|bowling|tenpin|ten.?pin|trampoline|inflatable/.test(n)) return 'entertainment'
+  if (/aquatic centre|swimming pool|splash park|water park|public pool/.test(n)) return 'active'
+  if (/lawn bowls|barefoot bowls/.test(n)) return 'entertainment'
   if (/winery|cellar door|vineyard|wine tasting|brewery|brewpub|brew house|craft beer|distillery|\bgin\b|whisky|whiskey|spirits/.test(n)) return 'drink'
   // Food-named attractions (cheese factory, dairy, farm shop etc.) → food, not nature
   if (/cheese|dairy|\bfarm\b|cider|olive|honey|chocolate|confection|providore|deli|pantry|smokehouse|preserves/.test(n)) return 'food'
@@ -701,6 +718,9 @@ async function enrichSubDest(
           wikipedia: tags.wikipedia || null, wikidata: tags.wikidata || null, quality_score: calcQualityScore(tags, 0) },
       })
     } else {
+      // Skip local clubs, gyms and non-tourist facilities — tourists can't participate
+      // But allow tourist-accessible recreation (public pools, bowling alleys, mini-golf etc.)
+      if (!TOURIST_RECREATION.test(name_) && (LOCAL_CLUB_BLACKLIST.test(name_) || NON_TOURIST_BLACKLIST.test(name_))) continue
       const actCat = activityCategory(tags, name_)
       // For heritage railway stations, derive display name from Wikipedia title or well-known operator names
       // e.g. "Belgrave (Narrow-gauge)" → "Puffing Billy Railway"

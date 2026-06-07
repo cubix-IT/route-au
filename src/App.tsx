@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Toaster } from 'react-hot-toast'
 import { PrivacyPage } from '@/components/PrivacyPage'
+import { ChangelogPage } from '@/components/ChangelogPage'
 import { Header } from '@/components/layout/Header'
 import { MapContainer } from '@/components/map/MapContainer'
 import { ProfileWizard } from '@/components/wizard/ProfileWizard'
@@ -69,9 +70,11 @@ function App() {
     else setView('landing')
   }, [activeItinerary])
 
-  // Handle /privacy route inside the SPA (for dev server + direct navigation)
   if (window.location.pathname === '/privacy') {
     return <PrivacyPage onBack={() => { window.history.back() }} />
+  }
+  if (window.location.pathname === '/changelog') {
+    return <ChangelogPage onBack={() => { window.history.back() }} />
   }
 
   return (

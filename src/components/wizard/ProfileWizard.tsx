@@ -6,6 +6,8 @@ import { useScrollLock } from '@/hooks/useScrollLock'
 function ScrollLock() { useScrollLock(); return null }
 import { useItineraryBuilder } from '@/hooks/useItineraryBuilder'
 import { matchDestinations, getNearbySubDests, VICTORIAN_CLUSTERS } from '@/data/victorianClusters.ts'
+import type { InterestDbCounts } from '@/data/victorianClusters.ts'
+import { supabase } from '@/lib/supabase'
 import { getCurrentSeason } from '@/utils/season'
 import { fetchWeatherForCoord } from '@/api/weather'
 import type { MatchedDest, TripInterest } from '@/data/victorianClusters.ts'
@@ -82,33 +84,27 @@ function haversinKm(a: Coordinate, b: Coordinate): number {
 // ── Interest definitions ──────────────────────────────────────────
 
 const INTEREST_GRAD: Record<string, string> = {
-  Wildlife:   'linear-gradient(145deg, #1a472a 0%, #2d6a4f 100%)',
-  Beach:      'linear-gradient(145deg, #0c4a6e 0%, #0284c7 100%)',
-  Wine:       'linear-gradient(145deg, #581c87 0%, #9333ea 100%)',
-  Hiking:     'linear-gradient(145deg, #1e3a5f 0%, #3b82f6 100%)',
-  Cycling:    'linear-gradient(145deg, #064e3b 0%, #10b981 100%)',
-  HotSprings: 'linear-gradient(145deg, #9f1239 0%, #f97316 100%)',
-  History:    'linear-gradient(145deg, #78350f 0%, #c97c2f 100%)',
-  Food:       'linear-gradient(145deg, #92400e 0%, #f59e0b 100%)',
-  Relaxation: 'linear-gradient(145deg, #164e63 0%, #06b6d4 100%)',
-  FamilyFun:  'linear-gradient(145deg, #92400e 0%, #fbbf24 100%)',
-  Adventure:  'linear-gradient(145deg, #14532d 0%, #22c55e 100%)',
-  Scenic:     'linear-gradient(145deg, #1e3a8a 0%, #60a5fa 100%)',
+  Wildlife:  'linear-gradient(145deg, #1a472a 0%, #2d6a4f 100%)',
+  Wine:      'linear-gradient(145deg, #581c87 0%, #9333ea 100%)',
+  Hiking:    'linear-gradient(145deg, #1e3a5f 0%, #3b82f6 100%)',
+  History:   'linear-gradient(145deg, #78350f 0%, #c97c2f 100%)',
+  Food:      'linear-gradient(145deg, #92400e 0%, #f59e0b 100%)',
+  Adventure: 'linear-gradient(145deg, #14532d 0%, #22c55e 100%)',
+  Scenic:    'linear-gradient(145deg, #1e3a8a 0%, #60a5fa 100%)',
+  Art:       'linear-gradient(145deg, #7c2d12 0%, #dc2626 100%)',
+  Pubs:      'linear-gradient(145deg, #451a03 0%, #b45309 100%)',
 }
 
 const INTERESTS: { id: TripInterest; emoji: string; label: string }[] = [
-  { id: 'Wildlife',   emoji: '🦘', label: 'Wildlife' },
-  { id: 'Beach',      emoji: '🌊', label: 'Beach' },
-  { id: 'Wine',       emoji: '🍷', label: 'Wine & cellar doors' },
-  { id: 'Hiking',     emoji: '🥾', label: 'Hiking & trails' },
-  { id: 'Cycling',    emoji: '🚴', label: 'Cycling & rail trails' },
-  { id: 'HotSprings', emoji: '♨️', label: 'Hot springs' },
-  { id: 'History',    emoji: '🏛️', label: 'History' },
-  { id: 'Food',       emoji: '☕', label: 'Cafes & food' },
-  { id: 'Relaxation', emoji: '🛁', label: 'Relaxation' },
-  { id: 'FamilyFun',  emoji: '🎠', label: 'Family fun' },
-  { id: 'Adventure',  emoji: '🚵', label: 'Adventure' },
-  { id: 'Scenic',     emoji: '👁️', label: 'Scenic drives' },
+  { id: 'Hiking',   emoji: '🥾', label: 'Hiking & walks' },
+  { id: 'Scenic',   emoji: '👁️', label: 'Scenic views' },
+  { id: 'History',  emoji: '🏛️', label: 'History' },
+  { id: 'Wildlife', emoji: '🦘', label: 'Wildlife' },
+  { id: 'Adventure',emoji: '🚵', label: 'Adventure' },
+  { id: 'Wine',     emoji: '🍷', label: 'Wineries' },
+  { id: 'Food',     emoji: '☕', label: 'Cafes & food' },
+  { id: 'Art',      emoji: '🎨', label: 'Art & culture' },
+  { id: 'Pubs',     emoji: '🍺', label: 'Pubs & breweries' },
 ]
 
 // ── Main wizard ───────────────────────────────────────────────────
@@ -161,7 +157,7 @@ export function ProfileWizard() {
   const [skipFuel, setSkipFuel] = useState(false)
   const [accommodation, setAccommodation] = useState<AccommodationPreference>('Any')
 
-  const totalSteps = isPreselected ? 3 : 6 // 0..2 for preselect, 0..5 for discovery
+  const totalSteps = isPreselected ? 3 : 5 // 0..2 for preselect, 0..4 for discovery
 
   if (!isWizardOpen) return null
 
@@ -182,11 +178,62 @@ export function ProfileWizard() {
   }
 
   const handleNext = async () => {
-    const lastStep = isPreselected ? 2 : 5
+    const lastStep = isPreselected ? 2 : 4
 
     // Step 1 in discovery mode → compute suggestions, derive dining prefs, advance
     if (!isPreselected && step === 1) {
       const { originCoord: currentOriginCoord } = useAppStore.getState()
+
+      // Fetch real DB counts for selected interests.
+      // food_places interests (Wine/Food/Pubs) and activities interests (Adventure/Hiking/Wildlife/History/Scenic/Art)
+      // are queried from their respective tables. If dbCounts is populated for an interest,
+      // a destination with 0 count will NOT be recommended — prevents empty result pages.
+      let dbCounts: InterestDbCounts | undefined
+      const fpInterestCategories: Record<string, string[]> = {
+        Wine:  ['%winer%', '%cellar door%'],
+        Pubs:  ['%pub%', '%brewery%', '%distillery%', '%bar%'],
+        Food:  ['%cafe%', '%restaurant%', '%bakery%'],
+      }
+      const actInterestCategories: Record<string, string[]> = {
+        Adventure: ['active'],
+        Hiking:    ['nature', 'active'],
+        Wildlife:  ['wildlife', 'nature'],
+        History:   ['history'],
+        Scenic:    ['viewpoint', 'nature'],
+        Art:       ['art', 'entertainment'],
+      }
+      try {
+        const rawCounts: Record<number, number> = {}
+        const addRows = (rows: { sub_dest_id: number }[]) => {
+          for (const r of rows) rawCounts[r.sub_dest_id] = (rawCounts[r.sub_dest_id] || 0) + 1
+        }
+
+        // food_places queries (ilike patterns)
+        const fpInterests = interests.filter(i => i in fpInterestCategories)
+        for (const interest of fpInterests) {
+          for (const pattern of fpInterestCategories[interest]) {
+            const { data } = await supabase.from('food_places').select('sub_dest_id').ilike('category', pattern)
+            if (data) addRows(data)
+          }
+        }
+
+        // activities queries (exact category match)
+        const actInterests = interests.filter(i => i in actInterestCategories)
+        for (const interest of actInterests) {
+          for (const cat of actInterestCategories[interest]) {
+            const { data } = await supabase.from('activities').select('sub_dest_id').eq('category', cat)
+            if (data) addRows(data)
+          }
+        }
+
+        if (fpInterests.length > 0 || actInterests.length > 0) {
+          // Map numeric IDs → slugs. Also include all known sub-dests so missing ones get 0.
+          const { data: subs } = await supabase.from('sub_destinations').select('sub_dest_id, slug')
+          dbCounts = {}
+          for (const s of subs ?? []) dbCounts[s.slug] = rawCounts[s.sub_dest_id] ?? 0
+        }
+      } catch { /* non-critical — fall back to static scoring */ }
+
       const matches = matchDestinations({
         maxDriveHours,
         interests,
@@ -194,6 +241,7 @@ export function ProfileWizard() {
         isOvernight: tripType === 'multiday',
         season,
         originCoord: currentOriginCoord,
+        dbCounts,
       })
       setSuggestions(matches)
 
@@ -310,12 +358,12 @@ export function ProfileWizard() {
   const msgs = ['Finding your route…', 'Matching experiences…', 'Building your day…', 'Almost ready…']
 
   // ── Step labels + subtitles (#17) ──
-  const discoveryStepLabels = ['How far & who', 'What you love', 'Pick a spot', 'Finishing touches', 'Trip summary']
+  const discoveryStepLabels = ['How far & who', 'What you love', 'Pick a spot', 'Your vehicle', 'Trip summary']
   const discoveryStepSubtitles = [
     'Tell us how far you want to travel and who\'s coming',
     'We\'ll match destinations to what you enjoy',
     'Choose from your personalised recommendations',
-    'Set dates, food preferences, and your vehicle',
+    'Help us find fuel stops along the way',
     'Review your trip before we build it',
   ]
   const preselectedStepLabels = ['Your trip details', 'Your vehicle', 'Trip summary']
@@ -334,8 +382,15 @@ export function ProfileWizard() {
       <ScrollLock />
       <div className="wizard-card animate-fade-up">
 
+        {/* Mobile drag handle */}
+        {typeof window !== 'undefined' && window.innerWidth < 600 && (
+          <div style={{ display: 'flex', justifyContent: 'center', padding: '10px 0 0', flexShrink: 0 }}>
+            <div style={{ width: 36, height: 4, borderRadius: 2, background: 'rgba(0,0,0,0.15)' }} />
+          </div>
+        )}
+
         {/* M3 Header */}
-        <div style={{ padding: '20px 20px 0', flexShrink: 0 }}>
+        <div style={{ padding: typeof window !== 'undefined' && window.innerWidth < 600 ? '10px 18px 0' : '20px 20px 0', flexShrink: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
             {/* Step label — M3 Headline Small */}
             <div style={{
@@ -449,27 +504,17 @@ export function ProfileWizard() {
                   suggestions={suggestions}
                   picked={pickedDest}
                   onPick={setPickedDest}
+                  maxDriveHours={maxDriveHours}
                 />
               )}
               {step === 3 && (
-                <StepPreferences
-                  hasKids={hasKids} kidsAge={kidsAge}
-                  tripType={tripType}
-                  accommodation={accommodation} setAccommodation={setAccommodation}
-                  dailyDriveHours={dailyDriveHours} setDailyDriveHours={setDailyDriveHours}
-                  departureHour={departureHour} setDepartureHour={setDepartureHour}
-                  destCoord={pickedDest?.sub.coord ?? undefined}
-                  hideDepartureTime
-                />
-              )}
-              {step === 4 && (
                 <StepVehicle
                   vehicleType={vehicleType} setVehicleType={setVehicleType}
                   fuelType={fuelType} setFuelType={setFuelType}
                   skipFuel={skipFuel} setSkipFuel={setSkipFuel}
                 />
               )}
-              {step === 5 && (
+              {step === 4 && (
                 <StepSummary
                   effectiveDest={effectiveDest}
                   startDate={startDate}
@@ -612,50 +657,72 @@ function StepHowFarAndWho({
       {/* Who's coming */}
       <div>
         <Label>Who's coming?</Label>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 10 }}>
+        <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
           {([
-            ['solo', 'Solo', 'Just me'],
-            ['couple', 'Couple', 'Two of us'],
-            ['family', 'Family', 'Kids included'],
-            ['group', 'Group', 'The crew'],
-          ] as const).map(([type, label, desc]) => (
-            <div key={type}
-              className={`option-card ${crewType === type ? 'selected' : ''}`}
+            ['solo', 'Solo'],
+            ['couple', 'Couple'],
+            ['family', 'Family'],
+            ['group', 'Group'],
+          ] as const).map(([type, label]) => (
+            <button key={type}
               onClick={() => setCrewType(type)}
-              style={{ flexDirection: 'column', padding: '14px 12px', gap: 4 }}>
-              <div style={{ fontWeight: 700, fontSize: 13, color: 'var(--text-primary)' }}>{label}</div>
-              <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{desc}</div>
-            </div>
+              style={{
+                flex: 1, minWidth: 0,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                padding: '14px 4px', borderRadius: 16,
+                background: crewType === type ? '#B7EDCA' : '#ECF0EB',
+                border: 'none', cursor: 'pointer',
+                boxShadow: crewType === type ? '0 4px 20px rgba(58,107,79,0.25)' : 'none',
+                transition: 'background 0.2s',
+                fontWeight: 700, fontSize: 13, color: 'var(--text-primary)',
+              }}>
+              {label}
+            </button>
           ))}
         </div>
       </div>
 
       {/* Kids — only when relevant */}
       {showKids && (
-        <div style={{ padding: '14px 16px', borderRadius: 12, background: 'var(--bg-muted)', border: '1px solid var(--border)' }}>
-          <ToggleRow label="Any kids in the group?" value={hasKids} onChange={setHasKids} />
+        <div>
+          <Label>Any kids coming?</Label>
+          <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+            {([['yes', 'Yes, kids!'], ['no', 'Adults only']] as const).map(([val, label]) => {
+              const sel = val === 'yes' ? hasKids : !hasKids
+              return (
+                <button key={val} onClick={() => setHasKids(val === 'yes')} style={{
+                  flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  padding: '14px 4px', borderRadius: 16,
+                  background: sel ? '#B7EDCA' : '#ECF0EB',
+                  border: 'none', cursor: 'pointer',
+                  boxShadow: sel ? '0 4px 20px rgba(58,107,79,0.25)' : 'none',
+                  transition: 'background 0.2s',
+                  fontWeight: 700, fontSize: 13, color: 'var(--text-primary)',
+                }}>
+                  {label}
+                </button>
+              )
+            })}
+          </div>
           {hasKids && (
-            <div style={{ marginTop: 14, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+            <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
               {([
                 ['toddler', 'Toddlers', 'Under 5'],
-                ['school',  'Primary school', '6–12'],
-                ['teen',    'Teenagers', '13+'],
-                ['mixed',   'Mixed ages', 'All of the above'],
+                ['school',  'Primary', '6–12'],
+                ['teen',    'Teens', '13+'],
+                ['mixed',   'Mixed', 'All ages'],
               ] as const).map(([age, label, desc]) => (
-                <div key={age}
-                  onClick={() => setKidsAge(age)}
-                  style={{
-                    display: 'flex', alignItems: 'center', gap: 8,
-                    padding: '10px 12px', borderRadius: 10, cursor: 'pointer',
-                    background: kidsAge === age ? 'var(--green-light)' : '#ECF0EB',
-                    border: `1.5px solid ${kidsAge === age ? 'var(--border-active)' : 'transparent'}`,
-                    transition: 'all 0.15s',
-                  }}>
-                  <div>
-                    <div style={{ fontSize: 12, fontWeight: 600, color: kidsAge === age ? GREEN : 'var(--text-primary)' }}>{label}</div>
-                    <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>{desc}</div>
-                  </div>
-                </div>
+                <button key={age} onClick={() => setKidsAge(age)} style={{
+                  flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center',
+                  gap: 3, padding: '12px 4px', borderRadius: 14,
+                  background: kidsAge === age ? '#B7EDCA' : '#ECF0EB',
+                  border: 'none', cursor: 'pointer',
+                  boxShadow: kidsAge === age ? '0 4px 16px rgba(58,107,79,0.2)' : 'none',
+                  transition: 'background 0.2s',
+                }}>
+                  <span style={{ fontWeight: 700, fontSize: 12, color: 'var(--text-primary)' }}>{label}</span>
+                  <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>{desc}</span>
+                </button>
               ))}
             </div>
           )}
@@ -690,60 +757,85 @@ function StepInterests({ interests, toggleInterest, hasKids, kidsAge }: {
   interests: TripInterest[]; toggleInterest: (id: TripInterest) => void
   hasKids: boolean; kidsAge: KidsAge | null
 }) {
-  const adultOnly: TripInterest[] = ['Wine']
-  const toddlerHide: TripInterest[] = ['Adventure']
+  // Wine/Pubs hidden for families with young kids; Adventure hidden for toddlers
   const visible = INTERESTS.filter((i) => {
-    if (hasKids && kidsAge !== 'teen' && adultOnly.includes(i.id)) return false
-    if (hasKids && kidsAge === 'toddler' && toddlerHide.includes(i.id)) return false
+    if (hasKids && kidsAge !== 'teen' && (i.id === 'Wine' || i.id === 'Pubs')) return false
+    if (hasKids && kidsAge === 'toddler' && i.id === 'Adventure') return false
     return true
   })
 
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-      <div>
-        <h2 style={{ fontSize: 20, fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-0.5px', marginBottom: 4 }}>
-          What do you love?
-        </h2>
-        <p style={{ fontSize: 13, color: 'var(--text-muted)' }}>
-          Pick everything that sounds good. We'll find spots that match.
-        </p>
-      </div>
+  const isMobile = typeof window !== 'undefined' && window.innerWidth < 600
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(3, 1fr)' : 'repeat(4, 1fr)', gap: 9 }}>
         {visible.map((i) => {
           const selected = interests.includes(i.id)
           return (
-            <div
+            <button
               key={i.id}
               onClick={() => toggleInterest(i.id)}
               style={{
                 position: 'relative',
-                borderRadius: 14,
+                borderRadius: 16,
                 background: INTEREST_GRAD[i.id] ?? '#2d5440',
-                padding: '18px 8px 14px',
-                display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6,
-                cursor: 'pointer',
-                outline: selected ? '3px solid #fff' : 'none',
+                padding: '16px 8px 13px',
+                display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 7,
+                cursor: 'pointer', border: 'none',
                 boxShadow: selected
-                  ? `0 0 0 4px ${GREEN}, 0 4px 14px rgba(0,0,0,0.3)`
-                  : '0 2px 8px rgba(0,0,0,0.14)',
-                transform: selected ? 'scale(1.06)' : 'scale(1)',
-                transition: 'all 0.18s',
-                filter: selected ? 'none' : 'brightness(0.82) saturate(0.85)',
+                  ? `inset 0 0 0 2.5px rgba(255,255,255,0.9), 0 3px 12px rgba(0,0,0,0.22)`
+                  : '0 1px 4px rgba(0,0,0,0.18)',
+                opacity: interests.length > 0 && !selected ? 0.5 : 1,
+                transition: 'opacity 0.15s, box-shadow 0.15s',
+                WebkitTapHighlightColor: 'transparent',
               }}
             >
-              <span style={{ fontSize: 12, fontWeight: 700, textAlign: 'center', lineHeight: 1.3, color: '#fff', textShadow: '0 1px 4px rgba(0,0,0,0.5)' }}>{i.label}</span>
+              <span style={{ fontSize: 28, lineHeight: 1 }}>{i.emoji}</span>
+              <span style={{ fontSize: 11, fontWeight: 700, textAlign: 'center', lineHeight: 1.3, color: '#fff', textShadow: '0 1px 3px rgba(0,0,0,0.4)' }}>
+                {i.label}
+              </span>
               {selected && (
-                <div style={{ position: 'absolute', top: 6, right: 6, width: 18, height: 18, borderRadius: '50%', background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, color: GREEN, fontWeight: 900 }}>✓</div>
+                <div style={{
+                  position: 'absolute', top: 7, right: 7,
+                  width: 17, height: 17, borderRadius: '50%',
+                  background: 'rgba(255,255,255,0.95)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: 9, color: GREEN, fontWeight: 900,
+                }}>✓</div>
               )}
-            </div>
+            </button>
           )
         })}
       </div>
 
-      {interests.length > 0 && (
-        <div style={{ fontSize: 12, color: GREEN, fontWeight: 600 }}>
-          {interests.length} interest{interests.length > 1 ? 's' : ''} selected — we'll match destinations to these
+      {/* Selected summary */}
+      {interests.length > 0 ? (
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
+          {interests.map((id) => {
+            const meta = INTERESTS.find((x) => x.id === id)
+            return (
+              <button
+                key={id}
+                onClick={() => toggleInterest(id)}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 4,
+                  padding: '4px 10px 4px 7px', borderRadius: 20,
+                  background: GREEN, color: '#fff', border: 'none',
+                  fontSize: 12, fontWeight: 600, cursor: 'pointer',
+                  WebkitTapHighlightColor: 'transparent',
+                }}
+              >
+                <span style={{ fontSize: 14 }}>{meta?.emoji}</span>
+                {meta?.label.split(' ')[0]}
+                <span style={{ fontSize: 10, opacity: 0.75, marginLeft: 1 }}>×</span>
+              </button>
+            )
+          })}
+        </div>
+      ) : (
+        <div style={{ fontSize: 12, color: 'var(--text-muted)', textAlign: 'center', padding: '4px 0' }}>
+          Tap anything that sounds like your kind of trip
         </div>
       )}
     </div>
@@ -832,44 +924,61 @@ function DestCard({ match, idx, isPicked, onPick, isHovered, onHover }: {
   )
 }
 
-function StepPickDest({ suggestions, picked, onPick }: {
+function StepPickDest({ suggestions, picked, onPick, maxDriveHours }: {
   suggestions: MatchedDest[]
   picked: MatchedDest | null
   onPick: (d: MatchedDest) => void
+  maxDriveHours: number
 }) {
-  const [hoveredId, setHoveredId] = useState<string | null>(null)
   const [search, setSearch] = useState('')
   const [regionFilter, setRegionFilter] = useState<string | null>(null)
+  const [showAll, setShowAll] = useState(false)
+  const [imgErrors, setImgErrors] = useState<Set<string>>(new Set())
 
-  // All destinations across every cluster — used when searching or filtering by region
+  const isMobile = typeof window !== 'undefined' && window.innerWidth < 600
+
+  // Within-range destinations; out-of-range shown dimmed when browsing a region/search
+  const withinRangeIds = new Set(suggestions.map((s) => s.sub.id))
   const allDests: MatchedDest[] = VICTORIAN_CLUSTERS.flatMap((cluster) =>
     cluster.subDests.map((sub) => {
       const existing = suggestions.find((s) => s.sub.id === sub.id)
       return existing ?? { sub, cluster, score: 0, matchReasons: [] }
     })
   )
+  const matchedIds = withinRangeIds
 
-  // All regions (always show all of Victoria)
-  const regions = VICTORIAN_CLUSTERS.map((c) => ({ id: c.id, name: c.name }))
+  // Detect if search matches a region name (for region shortcut card)
+  const q = search.trim().toLowerCase()
+  const regionMatch = q.length > 1
+    ? VICTORIAN_CLUSTERS.find((c) =>
+        c.name.toLowerCase().includes(q) || c.tagline?.toLowerCase().includes(q)
+      )
+    : null
 
-  const isSearching = search.trim().length > 0 || regionFilter !== null
-
-  // When searching/filtering: draw from allDests — matched suggestions first, then the rest
-  const matchedIds = new Set(suggestions.map((s) => s.sub.id))
-  const filtered = (isSearching ? allDests : suggestions).filter((s) => {
+  const isFiltering = search.trim().length > 0 || regionFilter !== null
+  // Recommended = suggestions that have at least one direct interest theme match
+  // All = every destination within drive time, or all when searching/browsing regions
+  const basePool = (showAll || isFiltering) ? allDests : suggestions.filter(s => s.activityMatches > 0)
+  const filtered = basePool.filter((s) => {
+    if (!showAll && !isFiltering && !withinRangeIds.has(s.sub.id)) return false
     if (regionFilter && s.cluster.id !== regionFilter) return false
     if (search.trim()) {
-      const q = search.toLowerCase()
       return s.sub.name.toLowerCase().includes(q) || s.cluster.name.toLowerCase().includes(q)
     }
     return true
   })
-  // Matched results first when browsing all
-  const sortedFiltered = isSearching
-    ? [...filtered].sort((a, b) => (matchedIds.has(b.sub.id) ? 1 : 0) - (matchedIds.has(a.sub.id) ? 1 : 0))
+  // Recommended tiles sorted by score; All tiles: within-range first
+  const tiles = (showAll || isFiltering)
+    ? [...filtered].sort((a, b) => {
+        const aIn = withinRangeIds.has(a.sub.id) ? 1 : 0
+        const bIn = withinRangeIds.has(b.sub.id) ? 1 : 0
+        return bIn - aIn || (b.score ?? 0) - (a.score ?? 0)
+      })
     : filtered
 
-  const preview = picked ?? (hoveredId ? sortedFiltered.find((s) => s.sub.id === hoveredId) ?? null : sortedFiltered[0] ?? null)
+  function driveLabel(hrs: number) {
+    return hrs < 1 ? `${Math.round(hrs * 60)} min` : `${hrs.toFixed(hrs === Math.floor(hrs) ? 0 : 1)} hr`
+  }
 
   if (suggestions.length === 0) {
     return (
@@ -881,231 +990,201 @@ function StepPickDest({ suggestions, picked, onPick }: {
     )
   }
 
-  const nearbyStops = preview && picked && picked.sub.id === preview.sub.id
-    ? getNearbySubDests(picked.sub)
-    : []
-
-  const previewImgUrl = preview ? (preview.sub.imageUrl ?? preview.cluster.imageUrl) : null
-  const [imgError, setImgError] = useState<string | null>(null) // stores the URL that failed
-  const previewHrs = preview ? preview.sub.driveTimeHours : 0
-  const previewDriveLabel = previewHrs < 1
-    ? `${Math.round(previewHrs * 60)} min drive`
-    : `${previewHrs.toFixed(previewHrs === Math.floor(previewHrs) ? 0 : 1)} hrs drive`
-
-  const isMobile = typeof window !== 'undefined' && window.innerWidth < 600
+  const cols = isMobile ? 2 : 3
 
   return (
-    <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: 0, height: '100%', minHeight: isMobile ? 'auto' : 480 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
 
-      {/* LEFT: Scrollable list */}
-      <div style={{
-        width: isMobile ? '100%' : 240,
-        maxHeight: isMobile ? 320 : undefined,
-        flexShrink: 0,
-        display: 'flex',
-        flexDirection: 'column',
-        borderRight: isMobile ? 'none' : '1px solid var(--border)',
-        borderBottom: isMobile ? '1px solid var(--border)' : 'none',
-        overflow: 'hidden',
-        background: '#FAFAF9',
-      }}>
-        <div style={{ padding: '14px 14px 8px' }}>
-          <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-0.2px', marginBottom: 8 }}>
-            Here's where you should go
-          </div>
-          {/* Search input */}
-          <input
-            type="search"
-            placeholder="Search destinations…"
-            value={search}
-            onChange={(e) => { setSearch(e.target.value); setRegionFilter(null) }}
+      {/* Search + region chips header */}
+      <div style={{ flexShrink: 0, padding: '12px 14px 0', background: '#FAFAF9' }}>
+        <input
+          type="search"
+          placeholder="Search destinations or regions…"
+          value={search}
+          onChange={(e) => { setSearch(e.target.value); setRegionFilter(null) }}
+          style={{
+            width: '100%', boxSizing: 'border-box',
+            padding: '8px 12px', borderRadius: 10,
+            border: '1.5px solid var(--border)', background: '#fff',
+            fontSize: 13, color: 'var(--text-primary)', outline: 'none',
+            marginBottom: 10,
+          }}
+        />
+        {/* Recommended / All toggle + region chips */}
+        <div style={{ display: 'flex', gap: 6, overflowX: 'auto', paddingBottom: 10, scrollbarWidth: 'none' }}>
+          {/* Recommended pill */}
+          <button
+            onClick={() => { setShowAll(false); setRegionFilter(null); setSearch('') }}
             style={{
-              width: '100%', boxSizing: 'border-box',
-              padding: '7px 10px', borderRadius: 8,
-              border: '1.5px solid var(--border)', background: '#fff',
-              fontSize: 12, color: 'var(--text-primary)', outline: 'none',
+              padding: '5px 13px', borderRadius: 20, flexShrink: 0,
+              fontSize: 12, fontWeight: 700, cursor: 'pointer',
+              background: !showAll && !regionFilter && !search ? GREEN : '#fff',
+              color: !showAll && !regionFilter && !search ? '#fff' : '#6B7280',
+              border: `1.5px solid ${!showAll && !regionFilter && !search ? GREEN : 'var(--border)'}`,
             }}
-          />
-        </div>
-
-        {/* Region filter chips */}
-        {!search && regions.length > 1 && (
-          <div style={{ display: 'flex', gap: 5, padding: '0 10px 8px', overflowX: 'auto', flexShrink: 0 }}>
+          >✦ Recommended</button>
+          {/* All destinations pill */}
+          <button
+            onClick={() => { setShowAll(true); setRegionFilter(null); setSearch('') }}
+            style={{
+              padding: '5px 13px', borderRadius: 20, flexShrink: 0,
+              fontSize: 12, fontWeight: 600, cursor: 'pointer',
+              background: showAll && !regionFilter && !search ? '#1C1B1F' : '#fff',
+              color: showAll && !regionFilter && !search ? '#fff' : '#6B7280',
+              border: `1.5px solid ${showAll && !regionFilter && !search ? '#1C1B1F' : 'var(--border)'}`,
+            }}
+          >All</button>
+          {VICTORIAN_CLUSTERS.map((c) => (
             <button
-              onClick={() => setRegionFilter(null)}
+              key={c.id}
+              onClick={() => { setRegionFilter(c.id); setSearch('') }}
               style={{
-                padding: '3px 10px', borderRadius: 12, flexShrink: 0,
-                fontSize: 10, fontWeight: 600, cursor: 'pointer',
-                background: regionFilter === null ? '#1C1B1F' : '#fff',
-                color: regionFilter === null ? '#fff' : '#6B7280',
-                border: `1.5px solid ${regionFilter === null ? '#1C1B1F' : 'var(--border)'}`,
+                padding: '5px 13px', borderRadius: 20, flexShrink: 0,
+                fontSize: 12, fontWeight: 600, cursor: 'pointer',
+                background: regionFilter === c.id ? c.gradientTo : '#fff',
+                color: regionFilter === c.id ? '#fff' : '#6B7280',
+                border: `1.5px solid ${regionFilter === c.id ? c.gradientTo : 'var(--border)'}`,
               }}
-            >All</button>
-            {regions.map((r) => (
-              <button
-                key={r.id}
-                onClick={() => setRegionFilter(r.id)}
-                style={{
-                  padding: '3px 10px', borderRadius: 12, flexShrink: 0,
-                  fontSize: 10, fontWeight: 600, cursor: 'pointer',
-                  background: regionFilter === r.id ? '#1C1B1F' : '#fff',
-                  color: regionFilter === r.id ? '#fff' : '#6B7280',
-                  border: `1.5px solid ${regionFilter === r.id ? '#1C1B1F' : 'var(--border)'}`,
-                }}
-              >{r.name}</button>
-            ))}
-          </div>
-        )}
-
-        {/* "We recommend" banner — shown when no search/filter active and top pick has reasons */}
-        {!search && !regionFilter && suggestions[0]?.matchReasons.length > 0 && (
-          <div style={{
-            margin: '0 10px 8px', padding: '8px 10px', borderRadius: 8,
-            background: 'linear-gradient(135deg, #F0FDF4, #ECFDF5)',
-            border: '1px solid rgba(58,107,79,0.2)',
-          }}>
-            <div style={{ fontSize: 9.5, fontWeight: 800, color: '#3A6B4F', letterSpacing: '0.06em', marginBottom: 2 }}>
-              WE RECOMMEND
-            </div>
-            <div style={{ fontSize: 12, fontWeight: 700, color: '#1C1B1F' }}>{suggestions[0].sub.name}</div>
-            <div style={{ fontSize: 10.5, color: '#6B7280', marginTop: 1 }}>
-              {suggestions[0].matchReasons.join(' · ')}
-            </div>
-          </div>
-        )}
-
-        <div style={{ flex: 1, overflowY: 'auto', padding: '0 10px 14px', display: 'flex', flexDirection: 'column', gap: 7 }}>
-          {sortedFiltered.length === 0 ? (
-            <div style={{ padding: '20px 0', textAlign: 'center', fontSize: 12, color: 'var(--text-muted)' }}>
-              No destinations match "{search}"
-            </div>
-          ) : sortedFiltered.map((match, idx) => {
-            const isFirstUnmatched = isSearching && idx > 0
-              && !matchedIds.has(match.sub.id)
-              && matchedIds.has(sortedFiltered[idx - 1].sub.id)
-            return (
-              <div key={match.sub.id}>
-                {isFirstUnmatched && (
-                  <div style={{ fontSize: 9.5, fontWeight: 700, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.07em', margin: '8px 2px 4px' }}>
-                    Other destinations
-                  </div>
-                )}
-                <DestCard
-                  match={match}
-                  idx={matchedIds.has(match.sub.id) ? suggestions.findIndex((s) => s.sub.id === match.sub.id) : 999}
-                  isPicked={picked?.sub.id === match.sub.id}
-                  onPick={() => onPick(match)}
-                  isHovered={hoveredId === match.sub.id}
-                  onHover={(hov) => setHoveredId(hov ? match.sub.id : null)}
-                />
-              </div>
-            )
-          })}
+            >{c.name}</button>
+          ))}
         </div>
       </div>
 
-      {/* RIGHT: Preview panel — image top, info bottom */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, overflow: isMobile ? 'visible' : 'hidden' }}>
-        {preview ? (
-          <>
-            {/* Top: hero image */}
-            <div
-              key={preview.sub.id}
+      {/* Scrollable tile grid */}
+      <div style={{ flex: 1, overflowY: 'auto', padding: '4px 14px 16px' }}>
+
+        {/* Region shortcut card — shown when search matches a region name */}
+        {regionMatch && !regionFilter && (() => {
+          const primaryDest = regionMatch.subDests[0]
+          const primaryMatch = allDests.find((d) => d.sub.id === primaryDest.id)
+          if (!primaryMatch) return null
+          return (
+            <button
+              onClick={() => onPick(primaryMatch)}
               style={{
-                height: 190, flexShrink: 0, position: 'relative', overflow: 'hidden',
-                backgroundImage: (previewImgUrl && imgError !== previewImgUrl) ? `url(${previewImgUrl})` : undefined,
-                backgroundSize: 'cover', backgroundPosition: 'center',
-                background: (!previewImgUrl || imgError === previewImgUrl)
-                  ? `linear-gradient(145deg, ${preview.cluster.gradientFrom}, ${preview.cluster.gradientTo})`
-                  : undefined,
-                transition: 'background-image 0.25s',
+                width: '100%', boxSizing: 'border-box', marginBottom: 10,
+                borderRadius: 14, border: 'none', cursor: 'pointer',
+                background: `linear-gradient(135deg, ${regionMatch.gradientFrom}, ${regionMatch.gradientTo})`,
+                padding: '14px 16px', textAlign: 'left',
+                WebkitTapHighlightColor: 'transparent',
+                boxShadow: picked?.sub.id === primaryDest.id
+                  ? `0 0 0 2.5px ${GREEN}`
+                  : '0 2px 8px rgba(0,0,0,0.12)',
               }}
             >
-              {/* Hidden img to detect load failure */}
-              {previewImgUrl && imgError !== previewImgUrl && (
-                <img
-                  src={previewImgUrl}
-                  alt=""
-                  onError={() => setImgError(previewImgUrl)}
-                  style={{ position: 'absolute', width: 1, height: 1, opacity: 0, pointerEvents: 'none' }}
-                />
-              )}
-              {/* Drive + match badges */}
-              <div style={{ position: 'absolute', top: 10, left: 12, display: 'flex', gap: 5 }}>
-                <span style={{
-                  fontSize: 10, fontWeight: 700, color: '#fff',
-                  background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(6px)',
-                  padding: '3px 9px', borderRadius: 20,
-                }}>🗺 {previewDriveLabel}</span>
-                {preview.matchReasons.length > 0 && (
-                  <span style={{
-                    fontSize: 10, fontWeight: 700, color: '#fff',
-                    background: `${GREEN}cc`, backdropFilter: 'blur(6px)',
-                    padding: '3px 9px', borderRadius: 20,
-                  }}>✦ {preview.matchReasons[0]}</span>
-                )}
+              <div style={{ fontSize: 10, fontWeight: 800, color: 'rgba(255,255,255,0.75)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 3 }}>
+                {regionMatch.name} region
               </div>
-              {/* Bottom fade into info section */}
-              <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 48, background: 'linear-gradient(to top, #fff 0%, transparent 100%)' }} />
-            </div>
-
-            {/* Bottom: destination info */}
-            <div style={{ flex: 1, overflowY: 'auto', padding: '10px 16px 16px', background: '#fff' }}>
-              <div style={{ fontSize: 10, fontWeight: 700, color: '#9CA3AF', letterSpacing: '0.07em', textTransform: 'uppercase', marginBottom: 4 }}>
-                {preview.cluster.name}
+              <div style={{ fontSize: 16, fontWeight: 900, color: '#fff', letterSpacing: '-0.02em' }}>
+                {primaryDest.name}
               </div>
-              <div style={{ fontSize: 20, fontWeight: 900, color: '#1C1B1F', letterSpacing: '-0.03em', lineHeight: 1.15, marginBottom: 10, fontFamily: "'Fraunces', Georgia, serif" }}>
-                {preview.sub.name}
+              <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.8)', marginTop: 3 }}>
+                🗺 {driveLabel(primaryDest.driveTimeHours)} drive · tap to select
               </div>
-
-              {/* Highlights */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                {preview.sub.highlights.slice(0, 4).map((h) => (
-                  <div key={h} style={{ display: 'flex', gap: 8, alignItems: 'flex-start', fontSize: 11.5, color: '#374151', lineHeight: 1.45 }}>
-                    <span style={{ color: '#B87333', flexShrink: 0, marginTop: 1, fontSize: 10 }}>▸</span>{h}
-                  </div>
-                ))}
-              </div>
-
-              {/* Nearby stops — only after picking */}
-              {nearbyStops.length > 0 && (
-                <div style={{ marginTop: 12, padding: '10px 12px', background: '#F8F7F4', borderRadius: 10, border: '1px solid var(--border)' }}>
-                  <div style={{ fontSize: 9.5, fontWeight: 700, color: '#9CA3AF', letterSpacing: '0.07em', textTransform: 'uppercase', marginBottom: 7 }}>
-                    Nearby stops worth adding
-                  </div>
-                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                    {nearbyStops.map(({ sub, cluster }) => {
-                      const nHrs = sub.driveTimeHours
-                      const nLabel = nHrs < 1 ? `${Math.round(nHrs * 60)} min` : `${nHrs.toFixed(nHrs === Math.floor(nHrs) ? 0 : 1)} hrs`
-                      return (
-                        <div key={sub.id} style={{ padding: '5px 9px', borderRadius: 8, background: '#fff', border: '1px solid var(--border)' }}>
-                          <div style={{ fontSize: 11, fontWeight: 700, color: '#1C1B1F' }}>{sub.name}</div>
-                          <div style={{ fontSize: 9, color: '#9CA3AF', marginTop: 1 }}>{cluster.name} · {nLabel}</div>
-                        </div>
-                      )
-                    })}
-                  </div>
+              {picked?.sub.id === primaryDest.id && (
+                <div style={{ position: 'absolute', top: 10, right: 12, width: 22, height: 22, borderRadius: '50%', background: GREEN, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <span style={{ color: '#fff', fontSize: 12, fontWeight: 900 }}>✓</span>
                 </div>
               )}
+            </button>
+          )
+        })()}
 
-              {/* Status hint */}
-              {!picked && (
-                <div style={{ marginTop: 12, fontSize: 10.5, color: '#9CA3AF', fontStyle: 'italic' }}>
-                  Click a destination in the list to select it
-                </div>
-              )}
-              {picked && picked.sub.id === preview.sub.id && (
-                <div style={{ marginTop: 12, fontSize: 11, color: GREEN, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 5 }}>
-                  <span style={{ width: 16, height: 16, borderRadius: '50%', background: GREEN, color: '#fff', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 8 }}>✓</span>
-                  Selected — hit Continue to proceed
-                </div>
-              )}
-            </div>
-          </>
+        {/* Destination tile grid */}
+        {tiles.length === 0 ? (
+          <div style={{ padding: '30px 0', textAlign: 'center', fontSize: 13, color: 'var(--text-muted)' }}>
+            No destinations found for "{search}"
+          </div>
         ) : (
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--text-muted)', fontSize: 13, flexDirection: 'column', gap: 8 }}>
-            <span style={{ fontSize: 28 }}>🗺</span>
-            Hover a destination to preview
+          <div style={{ display: 'grid', gridTemplateColumns: `repeat(${cols}, 1fr)`, gap: 8 }}>
+            {tiles.map((match) => {
+              const imgUrl = match.sub.imageUrl ?? match.cluster.imageUrl
+              const hasImg = !!imgUrl && !imgErrors.has(imgUrl)
+              const isPicked = picked?.sub.id === match.sub.id
+              const isMatched = matchedIds.has(match.sub.id)
+              const inRange = withinRangeIds.has(match.sub.id)
+              const hrs = match.sub.driveTimeHours
+              return (
+                <button
+                  key={match.sub.id}
+                  onClick={() => onPick(match)}
+                  style={{
+                    borderRadius: 14, border: 'none', cursor: 'pointer',
+                    position: 'relative', overflow: 'hidden',
+                    aspectRatio: '4/3',
+                    background: hasImg
+                      ? `url(${imgUrl}) center/cover`
+                      : `linear-gradient(145deg, ${match.cluster.gradientFrom}, ${match.cluster.gradientTo})`,
+                    boxShadow: isPicked
+                      ? `0 0 0 2.5px ${GREEN}, 0 2px 8px rgba(0,0,0,0.15)`
+                      : '0 1px 4px rgba(0,0,0,0.12)',
+                    opacity: !inRange && isFiltering ? 0.45 : 1,
+                    WebkitTapHighlightColor: 'transparent',
+                    padding: 0,
+                  }}
+                >
+                  {hasImg && (
+                    <img src={imgUrl} alt="" onError={() => setImgErrors((prev) => new Set(prev).add(imgUrl))}
+                      style={{ position: 'absolute', width: 1, height: 1, opacity: 0, pointerEvents: 'none' }} />
+                  )}
+                  {/* Bottom gradient overlay */}
+                  <div style={{
+                    position: 'absolute', inset: 0,
+                    background: 'linear-gradient(to top, rgba(0,0,0,0.72) 0%, rgba(0,0,0,0.1) 55%, transparent 100%)',
+                  }} />
+                  {/* Out-of-range badge */}
+                  {!inRange && isFiltering && (
+                    <div style={{
+                      position: 'absolute', top: 7, left: 7,
+                      background: 'rgba(0,0,0,0.6)', color: '#fff',
+                      fontSize: 9, fontWeight: 700, padding: '2px 6px', borderRadius: 6,
+                    }}>Beyond {maxDriveHours} hr limit</div>
+                  )}
+                  {/* Match badge — top left (only when in range) */}
+                  {inRange && isMatched && match.matchReasons.length > 0 && (
+                    <div style={{
+                      position: 'absolute', top: 7, left: 7,
+                      background: GREEN, color: '#fff',
+                      fontSize: 9, fontWeight: 800, padding: '2px 6px', borderRadius: 6,
+                    }}>✦ {match.matchReasons[0]}</div>
+                  )}
+                  {/* Drive time + km badge — top right */}
+                  <div style={{
+                    position: 'absolute', top: 7, right: 7,
+                    background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(6px)',
+                    borderRadius: 7, padding: '3px 7px',
+                    display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 1,
+                  }}>
+                    <span style={{ fontSize: 10, fontWeight: 800, color: '#fff', lineHeight: 1 }}>
+                      🕐 {driveLabel(hrs)}
+                    </span>
+                    <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.75)', lineHeight: 1 }}>
+                      {match.sub.driveKm ? `${match.sub.driveKm} km` : ''}
+                    </span>
+                  </div>
+                  {/* Picked checkmark — overlays the drive badge */}
+                  {isPicked && (
+                    <div style={{
+                      position: 'absolute', top: 7, right: 7,
+                      width: 26, height: 26, borderRadius: '50%',
+                      background: GREEN, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      boxShadow: '0 1px 4px rgba(0,0,0,0.3)',
+                    }}>
+                      <span style={{ color: '#fff', fontSize: 13, fontWeight: 900 }}>✓</span>
+                    </div>
+                  )}
+                  {/* Name + region */}
+                  <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: '8px 9px 9px' }}>
+                    <div style={{ fontSize: isMobile ? 12 : 13, fontWeight: 800, color: '#fff', lineHeight: 1.2, letterSpacing: '-0.01em' }}>
+                      {match.sub.name}
+                    </div>
+                    <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.75)', marginTop: 2 }}>
+                      {match.cluster.name}
+                    </div>
+                  </div>
+                </button>
+              )
+            })}
           </div>
         )}
       </div>
@@ -1115,7 +1194,7 @@ function StepPickDest({ suggestions, picked, onPick }: {
 
 // ── Date day-strip with weather ───────────────────────────────────
 
-function weatherEmoji(description: string): string {
+function weatherEmojiWizard(description: string): string {
   if (description === 'Clear sky') return '☀️'
   if (description === 'Partly cloudy') return '⛅'
   if (description === 'Foggy') return '🌫️'
@@ -1136,12 +1215,12 @@ function DateDayStrip({
   destCoord?: Coordinate
 }) {
   const [page, setPage] = useState(0)
-  const [wx, setWx] = useState<{ emoji: string; max: number }[] | null>(null)
+  const [wx, setWx] = useState<{ emoji: string; max: number; min: number }[] | null>(null)
 
   useEffect(() => {
     if (!destCoord) return
     fetchWeatherForCoord(destCoord, 14)
-      .then((days) => setWx(days.map((d) => ({ emoji: weatherEmoji(d.description), max: Math.round(d.temp_max_c) }))))
+      .then((days) => setWx(days.map((d) => ({ emoji: weatherEmojiWizard(d.description), max: Math.round(d.temp_max_c), min: Math.round(d.temp_min_c) }))))
       .catch(() => {})
   }, [destCoord?.lat, destCoord?.lng])
 
@@ -1150,8 +1229,9 @@ function DateDayStrip({
   const todayIsTooLate = nowH >= LAST_SLOT_HOUR
   // Start from tomorrow if it's too late to leave today
   const startOffset = todayIsTooLate ? 1 : 0
-  const PAGE_SIZE = 5
-  const allDays = Array.from({ length: 10 }, (_, i) => {
+  const isMobileView = typeof window !== 'undefined' && window.innerWidth < 600
+  const PAGE_SIZE = isMobileView ? 3 : 5
+  const allDays = Array.from({ length: 14 }, (_, i) => {
     const d = new Date()
     d.setDate(d.getDate() + startOffset + i)
     return {
@@ -1171,28 +1251,48 @@ function DateDayStrip({
           onClick={() => setPage(0)} disabled={page === 0}
           style={{ width: 28, height: 28, borderRadius: 14, border: '1px solid var(--border)', background: '#fff', cursor: page === 0 ? 'default' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: page === 0 ? 'var(--border)' : GREEN, fontSize: 15, fontWeight: 700, flexShrink: 0 }}
         >‹</button>
-        <div style={{ flex: 1, display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 3 }}>
+        <div style={{ flex: 1, display: 'grid', gridTemplateColumns: `repeat(${PAGE_SIZE}, 1fr)`, gap: 3 }}>
           {visible.map((d, idx) => {
             const wIdx = page * PAGE_SIZE + idx
             const selected = d.iso === value
+            const mobile = isMobileView
             return (
               <button key={d.iso} onClick={() => onChange(d.iso)} style={{
-                display: 'flex', flexDirection: 'column', alignItems: 'center',
-                padding: '7px 2px', borderRadius: 10, cursor: 'pointer', gap: 1,
-                background: selected ? 'var(--green-light)' : 'var(--bg-muted)',
-                border: `1.5px solid ${selected ? GREEN : 'transparent'}`,
+                display: 'flex',
+                flexDirection: mobile ? 'column' : 'row',
+                alignItems: 'center',
+                justifyContent: mobile ? 'center' : 'space-between',
+                padding: mobile ? '8px 4px' : '10px 14px',
+                borderRadius: 12, cursor: 'pointer',
+                gap: mobile ? 1 : 0,
+                background: selected ? 'var(--green-light)' : '#fff',
+                border: `1.5px solid ${selected ? GREEN : 'rgba(0,0,0,0.08)'}`,
+                boxShadow: selected ? `0 0 0 2px ${GREEN}33` : '0 1px 3px rgba(0,0,0,0.06)',
+                transition: 'all 0.15s',
               }}>
-                <span style={{ fontSize: 8.5, fontWeight: 700, color: selected ? GREEN : '#9CA3AF', textTransform: 'uppercase' }}>{d.day}</span>
-                <span style={{ fontSize: 14, fontWeight: 800, color: selected ? GREEN : '#1C1B1F' }}>{d.num}</span>
-                <span style={{ fontSize: 8, color: '#9CA3AF' }}>{d.mon}</span>
-                {wx?.[wIdx] && <span style={{ fontSize: 11, lineHeight: 1.2 }}>{wx[wIdx].emoji}</span>}
-                {wx?.[wIdx] && <span style={{ fontSize: 8, color: selected ? GREEN : '#6B7280' }}>{wx[wIdx].max}°</span>}
+                {/* Date — left on desktop, top on mobile */}
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: mobile ? 'center' : 'flex-start', gap: 1 }}>
+                  <span style={{ fontSize: 10, fontWeight: 700, color: selected ? GREEN : '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.04em' }}>{d.day}</span>
+                  <span style={{ fontSize: mobile ? 18 : 22, fontWeight: 800, color: selected ? GREEN : '#1C1B1F', lineHeight: 1 }}>{d.num}</span>
+                  <span style={{ fontSize: 9, color: selected ? GREEN : '#9CA3AF', fontWeight: 600 }}>{d.mon}</span>
+                </div>
+                {/* Weather — right on desktop, bottom on mobile */}
+                {wx?.[wIdx] ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: mobile ? 'center' : 'flex-end', gap: 1, marginTop: mobile ? 2 : 0 }}>
+                    <span style={{ fontSize: mobile ? 18 : 20, lineHeight: 1 }}>{wx[wIdx].emoji}</span>
+                    <span style={{ fontSize: 10, fontWeight: 700, color: selected ? GREEN : '#374151', whiteSpace: 'nowrap' }}>
+                      {wx[wIdx].max}°<span style={{ opacity: 0.45, fontWeight: 500 }}>/{wx[wIdx].min}°</span>
+                    </span>
+                  </div>
+                ) : (
+                  <span style={{ fontSize: 9, color: '#D1D5DB' }}>–</span>
+                )}
               </button>
             )
           })}
         </div>
         <button
-          onClick={() => setPage((p) => Math.min(p + 1, 1))} disabled={page === 1}
+          onClick={() => setPage((p) => Math.min(p + 1, Math.ceil(allDays.length / PAGE_SIZE) - 1))} disabled={page >= Math.ceil(allDays.length / PAGE_SIZE) - 1}
           style={{ width: 28, height: 28, borderRadius: 14, border: '1px solid var(--border)', background: '#fff', cursor: page === 1 ? 'default' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: page === 1 ? 'var(--border)' : GREEN, fontSize: 15, fontWeight: 700, flexShrink: 0 }}
         >›</button>
       </div>
@@ -1272,7 +1372,7 @@ function StepPreferences({
               tripType={tripType}
               endDate={endDate}
               onEndDateChange={setEndDate}
-              destCoord={destCoord}
+              destCoord={preselectedDest.destCoord}
             />
           </div>
         </div>
@@ -1645,34 +1745,58 @@ function StepPlanningDetails({
       {/* Who */}
       <div>
         <Label>Who's coming?</Label>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 10 }}>
-          {(['solo', 'couple', 'family', 'group'] as const).map((type) => (
-            <div key={type}
-              className={`option-card ${crewType === type ? 'selected' : ''}`}
-              onClick={() => setCrewType(type)}
-              style={{ flexDirection: 'row', padding: '10px 12px', gap: 0 }}>
-              <span style={{ fontSize: 13, fontWeight: 600, textTransform: 'capitalize' }}>{type}</span>
-            </div>
+        <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+          {([['solo', 'Solo'], ['couple', 'Couple'], ['family', 'Family'], ['group', 'Group']] as const).map(([type, label]) => (
+            <button key={type} onClick={() => setCrewType(type)} style={{
+              flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
+              padding: '14px 4px', borderRadius: 16,
+              background: crewType === type ? '#B7EDCA' : '#ECF0EB',
+              border: 'none', cursor: 'pointer',
+              boxShadow: crewType === type ? '0 4px 20px rgba(58,107,79,0.25)' : 'none',
+              transition: 'background 0.2s',
+              fontWeight: 700, fontSize: 13, color: 'var(--text-primary)',
+            }}>
+              {label}
+            </button>
           ))}
         </div>
       </div>
 
       {showKids && (
-        <div style={{ padding: '12px 14px', borderRadius: 10, background: 'var(--bg-muted)', border: '1px solid var(--border)' }}>
-          <ToggleRow label="Any kids?" value={hasKids} onChange={setHasKids} />
-          {hasKids && (
-            <div style={{ marginTop: 12, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
-              {(['toddler', 'school', 'teen', 'mixed'] as KidsAge[]).map((age) => (
-                <div key={age} onClick={() => setKidsAge(age)} style={{
-                  padding: '8px 10px', borderRadius: 8, cursor: 'pointer',
-                  background: kidsAge === age ? 'var(--green-light)' : '#fff',
-                  border: `1.5px solid ${kidsAge === age ? 'var(--border-active)' : 'var(--border)'}`,
-                  fontSize: 12, fontWeight: 600,
-                  color: kidsAge === age ? GREEN : 'var(--text-primary)',
-                  textTransform: 'capitalize',
+        <div>
+          <Label>Any kids coming?</Label>
+          <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+            {([['yes', 'Yes, kids!'], ['no', 'Adults only']] as const).map(([val, label]) => {
+              const sel = val === 'yes' ? hasKids : !hasKids
+              return (
+                <button key={val} onClick={() => setHasKids(val === 'yes')} style={{
+                  flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  padding: '14px 4px', borderRadius: 16,
+                  background: sel ? '#B7EDCA' : '#ECF0EB',
+                  border: 'none', cursor: 'pointer',
+                  boxShadow: sel ? '0 4px 20px rgba(58,107,79,0.25)' : 'none',
+                  transition: 'background 0.2s',
+                  fontWeight: 700, fontSize: 13, color: 'var(--text-primary)',
                 }}>
-                  {age === 'toddler' ? '🍼 Toddlers' : age === 'school' ? '🎒 Primary' : age === 'teen' ? '🎧 Teens' : '👶🧒 Mixed'}
-                </div>
+                  {label}
+                </button>
+              )
+            })}
+          </div>
+          {hasKids && (
+            <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+              {([['toddler', 'Toddlers', 'Under 5'], ['school', 'Primary', '6–12'], ['teen', 'Teens', '13+'], ['mixed', 'Mixed', 'All ages']] as const).map(([age, label, desc]) => (
+                <button key={age} onClick={() => setKidsAge(age)} style={{
+                  flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center',
+                  gap: 3, padding: '12px 4px', borderRadius: 14,
+                  background: kidsAge === age ? '#B7EDCA' : '#ECF0EB',
+                  border: 'none', cursor: 'pointer',
+                  boxShadow: kidsAge === age ? '0 4px 16px rgba(58,107,79,0.2)' : 'none',
+                  transition: 'background 0.2s',
+                }}>
+                  <span style={{ fontWeight: 700, fontSize: 12, color: 'var(--text-primary)' }}>{label}</span>
+                  <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>{desc}</span>
+                </button>
               ))}
             </div>
           )}
@@ -1685,32 +1809,33 @@ function StepPlanningDetails({
 // ── Generating screen ─────────────────────────────────────────────
 
 function GeneratingScreen({ step, messages }: { step: number; messages: string[] }) {
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flex: 1, gap: 20, padding: '0 24px' }}>
+  const progress = ((step + 1) / messages.length) * 100
 
-      {/* Victorian landscape SVG animation */}
-      <div style={{ width: '100%', maxWidth: 380, borderRadius: 20, overflow: 'hidden', background: '#E8F3ED' }}>
+  return (
+    <div style={{
+      display: 'flex', flexDirection: 'column', alignItems: 'center',
+      justifyContent: 'center', flex: 1, padding: '24px 28px', gap: 0,
+      minHeight: 0,
+    }}>
+      {/* Victorian landscape SVG */}
+      <div style={{ width: '100%', maxWidth: 340, borderRadius: 24, overflow: 'hidden', marginBottom: 28 }}>
         <svg viewBox="0 0 380 160" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ display: 'block', width: '100%' }}>
           <defs>
             <style>{`
               @keyframes drive { from { transform: translateX(-90px) } to { transform: translateX(420px) } }
               @keyframes cloud1 { from { transform: translateX(0) } to { transform: translateX(-200px) } }
               @keyframes cloud2 { from { transform: translateX(60px) } to { transform: translateX(-200px) } }
-              @keyframes treeSway { 0%,100% { transform-origin: bottom center; transform: rotate(-1deg) } 50% { transform: rotate(1.5deg) } }
+              @keyframes treeSway { 0%,100% { transform: rotate(-1deg) } 50% { transform: rotate(1.5deg) } }
               @keyframes dustPuff { 0% { opacity: 0.6; transform: translateX(0) scale(1) } 100% { opacity: 0; transform: translateX(-18px) scale(2.5) } }
               .car { animation: drive 3.2s cubic-bezier(0.4,0,0.6,1) infinite }
               .cloud1 { animation: cloud1 18s linear infinite }
               .cloud2 { animation: cloud2 26s linear infinite }
-              .tree1 { animation: treeSway 2.8s ease-in-out infinite }
-              .tree2 { animation: treeSway 3.4s ease-in-out infinite 0.6s }
-              .dust { animation: dustPuff 0.6s ease-out infinite }
+              .tree1 { animation: treeSway 2.8s ease-in-out infinite; transform-origin: 310px 128px }
+              .tree2 { animation: treeSway 3.4s ease-in-out infinite 0.6s; transform-origin: 330px 128px }
+              .dust { animation: dustPuff 0.6s ease-out infinite; transform-origin: 8px 138px }
             `}</style>
           </defs>
-
-          {/* Sky */}
           <rect width="380" height="160" fill="#C8E6D8"/>
-
-          {/* Clouds */}
           <g className="cloud1">
             <ellipse cx="80" cy="38" rx="28" ry="12" fill="white" opacity="0.7"/>
             <ellipse cx="100" cy="32" rx="18" ry="11" fill="white" opacity="0.7"/>
@@ -1720,89 +1845,97 @@ function GeneratingScreen({ step, messages }: { step: number; messages: string[]
             <ellipse cx="280" cy="28" rx="22" ry="10" fill="white" opacity="0.5"/>
             <ellipse cx="296" cy="23" rx="14" ry="9" fill="white" opacity="0.5"/>
           </g>
-
-          {/* Far hills */}
           <path d="M0 100 Q60 60 120 80 Q180 55 240 75 Q300 50 380 70 L380 160 L0 160Z" fill="#4A8C65" opacity="0.5"/>
-
-          {/* Mid hills */}
           <path d="M0 115 Q50 85 110 100 Q170 78 230 95 Q290 70 380 90 L380 160 L0 160Z" fill="#3A6B4F" opacity="0.7"/>
-
-          {/* Ground */}
           <path d="M0 130 Q95 118 190 128 Q285 115 380 125 L380 160 L0 160Z" fill="#2D5440"/>
-
-          {/* Road */}
           <path d="M0 140 Q190 132 380 138 L380 145 Q190 137 0 145Z" fill="#1A3D2B" opacity="0.6"/>
-          {/* Road dashes */}
           <rect x="40" y="141" width="30" height="2" rx="1" fill="#B7EDCA" opacity="0.5"/>
           <rect x="120" y="140" width="30" height="2" rx="1" fill="#B7EDCA" opacity="0.5"/>
           <rect x="200" y="141" width="30" height="2" rx="1" fill="#B7EDCA" opacity="0.5"/>
           <rect x="280" y="140" width="30" height="2" rx="1" fill="#B7EDCA" opacity="0.5"/>
-
-          {/* Trees - background */}
-          <g className="tree1" style={{ transformOrigin: '310px 118px' }}>
+          <g className="tree1">
             <rect x="308" y="110" width="4" height="18" fill="#1A3D2B"/>
             <ellipse cx="310" cy="104" rx="10" ry="12" fill="#2D5440"/>
           </g>
-          <g className="tree2" style={{ transformOrigin: '330px 115px' }}>
+          <g className="tree2">
             <rect x="328" y="108" width="4" height="20" fill="#1A3D2B"/>
             <ellipse cx="330" cy="102" rx="8" ry="10" fill="#3A6B4F"/>
           </g>
-          <g style={{ transform: 'none' }}>
+          <g>
             <rect x="348" y="112" width="3" height="16" fill="#1A3D2B"/>
             <ellipse cx="349.5" cy="107" rx="7" ry="9" fill="#2D5440"/>
           </g>
-
-          {/* Car group — animates across */}
           <g className="car">
-            {/* Dust puff */}
-            <g className="dust" style={{ transformOrigin: '8px 138px' }}>
-              <ellipse cx="8" cy="138" rx="5" ry="3" fill="#B7EDCA" opacity="0.5"/>
-            </g>
-            {/* 4WD body */}
+            <g className="dust"><ellipse cx="8" cy="138" rx="5" ry="3" fill="#B7EDCA" opacity="0.5"/></g>
             <rect x="14" y="124" width="52" height="18" rx="5" fill="#B87333"/>
-            {/* Cabin */}
             <rect x="22" y="114" width="34" height="12" rx="4" fill="#92400E"/>
-            {/* Windows */}
             <rect x="25" y="116" width="13" height="8" rx="2" fill="#C8E6D8" opacity="0.8"/>
             <rect x="41" y="116" width="12" height="8" rx="2" fill="#C8E6D8" opacity="0.8"/>
-            {/* Roof rack */}
             <rect x="22" y="113" width="34" height="2" rx="1" fill="#6B3A1F"/>
             <rect x="26" y="111" width="4" height="3" rx="0.5" fill="#6B3A1F"/>
             <rect x="34" y="111" width="4" height="3" rx="0.5" fill="#6B3A1F"/>
             <rect x="42" y="111" width="4" height="3" rx="0.5" fill="#6B3A1F"/>
-            {/* Wheels */}
             <circle cx="26" cy="142" r="8" fill="#1A1A1A"/>
             <circle cx="26" cy="142" r="4" fill="#3A3A3A"/>
             <circle cx="54" cy="142" r="8" fill="#1A1A1A"/>
             <circle cx="54" cy="142" r="4" fill="#3A3A3A"/>
-            {/* Headlight */}
             <rect x="65" y="128" width="4" height="5" rx="1" fill="#FEF3C7" opacity="0.9"/>
           </g>
         </svg>
       </div>
 
-      {/* Brand wordmark */}
-      <div style={{ textAlign: 'center' }}>
-        <div style={{ fontFamily: "'Fraunces', Georgia, serif", fontSize: 18, fontWeight: 700, color: '#002112', letterSpacing: '-0.02em' }}>
+      {/* Current message */}
+      <div style={{ textAlign: 'center', marginBottom: 24 }}>
+        <div style={{ fontFamily: "'Fraunces', Georgia, serif", fontSize: 20, fontWeight: 700, color: '#002112', letterSpacing: '-0.02em', marginBottom: 6 }}>
           Unplanned <span style={{ color: GREEN }}>Escapes</span>
         </div>
-        <div style={{ fontSize: 13, color: '#3F4F42', marginTop: 4 }}>{messages[step]}</div>
+        <div style={{ fontSize: 14, color: '#3F4F42', fontWeight: 500 }}>{messages[step]}</div>
       </div>
 
-      {/* Progress steps */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 7, width: '100%', maxWidth: 260 }}>
+      {/* M3 wave linear progress indicator */}
+      <div style={{ width: '100%', maxWidth: 320, marginBottom: 24 }}>
+        <div style={{
+          width: '100%', height: 4, borderRadius: 2,
+          background: '#C8D8C4', overflow: 'hidden', position: 'relative',
+        }}>
+          <div style={{
+            position: 'absolute', top: 0, left: 0, height: '100%',
+            width: `${progress}%`,
+            background: GREEN,
+            borderRadius: 2,
+            transition: 'width 0.45s cubic-bezier(0.4, 0, 0.2, 1)',
+          }} />
+          {/* Wave shimmer on the leading edge */}
+          <div style={{
+            position: 'absolute', top: 0, left: `${progress}%`,
+            height: '100%', width: 40,
+            background: `linear-gradient(90deg, ${GREEN} 0%, transparent 100%)`,
+            opacity: 0.4,
+            animation: 'waveShimmer 1.2s ease-in-out infinite',
+            transform: 'translateX(-20px)',
+          }} />
+        </div>
+        <style>{`@keyframes waveShimmer { 0%,100% { opacity: 0.3 } 50% { opacity: 0.7 } }`}</style>
+      </div>
+
+      {/* Step list */}
+      <div style={{ width: '100%', maxWidth: 300, display: 'flex', flexDirection: 'column', gap: 10 }}>
         {messages.map((msg, i) => (
-          <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 12 }}>
-            <span style={{
-              width: 18, height: 18, borderRadius: '50%', flexShrink: 0,
+          <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <div style={{
+              width: 20, height: 20, borderRadius: '50%', flexShrink: 0,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: 10, fontWeight: 700, color: 'white',
-              background: i < step ? GREEN : i === step ? WARM : '#C8D8C4',
+              fontSize: 11, fontWeight: 700, color: 'white',
+              background: i < step ? GREEN : i === step ? WARM : '#DCE4DB',
               transition: 'background 0.3s',
             }}>
-              {i < step ? '✓' : ''}
-            </span>
-            <span style={{ color: i <= step ? '#002112' : '#6F7F71', fontWeight: i === step ? 600 : 400 }}>{msg}</span>
+              {i < step ? '✓' : i === step ? '' : ''}
+            </div>
+            <span style={{
+              fontSize: 13, fontWeight: i === step ? 600 : 400,
+              color: i < step ? GREEN : i === step ? '#002112' : '#9CA3AF',
+              transition: 'color 0.3s',
+            }}>{msg}</span>
           </div>
         ))}
       </div>

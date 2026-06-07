@@ -2,7 +2,7 @@
   "alias": ["unplanned-escapes.vercel.app"],
   "rewrites": [
     { "source": "/privacy",   "destination": "/privacy.html" },
-    { "source": "/changelog", "destination": "/api/changelog" },
+    { "source": "/changelog", "destination": "/index.html" },
     { "source": "/api/(.*)", "destination": "/api/$1" }
   ],
   "crons": [

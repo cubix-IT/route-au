@@ -66,7 +66,7 @@ User wizard → Zustand store (useAppStore) → usePlannerData hook
 - **DB `source` column** — always `'static'` (CHECK constraint)
 - **Activities `category`** — must be one of: `nature wildlife history art family active relaxation markets viewpoint beach wellness entertainment sports shopping food drink`
 - **Slug conventions:** OSM → `osm-<type>-<id>`, VHD heritage → `vhd-<id>`
-- **Maps URLs** — always coordinate format: `https://maps.google.com/?q=LAT,LNG`
+- **Maps URLs** — labeled format only: `https://maps.google.com/maps?q=LAT,LNG+(Name)` — raw coord URLs (`?q=LAT,LNG` without label or `/maps` path) are FORBIDDEN
 
 ## Enrichment (Geofabrik — replaces Overpass)
 

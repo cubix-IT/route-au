@@ -8,6 +8,7 @@ export interface SubDest {
   driveKm: number
   highlights: string[]    // 3–5 specific things it's known for
   themes: string[]
+  seasonalThemes?: Partial<Record<Season, string[]>>  // overrides themes for specific seasons
   coord: Coordinate
   imageUrl?: string       // optional override; falls back to cluster imageUrl
   nearbyIds?: string[]    // IDs of nearby sub-dests worth suggesting as add-ons
@@ -47,7 +48,7 @@ export const VICTORIAN_CLUSTERS: VicCluster[] = [
         driveTimeHours: 0.75,
         driveKm: 50,
         highlights: ['Gulf Station Historic Farm', 'Tarrawarra Museum of Art', 'Giant Steps & Innocent Bystander', 'Cellar doors lining Melba Hwy'],
-        themes: ['Wine', 'Art', 'History'],
+        themes: ['Dining', 'Winery', 'Brewery'],
         coord: { lng: 145.383, lat: -37.655 },
         nearbyIds: ['healesville', 'marysville'],
       },
@@ -57,7 +58,7 @@ export const VICTORIAN_CLUSTERS: VicCluster[] = [
         driveTimeHours: 1.0,
         driveKm: 65,
         highlights: ['Healesville Sanctuary — platypus, echidnas, Tasmanian devils', 'Coombe Estate winery lunch', 'Badger Weir rainforest walk', 'Cafes on Don Road'],
-        themes: ['Wildlife', 'Wine', 'Walking'],
+        themes: ['Nature', 'History', 'Winery'],
         coord: { lng: 145.520, lat: -37.654 },
         nearbyIds: ['yarra-glen', 'warburton'],
       },
@@ -67,7 +68,8 @@ export const VICTORIAN_CLUSTERS: VicCluster[] = [
         driveTimeHours: 1.3,
         driveKm: 90,
         highlights: ['Steavenson Falls — Victoria\'s highest accessible waterfall (lit at night)', 'Lake Mountain snow (Jul–Sep, closest alpine resort to Melbourne)', 'Bruno\'s Art & Sculpture Garden', 'Marysville Bakery and village walks'],
-        themes: ['Nature', 'Snow', 'Walking', 'Waterfalls'],
+        themes: ['Nature', 'Viewpoint', 'Hiking'],
+        seasonalThemes: { winter: ['Snow', 'Nature', 'Scenic'] },
         coord: { lng: 145.745, lat: -37.513 },
         nearbyIds: ['warburton', 'yarra-glen'],
       },
@@ -77,7 +79,7 @@ export const VICTORIAN_CLUSTERS: VicCluster[] = [
         driveTimeHours: 1.3,
         driveKm: 75,
         highlights: ['Cement Creek Redwood Forest — towering Californian redwoods, 10 min from town', 'O\'Shannassy Aqueduct Trail (cycling/walking)', 'Ada Tree — 300-yr-old mountain ash', 'Upper Yarra dam and Black\'s Spur scenic drive'],
-        themes: ['Hiking', 'Cycling', 'Nature', 'Forests'],
+        themes: ['History', 'Nature', 'Viewpoint'],
         coord: { lng: 145.685, lat: -37.753 },
         nearbyIds: ['marysville', 'healesville'],
       },
@@ -103,7 +105,7 @@ export const VICTORIAN_CLUSTERS: VicCluster[] = [
         driveTimeHours: 0.75,
         driveKm: 42,
         highlights: ['Puffing Billy steam train to Gembrook', 'Sherbrooke Forest walk (massive mountain ash)', 'Grants Picnic Ground — king parrots eat from your hand', 'Mist over the ranges at dawn'],
-        themes: ['Family', 'Walking', 'Wildlife'],
+        themes: ['History', 'Nature', 'Active'],
         coord: { lng: 145.355, lat: -37.902 },
         nearbyIds: ['sassafras-olinda', 'emerald'],
       },
@@ -123,7 +125,7 @@ export const VICTORIAN_CLUSTERS: VicCluster[] = [
         driveTimeHours: 1.0,
         driveKm: 55,
         highlights: ['Sky High restaurant — panoramic views over Melbourne at night', 'William Ricketts Sanctuary (forest sculptures)', 'George Tindale Memorial Garden', 'Doongalla Reserve walking tracks'],
-        themes: ['Views', 'Gardens', 'Walking'],
+        themes: ['Dining', 'Viewpoint', 'Nature'],
         coord: { lng: 145.359, lat: -37.832 },
         nearbyIds: ['sassafras-olinda', 'belgrave'],
       },
@@ -159,7 +161,7 @@ export const VICTORIAN_CLUSTERS: VicCluster[] = [
         driveTimeHours: 1.0,
         driveKm: 60,
         highlights: ['Mornington Main Street — cafes, galleries, and boutiques on a classic bayside strip', 'Mills Beach and pier — calm swimming, sunsets, and fish & chips nearby', 'Mornington Racecourse Market (Wednesdays & Saturdays)', 'Gateway to Red Hill wineries and Peninsula Hot Springs 20 min south'],
-        themes: ['Beach', 'Food', 'Relaxation', 'Markets', 'Gateway'],
+        themes: ['Dining', 'Cafes', 'Nature'],
         coord: { lng: 145.037, lat: -38.219 },
         nearbyIds: ['dromana', 'red-hill'],
       },
@@ -169,7 +171,7 @@ export const VICTORIAN_CLUSTERS: VicCluster[] = [
         driveTimeHours: 1.2,
         driveKm: 75,
         highlights: ['Peninsula Hot Springs — open-air geothermal pools with bay views', 'Arthurs Seat Eagle gondola and treetop adventure', 'Alba Thermal Springs — adults-only, quieter alternative to Peninsula', 'Dromana waterfront and McCrae Lighthouse walk'],
-        themes: ['Wellness', 'Hot springs', 'Views', 'Family'],
+        themes: ['Dining', 'Winery', 'Cafes'],
         coord: { lng: 144.954, lat: -38.416 },
         nearbyIds: ['red-hill', 'sorrento'],
       },
@@ -199,7 +201,7 @@ export const VICTORIAN_CLUSTERS: VicCluster[] = [
         driveTimeHours: 1.7,
         driveKm: 110,
         highlights: ['Cape Schanck Lighthouse — dramatic boardwalk over volcanic rock', 'Flinders Hotel (great pub, clifftop views)', 'Bass & Flinders Distillery', 'Wild ocean beaches with almost no crowds'],
-        themes: ['Scenic', 'Food', 'Coastal', 'Walking'],
+        themes: ['Dining', 'Pub', 'Winery'],
         coord: { lng: 145.296, lat: -38.473 },
         nearbyIds: ['red-hill', 'dromana'],
       },
@@ -235,7 +237,7 @@ export const VICTORIAN_CLUSTERS: VicCluster[] = [
         driveTimeHours: 1.5,
         driveKm: 110,
         highlights: ['Fort Queenscliff — 1880s coastal artillery, excellent tours', 'Ferry to Sorrento and Mornington Peninsula', 'Marine Discovery Centre (penguins, touch pool)', 'Queenscliff Hotel (National Trust listed)'],
-        themes: ['History', 'Coastal', 'Family'],
+        themes: ['History', 'Nature', 'Viewpoint'],
         coord: { lng: 144.661, lat: -38.268 },
         nearbyIds: ['ocean-grove', 'point-lonsdale'],
       },
@@ -255,7 +257,7 @@ export const VICTORIAN_CLUSTERS: VicCluster[] = [
         driveTimeHours: 1.0,
         driveKm: 80,
         highlights: ['Fresh mussels straight from the pier', 'Portarlington Mill (restored 1857 windmill)', 'Portarlington Mussel Festival (summer)', 'Geelong Wine Region cellar doors nearby'],
-        themes: ['Food', 'History', 'Coastal'],
+        themes: ['Nature', 'Dining', 'Winery'],
         coord: { lng: 144.648, lat: -38.114 },
         nearbyIds: ['queenscliff', 'ocean-grove'],
       },
@@ -281,7 +283,7 @@ export const VICTORIAN_CLUSTERS: VicCluster[] = [
         driveTimeHours: 0.9,
         driveKm: 75,
         highlights: ['Piper Street — one of Victoria\'s best food streets', 'Campaspe River walk and stone bridges', 'Kyneton Botanical Gardens', 'Local art galleries and antique shops'],
-        themes: ['Food', 'History', 'Walking'],
+        themes: ['History', 'Nature', 'Viewpoint'],
         coord: { lng: 144.452, lat: -37.244 },
         nearbyIds: ['macedon', 'daylesford-town'],
       },
@@ -291,7 +293,7 @@ export const VICTORIAN_CLUSTERS: VicCluster[] = [
         driveTimeHours: 1.0,
         driveKm: 65,
         highlights: ['Hanging Rock Reserve', 'Macedon Ranges wineries', 'Woodend High Street bakeries and cafes', 'Mount Macedon gardens (stunning in April)'],
-        themes: ['History', 'Wine', 'Walking'],
+        themes: ['History', 'Cafes', 'Dining'],
         coord: { lng: 144.568, lat: -37.424 },
         nearbyIds: ['kyneton', 'trentham'],
       },
@@ -311,7 +313,7 @@ export const VICTORIAN_CLUSTERS: VicCluster[] = [
         driveTimeHours: 1.5,
         driveKm: 110,
         highlights: ['Hepburn Bathhouse & Spa — Victorian-era mineral baths', 'Lake Daylesford walk', 'Free mineral springs — drink straight from roadside pumps', 'Convent Gallery and Wombat Hill Botanic Gardens'],
-        themes: ['Wellness', 'Art', 'Spa', 'Food'],
+        themes: ['Nature', 'History', 'Dining'],
         coord: { lng: 144.143, lat: -37.344 },
         nearbyIds: ['trentham', 'macedon'],
       },
@@ -324,7 +326,7 @@ export const VICTORIAN_CLUSTERS: VicCluster[] = [
     name: 'Phillip Island',
     tagline: "The penguin parade at sunset. Surf beaches by day. One of Victoria's greats.",
     driveTimeRange: '1.5 – 2 hrs',
-    themes: ['Wildlife', 'Beach', 'Surfing', 'Family'],
+    themes: ['Nature', 'Viewpoint', 'History'],
     seasonalScores: { summer: 9, autumn: 7, winter: 6, spring: 8 },
     image: '🐧',
     imageUrl: 'https://images.unsplash.com/photo-1559827260-dc66d52bef19?w=1200&q=80',
@@ -337,7 +339,7 @@ export const VICTORIAN_CLUSTERS: VicCluster[] = [
         driveTimeHours: 1.8,
         driveKm: 140,
         highlights: ['Thompson Avenue cafes and restaurants', 'Cowes Beach (calm, family-friendly)', 'Koala Conservation Reserve', 'Ferry to Stony Point (Mornington Peninsula)'],
-        themes: ['Beach', 'Food', 'Family'],
+        themes: ['Nature', 'Active', 'Viewpoint'],
         coord: { lng: 145.238, lat: -38.455 },
         nearbyIds: ['penguin-parade', 'rhyll'],
       },
@@ -347,7 +349,7 @@ export const VICTORIAN_CLUSTERS: VicCluster[] = [
         driveTimeHours: 2.0,
         driveKm: 145,
         highlights: ['Little penguin parade — nightly at dusk, year-round', 'Nobbies Centre and fur seal colony viewing', 'Boardwalk over rugged coastal landscape', 'Sunset at Cape Woolamai surf beach'],
-        themes: ['Wildlife', 'Coastal', 'Iconic'],
+        themes: ['Nature', 'Active', 'History'],
         coord: { lng: 144.998, lat: -38.515 },
         nearbyIds: ['cowes', 'rhyll'],
       },
@@ -403,7 +405,7 @@ export const VICTORIAN_CLUSTERS: VicCluster[] = [
         driveTimeHours: 1.5,
         driveKm: 115,
         highlights: ['Split Point Lighthouse — iconic white tower on the cliff (used in Round the Twist)', 'Fairhaven surf beach and rock shelves', 'Moggs Creek Picnic Ground', 'Local galleries and studios on the Artists Walk'],
-        themes: ['Coastal', 'Scenic', 'Walking', 'Art'],
+        themes: ['Dining', 'Cafes', 'Pub'],
         coord: { lng: 144.094, lat: -38.461 },
         nearbyIds: ['anglesea', 'lorne'],
       },
@@ -423,7 +425,7 @@ export const VICTORIAN_CLUSTERS: VicCluster[] = [
         driveTimeHours: 1.8,
         driveKm: 145,
         highlights: ['Wild koalas in the eucalypts on Grey River Road — dozens visible', 'Wye River Beach (small, beautiful)', 'Café Koala caravan park', 'One of the best free wildlife encounters on the GOR'],
-        themes: ['Wildlife', 'Camping', 'Coastal'],
+        themes: ['Nature', 'Viewpoint', 'History'],
         coord: { lng: 143.870, lat: -38.618 },
         nearbyIds: ['lorne', 'apollo-bay'],
       },
@@ -433,7 +435,7 @@ export const VICTORIAN_CLUSTERS: VicCluster[] = [
         driveTimeHours: 2.3,
         driveKm: 190,
         highlights: ['Saturday foreshore market', 'Mariners Lookout walk (45 min)', 'Wild Dog Road detour into Otways rainforest', 'Fresh crayfish at the harbour'],
-        themes: ['Food', 'Rainforest', 'Coastal'],
+        themes: ['Dining', 'Cafes', 'Distillery'],
         coord: { lng: 143.672, lat: -38.759 },
         nearbyIds: ['great-otway', 'kennett-river'],
       },
@@ -443,7 +445,7 @@ export const VICTORIAN_CLUSTERS: VicCluster[] = [
         driveTimeHours: 2.5,
         driveKm: 210,
         highlights: ['Triplet Falls — ancient temperate rainforest walk', 'Cape Otway Lighthouse (oldest on mainland Australia, 1848)', 'Wild koalas in the roadside gums near the lighthouse', 'Aire River camping ground'],
-        themes: ['Rainforest', 'Wildlife', 'Lighthouse', 'Hiking'],
+        themes: ['Nature', 'Viewpoint', 'Wildlife'],
         coord: { lng: 143.550, lat: -38.868 },
         nearbyIds: ['apollo-bay', 'twelve-apostles'],
       },
@@ -453,7 +455,7 @@ export const VICTORIAN_CLUSTERS: VicCluster[] = [
         driveTimeHours: 3.5,
         driveKm: 275,
         highlights: ['Twelve Apostles at sunrise or golden hour', 'Loch Ard Gorge — shipwreck history and hidden beach', 'The Arch and London Bridge rock stacks', 'Port Campbell township for overnight stays'],
-        themes: ['Iconic', 'Coastal', 'Photography'],
+        themes: ['Viewpoint', 'Dining', 'Nature'],
         coord: { lng: 142.996, lat: -38.663 },
         nearbyIds: ['warrnambool', 'great-otway'],
       },
@@ -463,7 +465,7 @@ export const VICTORIAN_CLUSTERS: VicCluster[] = [
         driveTimeHours: 3.3,
         driveKm: 265,
         highlights: ['Southern right whales at Logans Beach (Jun–Sep, platform viewing)', 'Flagstaff Hill Maritime Village — live shipwreck theatre', 'Lake Pertobe Adventure Playground', 'Tower Hill Wildlife Reserve — emus, koalas, kangaroos'],
-        themes: ['Wildlife', 'History', 'Coastal', 'Family'],
+        themes: ['History', 'Viewpoint', 'Dining'],
         coord: { lng: 142.484, lat: -38.381 },
         nearbyIds: ['port-fairy-town', 'twelve-apostles'],
       },
@@ -489,7 +491,7 @@ export const VICTORIAN_CLUSTERS: VicCluster[] = [
         driveTimeHours: 3.5,
         driveKm: 290,
         highlights: ['One of Australia\'s best-preserved 19th-century port towns', 'Griffiths Island — mutton birds (Sep–Apr) and lighthouse walk', 'Port Fairy Folk Festival (March, world-class)', 'Caledonian Hotel — one of the oldest licensed pubs in Australia'],
-        themes: ['History', 'Wildlife', 'Heritage', 'Food'],
+        themes: ['Dining', 'Cafes'],
         coord: { lng: 142.232, lat: -38.383 },
         nearbyIds: ['portland', 'cape-bridgewater'],
       },
@@ -499,7 +501,7 @@ export const VICTORIAN_CLUSTERS: VicCluster[] = [
         driveTimeHours: 4.0,
         driveKm: 360,
         highlights: ['Cape Nelson Lighthouse and cliff walk', 'Discovery Bay Coastal Park — remote surf beaches', 'Portland Cable Trams (heritage)', 'Great South West Walk (250 km loop, start/end here)'],
-        themes: ['History', 'Coastal', 'Walking'],
+        themes: ['Dining', 'Cafes'],
         coord: { lng: 141.604, lat: -38.344 },
         nearbyIds: ['cape-bridgewater', 'port-fairy-town'],
       },
@@ -509,7 +511,7 @@ export const VICTORIAN_CLUSTERS: VicCluster[] = [
         driveTimeHours: 4.2,
         driveKm: 380,
         highlights: ['Australia\'s largest accessible fur seal colony (250+ seals year-round)', 'Blowholes walk over dramatic volcanic coastline', 'Petrified forest — unique geological feature', 'Swan Lake (seasonal) behind the dunes'],
-        themes: ['Wildlife', 'Coastal', 'Walking', 'Scenic'],
+        themes: ['Viewpoint', 'Nature', 'History'],
         coord: { lng: 141.394, lat: -38.384 },
         nearbyIds: ['portland', 'port-fairy-town'],
       },
@@ -555,7 +557,7 @@ export const VICTORIAN_CLUSTERS: VicCluster[] = [
         driveTimeHours: 2.3,
         driveKm: 180,
         highlights: ['Fish Creek Hotel (excellent pub food, arts community)', 'Rolling green South Gippsland hills', 'Foster — gateway town for the Prom, good bakeries', 'Agnes Falls (Victoria\'s highest single-drop waterfall)'],
-        themes: ['Food', 'Scenic', 'Gateway', 'Nature'],
+        themes: ['Brewery', 'Cafes'],
         coord: { lng: 146.086, lat: -38.687 },
         nearbyIds: ['wilsons-prom', 'wonthaggi'],
       },
@@ -591,7 +593,7 @@ export const VICTORIAN_CLUSTERS: VicCluster[] = [
         driveTimeHours: 3.0,
         driveKm: 235,
         highlights: ['Kangaroos on the oval at dawn — walk among them', 'Brambuk Cultural Centre — ancient rock art and Bunjil\'s Shelter', 'Silverband Falls walk (easy, 30 min)', 'Base camp for all major Grampians hikes'],
-        themes: ['Wildlife', 'Hiking', 'Culture', 'Base camp'],
+        themes: ['Dining', 'Winery', 'Nature'],
         coord: { lng: 142.518, lat: -37.138 },
         nearbyIds: ['boroka-pinnacle', 'dunkeld'],
       },
@@ -611,7 +613,7 @@ export const VICTORIAN_CLUSTERS: VicCluster[] = [
         driveTimeHours: 3.5,
         driveKm: 260,
         highlights: ['Royal Mail Hotel — one of the finest regional restaurants in Australia', 'Mount Sturgeon and Mount Abrupt hikes', 'Southern Grampians visitor centre', 'Kangaroos and emus at the foothills'],
-        themes: ['Dining', 'Hiking', 'Wildlife'],
+        themes: ['History', 'Viewpoint', 'Nature'],
         coord: { lng: 142.362, lat: -37.653 },
         nearbyIds: ['halls-gap', 'boroka-pinnacle'],
       },
@@ -647,7 +649,7 @@ export const VICTORIAN_CLUSTERS: VicCluster[] = [
         driveTimeHours: 3.3,
         driveKm: 300,
         highlights: ['Horsham Regional Art Gallery (genuinely impressive)', 'Wimmera River parklands and wetlands', 'Green Lake and Spring Lake — migratory birds (winter)', 'Gateway to Grampians and Little Desert NP'],
-        themes: ['Art', 'Nature', 'Gateway'],
+        themes: ['Nature', 'History', 'Active'],
         coord: { lng: 142.199, lat: -36.710 },
         nearbyIds: ['natimuk-mt-arapiles', 'little-desert-national-park'],
       },
@@ -703,7 +705,7 @@ export const VICTORIAN_CLUSTERS: VicCluster[] = [
         driveTimeHours: 3.8,
         driveKm: 340,
         highlights: ['Pink Lake near Dimboola — flamingo-pink from halobacteria', 'Hopetoun Bakery (famous country pies)', 'Wyperfeld NP wildflowers in spring', 'Malleefowl spotting at dusk'],
-        themes: ['Nature', 'Photography', 'Wildlife', 'Food'],
+        themes: ['Nature', 'Wildlife', 'Family'],
         coord: { lng: 142.373, lat: -35.723 },
         nearbyIds: ['sea-lake', 'wyperfeld-national-park'],
       },
@@ -713,7 +715,7 @@ export const VICTORIAN_CLUSTERS: VicCluster[] = [
         driveTimeHours: 4.0,
         driveKm: 370,
         highlights: ['Vast mallee eucalypt woodland with virtually no other visitors', 'Spring wildflowers (Sep–Oct) carpeting the red sand', 'Emus, parrots and echidnas around the campground', 'Mallee spinifex and sandridges — feels like the outback'],
-        themes: ['Wildlife', 'Wildflowers', 'Camping', 'Remote'],
+        themes: ['Nature', 'Wildlife', 'Hiking'],
         coord: { lng: 141.907, lat: -35.515 },
         nearbyIds: ['hopetoun-pink-lake', 'sea-lake'],
       },
@@ -769,7 +771,7 @@ export const VICTORIAN_CLUSTERS: VicCluster[] = [
         driveTimeHours: 3.0,
         driveKm: 270,
         highlights: ['Beechworth Honey (museum + tasting)', 'Historic granite precinct — gold-rush era unchanged', 'Bridge Road Brewers craft beer', 'Ned Kelly was tried here — courthouse still standing'],
-        themes: ['History', 'Food', 'Craft beer'],
+        themes: ['Pub', 'Brewery', 'Winery'],
         coord: { lng: 146.688, lat: -36.357 },
         nearbyIds: ['yackandandah', 'chiltern'],
       },
@@ -779,7 +781,8 @@ export const VICTORIAN_CLUSTERS: VicCluster[] = [
         driveTimeHours: 3.5,
         driveKm: 320,
         highlights: ['Ovens River walk — peak autumn colour in May', 'Buffalo River swimming holes — crystal-clear mountain water', 'Canyon Brewery and Eatery', 'Ovens Valley Rail Trail (cycling, flat and beautiful)'],
-        themes: ['Autumn colours', 'Cycling', 'Swimming', 'Food'],
+        themes: ['Scenic', 'Hiking', 'Active'],
+        seasonalThemes: { winter: ['Skiing', 'Snow', 'Scenic'] },
         coord: { lng: 146.957, lat: -36.727 },
         nearbyIds: ['harrietville', 'mount-buffalo-national-park'],
       },
@@ -789,7 +792,8 @@ export const VICTORIAN_CLUSTERS: VicCluster[] = [
         driveTimeHours: 4.0,
         driveKm: 370,
         highlights: ['Victoria\'s highest ski resort — steep terrain, serious skiing', 'Dinner Plain village (architecturally remarkable, 9 km away)', 'Alpine walking tracks in summer', 'Hotham–Falls Creek ski-through (longest in Australia)'],
-        themes: ['Skiing', 'Snow', 'Hiking', 'Village'],
+        themes: ['Hiking', 'Nature', 'Scenic'],
+        seasonalThemes: { winter: ['Skiing', 'Snow', 'Active'] },
         coord: { lng: 147.200, lat: -36.990 },
         nearbyIds: ['harrietville', 'falls-creek'],
       },
@@ -799,7 +803,8 @@ export const VICTORIAN_CLUSTERS: VicCluster[] = [
         driveTimeHours: 4.5,
         driveKm: 380,
         highlights: ['Ski-in ski-out village (Jun–Sep)', 'Snowshoe and cross-country trails in winter', 'Falls Creek walking tracks in summer', 'Village square — good food year-round'],
-        themes: ['Skiing', 'Snow', 'Village'],
+        themes: ['Hiking', 'Nature', 'Scenic'],
+        seasonalThemes: { winter: ['Skiing', 'Snow', 'Active'] },
         coord: { lng: 147.274, lat: -36.863 },
         nearbyIds: ['mount-hotham', 'bright-town'],
       },
@@ -825,7 +830,7 @@ export const VICTORIAN_CLUSTERS: VicCluster[] = [
         driveTimeHours: 2.8,
         driveKm: 240,
         highlights: ['Dal Zotto — Australia\'s original prosecco producer', 'Milawa Cheese Factory — handmade brie and King River gold', 'Brown Brothers winery (Epicurean Centre lunch)', 'Glenrowan — Ned Kelly\'s last stand, 10 min south'],
-        themes: ['Food', 'Wine', 'History', 'Cycling'],
+        themes: ['Dining', 'Winery'],
         coord: { lng: 146.447, lat: -36.448 },
         nearbyIds: ['beechworth', 'bright-town'],
       },
@@ -835,7 +840,7 @@ export const VICTORIAN_CLUSTERS: VicCluster[] = [
         driveTimeHours: 3.2,
         driveKm: 295,
         highlights: ['One of Victoria\'s most intact 1850s gold-rush towns', 'Yackandandah Provenance Wines', 'The Butter Factory arts and culture hub', 'Yackandandah Creek swimming hole'],
-        themes: ['History', 'Wine', 'Art', 'Walking'],
+        themes: ['History', 'Active'],
         coord: { lng: 146.839, lat: -36.313 },
         nearbyIds: ['beechworth', 'chiltern'],
       },
@@ -845,7 +850,7 @@ export const VICTORIAN_CLUSTERS: VicCluster[] = [
         driveTimeHours: 2.8,
         driveKm: 255,
         highlights: ['Chiltern-Mt Pilot NP — box-ironbark woodland, almost no visitors', 'Lake View homestead (Henry Handel Richardson\'s childhood home)', 'Federation-era main street virtually unchanged since 1890s', 'Superb parrots and regent honeyeaters in the woodland'],
-        themes: ['History', 'Wildlife', 'Walking', 'Heritage'],
+        themes: ['Winery', 'History', 'Pub'],
         coord: { lng: 146.606, lat: -36.155 },
         nearbyIds: ['beechworth', 'rutherglen'],
       },
@@ -881,7 +886,8 @@ export const VICTORIAN_CLUSTERS: VicCluster[] = [
         driveTimeHours: 4.0,
         driveKm: 340,
         highlights: ['The Horn (1723 m) — summit views over four states', 'Lake Catani — camping among granite boulders', 'Crystal Brook and Eurobin Falls walks (wildflower-lined)', 'Mount Buffalo Chalet — 1910 heritage accommodation still operating'],
-        themes: ['Hiking', 'Camping', 'Snow', 'Scenic'],
+        themes: ['Hiking', 'Nature', 'Family'],
+        seasonalThemes: { winter: ['Skiing', 'Snow', 'Hiking'] },
         coord: { lng: 146.817, lat: -36.721 },
         nearbyIds: ['harrietville', 'bright-town'],
       },
@@ -907,7 +913,7 @@ export const VICTORIAN_CLUSTERS: VicCluster[] = [
         driveTimeHours: 2.5,
         driveKm: 200,
         highlights: ['Man from Snowy River history — horse country, heritage rides', 'Mansfield Visitor Centre and Main Street cafes', 'Mansfield Brewery and local restaurants', 'Gateway to Mount Buller and the High Country'],
-        themes: ['History', 'Food', 'Gateway'],
+        themes: ['Nature', 'Dining', 'Brewery'],
         coord: { lng: 146.088, lat: -37.054 },
         nearbyIds: ['mount-buller', 'lake-eildon'],
       },
@@ -917,7 +923,8 @@ export const VICTORIAN_CLUSTERS: VicCluster[] = [
         driveTimeHours: 3.0,
         driveKm: 240,
         highlights: ['Victoria\'s most visited ski resort (Jun–Sep)', 'Mountain biking and hiking trails (Oct–May)', 'Village atmosphere with year-round accommodation', 'Summit views from 1805 m in any season'],
-        themes: ['Skiing', 'Snow', 'Hiking', 'Village'],
+        themes: ['Hiking', 'Nature', 'Active'],
+        seasonalThemes: { winter: ['Skiing', 'Snow', 'Active'] },
         coord: { lng: 146.440, lat: -37.153 },
         nearbyIds: ['mansfield-town', 'lake-eildon'],
       },
@@ -953,7 +960,7 @@ export const VICTORIAN_CLUSTERS: VicCluster[] = [
         driveTimeHours: 2.5,
         driveKm: 210,
         highlights: ['Port of Echuca — best-preserved Victorian-era river port in Australia', 'Paddle steamer trips on the Murray', 'Historic High Street and Star Hotel (one of Victoria\'s oldest)', 'Murray Esplanade restaurants'],
-        themes: ['History', 'River', 'Food', 'Family'],
+        themes: ['History', 'Nature', 'Dining'],
         coord: { lng: 144.753, lat: -36.139 },
         nearbyIds: ['yarrawonga', 'cobram'],
       },
@@ -963,7 +970,7 @@ export const VICTORIAN_CLUSTERS: VicCluster[] = [
         driveTimeHours: 3.0,
         driveKm: 290,
         highlights: ['Lake Mulwala — water skiing, jetskis, houseboats', 'Yarrawonga Mulwala Golf Club (36 holes, two states)', 'Boat hire on the Murray', 'Holiday-town energy without the crowds of Echuca'],
-        themes: ['Water sports', 'Golf', 'Relaxation'],
+        themes: ['History', 'Nature', 'Dining'],
         coord: { lng: 146.002, lat: -36.021 },
         nearbyIds: ['echuca', 'rutherglen'],
       },
@@ -973,7 +980,7 @@ export const VICTORIAN_CLUSTERS: VicCluster[] = [
         driveTimeHours: 3.0,
         driveKm: 285,
         highlights: ['Murray River beaches — white sand, calm swimming', 'Peach and nectarine picking in season (Jan–Feb)', 'Thompsons Beach on the Murray (free, beautiful)', 'Cobram peach festival'],
-        themes: ['Nature', 'Food', 'Swimming', 'Family'],
+        themes: ['Nature', 'Active', 'Entertainment'],
         coord: { lng: 145.649, lat: -35.924 },
         nearbyIds: ['echuca', 'yarrawonga'],
       },
@@ -999,7 +1006,7 @@ export const VICTORIAN_CLUSTERS: VicCluster[] = [
         driveTimeHours: 3.5,
         driveKm: 335,
         highlights: ['Swan Hill Pioneer Settlement — living history museum with paddle steamer trips', 'Murray River beaches (free, beautiful)', 'Tyntynder Homestead (1846, gardens)', 'Murray River sunset from the pedestrian bridge'],
-        themes: ['History', 'River', 'Family', 'Relaxation'],
+        themes: ['Nature', 'History', 'Dining'],
         coord: { lng: 143.554, lat: -35.338 },
         nearbyIds: ['robinvale', 'mildura'],
       },
@@ -1009,7 +1016,7 @@ export const VICTORIAN_CLUSTERS: VicCluster[] = [
         driveTimeHours: 4.5,
         driveKm: 430,
         highlights: ['Robinvale Wines — organic wines on the Murray', 'Murray River beaches at Euston (uncrowded)', 'Fresh table grapes and olive oil in season', 'NSW border crossing walk on the river'],
-        themes: ['Wine', 'River', 'Food'],
+        themes: ['Nature', 'History', 'Active'],
         coord: { lng: 142.771, lat: -34.581 },
         nearbyIds: ['swan-hill', 'mildura'],
       },
@@ -1019,7 +1026,7 @@ export const VICTORIAN_CLUSTERS: VicCluster[] = [
         driveTimeHours: 5.5,
         driveKm: 555,
         highlights: ['Stefano\'s Restaurant — Italian fine dining in an unlikely setting', 'Murray River cruises and houseboat hire', 'Golden hour at the Mildura weir', 'Red Cliffs Psyche Bend pumping station (engineering marvel)'],
-        themes: ['Food', 'River', 'History', 'Relaxation'],
+        themes: ['Brewery', 'Distillery', 'Dining'],
         coord: { lng: 142.155, lat: -34.188 },
         nearbyIds: ['robinvale', 'hattah-kulkyne-national-park'],
       },
@@ -1045,7 +1052,7 @@ export const VICTORIAN_CLUSTERS: VicCluster[] = [
         driveTimeHours: 1.5,
         driveKm: 115,
         highlights: ['Sovereign Hill — living gold rush precinct, pan for real gold', 'Art Gallery of Ballarat — best regional gallery in VIC', 'Lydiard Street heritage architecture', 'Lake Wendouree parklands and rowing'],
-        themes: ['Art', 'History', 'Family', 'Food'],
+        themes: ['Dining', 'Cafes', 'Pub'],
         coord: { lng: 143.864, lat: -37.562 },
         nearbyIds: ['clunes', 'ararat'],
       },
@@ -1055,7 +1062,7 @@ export const VICTORIAN_CLUSTERS: VicCluster[] = [
         driveTimeHours: 1.8,
         driveKm: 140,
         highlights: ['Clunes Booktown Festival (May)', 'Intact 1850s goldfield streetscape', 'Cornish Hill walking track', 'Clunes Museum — first place gold found in Victoria'],
-        themes: ['History', 'Books', 'Walking'],
+        themes: ['History', 'Dining'],
         coord: { lng: 143.786, lat: -37.296 },
         nearbyIds: ['ballarat-town', 'castlemaine'],
       },
@@ -1065,7 +1072,7 @@ export const VICTORIAN_CLUSTERS: VicCluster[] = [
         driveTimeHours: 2.0,
         driveKm: 200,
         highlights: ['Best\'s Wines — Victoria\'s oldest family winery (1866)', 'Seppelt Great Western cellar (underground drives, extraordinary)', 'J Ward — former lunatic asylum, heritage tours', 'Pyrenees wine region cellar doors'],
-        themes: ['Wine', 'History', 'Heritage'],
+        themes: ['History', 'Nature', 'Active'],
         coord: { lng: 143.014, lat: -37.284 },
         nearbyIds: ['ballarat-town', 'halls-gap'],
       },
@@ -1091,7 +1098,7 @@ export const VICTORIAN_CLUSTERS: VicCluster[] = [
         driveTimeHours: 1.5,
         driveKm: 120,
         highlights: ['Castlemaine Art Museum (stunning heritage building)', 'The Taproom and Theatre Royal', 'Mount Alexander Fruit Gardens', 'Castlemaine Diggings National Heritage Park'],
-        themes: ['Art', 'History', 'Food'],
+        themes: ['History', 'Dining', 'Winery'],
         coord: { lng: 144.213, lat: -37.062 },
         nearbyIds: ['maldon', 'bendigo-town'],
       },
@@ -1111,7 +1118,7 @@ export const VICTORIAN_CLUSTERS: VicCluster[] = [
         driveTimeHours: 1.5,
         driveKm: 130,
         highlights: ['Heathcote wine region — 100% Cambrian red soil, unique in Australia', 'Paul Osicka Winery and Tellurian Wines', 'McIvor Creek and McIvor Forest walks', 'Local deli and galleries on the main street'],
-        themes: ['Wine', 'Nature', 'Food'],
+        themes: ['History', 'Nature', 'Viewpoint'],
         coord: { lng: 144.706, lat: -36.915 },
         nearbyIds: ['bendigo-town', 'castlemaine'],
       },
@@ -1121,7 +1128,7 @@ export const VICTORIAN_CLUSTERS: VicCluster[] = [
         driveTimeHours: 1.8,
         driveKm: 150,
         highlights: ['Bendigo Art Gallery (major national exhibitions)', 'Central Deborah Gold Mine tour', 'Golden Dragon Museum', 'Rosalind Park and heritage fountains'],
-        themes: ['Art', 'History', 'Food'],
+        themes: ['History', 'Dining', 'Nature'],
         coord: { lng: 144.280, lat: -36.758 },
         nearbyIds: ['castlemaine', 'heathcote'],
       },
@@ -1147,7 +1154,7 @@ export const VICTORIAN_CLUSTERS: VicCluster[] = [
         driveTimeHours: 2.8,
         driveKm: 230,
         highlights: ['Squeaky Beach — literally squeaks underfoot (pure silica sand)', 'Lilly Pilly Gully nature walk (2.5 hrs, ferns and forest)', 'Wombats roaming Tidal River campsite at dusk', 'Norman Beach — clear and calm swimming'],
-        themes: ['Camping', 'Beaches', 'Wildlife', 'Hiking'],
+        themes: ['Hiking', 'Wildlife', 'Family'],
         coord: { lng: 146.316, lat: -38.984 },
         nearbyIds: ['fish-creek', 'wilsons-lighthouse'],
       },
@@ -1157,7 +1164,7 @@ export const VICTORIAN_CLUSTERS: VicCluster[] = [
         driveTimeHours: 3.5,
         driveKm: 250,
         highlights: ['Southernmost point of mainland Australia', 'Lighthouse overnight stays (book well ahead)', 'Waterloo Bay — wild and remote', 'Multi-day Great Prom Walk'],
-        themes: ['Hiking', 'Remote', 'Iconic'],
+        themes: ['Hiking', 'Nature', 'Scenic'],
         coord: { lng: 146.380, lat: -39.136 },
         nearbyIds: ['wilsons-prom'],
       },
@@ -1223,7 +1230,7 @@ export const VICTORIAN_CLUSTERS: VicCluster[] = [
         driveTimeHours: 4.5,
         driveKm: 390,
         highlights: ['Oldest cool-temperate rainforest in Victoria — cathedral-like ferns', 'Big Tree — a 300-yr ancient mountain ash', 'Adams Creek walk in total silence', 'Virtually no other tourists at any time of year'],
-        themes: ['Rainforest', 'Remote', 'Nature'],
+        themes: ['Nature', 'Hiking', 'Wildlife'],
         coord: { lng: 148.840, lat: -37.435 },
         nearbyIds: ['buchan', 'orbost'],
       },
@@ -1259,7 +1266,7 @@ export const VICTORIAN_CLUSTERS: VicCluster[] = [
         driveTimeHours: 4.5,
         driveKm: 395,
         highlights: ['Snowy River NP — kayaking and swimming in pristine gorges', 'McKillops Bridge — spectacular gorge viewpoint', 'Corringle Picnic Area and Orbost rainforest', 'Junction of Snowy and Brodribb rivers'],
-        themes: ['Hiking', 'Kayaking', 'Nature', 'Remote'],
+        themes: ['History', 'Viewpoint', 'Dining'],
         coord: { lng: 148.461, lat: -37.706 },
         nearbyIds: ['cape-conran', 'buchan'],
       },
@@ -1295,7 +1302,7 @@ export const VICTORIAN_CLUSTERS: VicCluster[] = [
         driveTimeHours: 0.25,
         driveKm: 4,
         highlights: ['Federation Square and Birrarung Marr', 'St Paul\'s Cathedral and the Block Arcade', 'Melbourne laneways — Hosier, AC/DC, Degraves', 'Queen Victoria Market (open Tue–Sun)'],
-        themes: ['Culture', 'Food', 'History', 'Markets', 'Art'],
+        themes: ['Nature', 'Dining', 'History'],
         coord: { lng: 144.963, lat: -37.814 },
         nearbyIds: ['fitzroy', 'st-kilda'],
       },
@@ -1305,7 +1312,7 @@ export const VICTORIAN_CLUSTERS: VicCluster[] = [
         driveTimeHours: 0.4,
         driveKm: 9,
         highlights: ['Luna Park (heritage amusement park, open weekends)', 'Acland Street cake shops and cafes', 'St Kilda Beach and pier with Little Penguins at dusk', 'The Espy and live music strip'],
-        themes: ['Beach', 'Food', 'Entertainment', 'Family'],
+        themes: ['Dining', 'Pub', 'Cafes'],
         coord: { lng: 144.979, lat: -37.868 },
         nearbyIds: ['melbourne-cbd', 'williamstown'],
       },
@@ -1335,7 +1342,7 @@ export const VICTORIAN_CLUSTERS: VicCluster[] = [
         driveTimeHours: 0.3,
         driveKm: 6,
         highlights: ['Sydney Road — multicultural food strip with A1 Bakery', 'Marios Cafe (Melbourne icon)', 'Brunswick Ballroom and live music', 'Vintage stores and independent bookshops'],
-        themes: ['Food', 'Culture', 'Markets', 'Art'],
+        themes: ['Dining', 'Brewery', 'Pub'],
         coord: { lng: 144.960, lat: -37.770 },
         nearbyIds: ['fitzroy', 'melbourne-cbd'],
       },
@@ -1345,7 +1352,7 @@ export const VICTORIAN_CLUSTERS: VicCluster[] = [
         driveTimeHours: 0.4,
         driveKm: 14,
         highlights: ['Williamstown Beach and foreshore promenade', 'Craft beer at Robb Pier and Point Gellibrand', 'Ferry to Docklands across the bay', 'Nelson Place heritage streetscape and restaurants'],
-        themes: ['Beach', 'Food', 'History', 'Walking'],
+        themes: ['Dining', 'Cafes', 'Pub'],
         coord: { lng: 144.900, lat: -37.866 },
         nearbyIds: ['st-kilda', 'melbourne-cbd'],
       },
@@ -1371,7 +1378,8 @@ export const VICTORIAN_CLUSTERS: VicCluster[] = [
         driveTimeHours: 2.2,
         driveKm: 175,
         highlights: ['Ski and snowboard runs (June–September)', 'Mount Baw Baw Alpine Resort village', 'Cascades Nature Walk and alpine wildflowers (spring/summer)', 'Mountain ash forests and lyrebird habitat'],
-        themes: ['Snow', 'Hiking', 'Nature', 'Wildlife'],
+        themes: ['Hiking', 'Nature', 'Wildlife'],
+        seasonalThemes: { winter: ['Skiing', 'Snow', 'Active'] },
         coord: { lng: 146.270, lat: -37.838 },
         nearbyIds: ['walhalla', 'fish-creek'],
       },
@@ -1381,7 +1389,7 @@ export const VICTORIAN_CLUSTERS: VicCluster[] = [
         driveTimeHours: 2.0,
         driveKm: 165,
         highlights: ['Thomson River trout fishing', 'Rawson township with local cafe', 'Scenic drive through Tyers and Rawson', 'Gateway to Baw Baw National Park'],
-        themes: ['Nature', 'Hiking', 'Scenic'],
+        themes: ['Pub'],
         coord: { lng: 146.482, lat: -37.897 },
         nearbyIds: ['mount-baw-baw', 'walhalla'],
       },
@@ -1418,31 +1426,25 @@ export function getNearbySubDests(sub: SubDest): Array<{ sub: SubDest; cluster: 
 
 export type TripInterest =
   | 'Wildlife'
-  | 'Beach'
   | 'Wine'
   | 'Hiking'
-  | 'Cycling'
-  | 'HotSprings'
   | 'History'
   | 'Food'
-  | 'Relaxation'
-  | 'FamilyFun'
   | 'Adventure'
   | 'Scenic'
+  | 'Art'
+  | 'Pubs'
 
 const INTEREST_THEMES: Record<TripInterest, string[]> = {
-  Wildlife:    ['Wildlife', 'Nature', 'Family', 'Birdwatching'],
-  Beach:       ['Beach', 'Coastal', 'Surf', 'Swimming', 'Beaches'],
-  Wine:        ['Wine', 'Cellar doors', 'Wineries'],
-  Hiking:      ['Hiking', 'Walking', 'Trails', 'Nature', 'Remote'],
-  Cycling:     ['Cycling', 'Rail trails', 'Mountain bike', 'Trails'],
-  HotSprings:  ['Hot springs', 'Wellness', 'Spa', 'Relaxation'],
-  History:     ['History', 'Heritage', 'Historic', 'Immersive', 'Indigenous', 'Culture'],
-  Food:        ['Food', 'Cafes', 'Bakeries', 'Dining', 'Markets', 'Gateway'],
-  Relaxation:  ['Relaxation', 'Wellness', 'Spa', 'Chilling', 'Day trip', 'Boating'],
-  FamilyFun:   ['Family', 'Wildlife', 'Interactive', 'Family attractions'],
-  Adventure:   ['Adventure', 'Cycling', 'Surf', 'Remote', 'Climbing', 'Kayaking'],
-  Scenic:      ['Scenic', 'Lookouts', 'Views', 'Coastal', 'Iconic', 'Photography', 'Night sky'],
+  Wildlife:  ['Wildlife', 'Birdwatching', 'Animals', 'Penguins', 'Koalas', 'Seals'],
+  Wine:      ['Wine', 'Cellar doors', 'Wineries', 'Winery'],
+  Hiking:    ['Hiking', 'Walking', 'Trails', 'Nature', 'Remote', 'Bushwalking', 'Forests'],
+  History:   ['History', 'Heritage', 'Historic', 'Immersive', 'Indigenous', 'Culture'],
+  Food:      ['Food', 'Cafes', 'Bakeries', 'Dining', 'Markets', 'Restaurants'],
+  Adventure: ['Adventure', 'Surf', 'Climbing', 'Kayaking', 'Mountain bike', 'Active', 'Skydiving', 'Abseiling', 'Skiing'],
+  Scenic:    ['Scenic', 'Lookouts', 'Views', 'Coastal', 'Iconic', 'Photography', 'Night sky', 'Viewpoint'],
+  Art:       ['Art', 'Culture', 'Entertainment', 'Creative', 'Gallery', 'Theatre', 'Indigenous'],
+  Pubs:      ['Pub', 'Brewery', 'Beer', 'Distillery', 'Bar', 'Craft beer', 'Food', 'Drink'],
 }
 
 export interface MatchedDest {
@@ -1450,6 +1452,7 @@ export interface MatchedDest {
   cluster: VicCluster
   score: number
   matchReasons: string[]
+  activityMatches: number
 }
 
 function haversineKm(a: Coordinate, b: Coordinate): number {
@@ -1461,6 +1464,9 @@ function haversineKm(a: Coordinate, b: Coordinate): number {
   return R * 2 * Math.atan2(Math.sqrt(s), Math.sqrt(1 - s))
 }
 
+/** Maps sub-destination slug → interest category DB count (e.g. 'yarra-glen' → 5) */
+export type InterestDbCounts = Record<string, number>
+
 export function matchDestinations(opts: {
   maxDriveHours: number
   interests: TripInterest[]
@@ -1468,8 +1474,9 @@ export function matchDestinations(opts: {
   isOvernight: boolean
   season: Season
   originCoord?: Coordinate
+  dbCounts?: InterestDbCounts
 }): MatchedDest[] {
-  const { maxDriveHours, interests, hasKids, isOvernight, season, originCoord } = opts
+  const { maxDriveHours, interests, hasKids, isOvernight, season, originCoord, dbCounts } = opts
   const results: MatchedDest[] = []
 
   for (const cluster of VICTORIAN_CLUSTERS) {
@@ -1491,9 +1498,16 @@ export function matchDestinations(opts: {
       else if (seasonScore >= 7) matchReasons.push(`Great in ${season}`)
 
       const clusterThemes = cluster.themes.map((t) => t.toLowerCase())
-      const subThemes = sub.themes.map((t) => t.toLowerCase())
+      const activeSubThemes = sub.seasonalThemes?.[season] ?? sub.themes
+      const subThemes = activeSubThemes.map((t) => t.toLowerCase())
       const subNameLower = sub.name.toLowerCase()
       let activityMatches = 0
+      const matchedInterestLabels: string[] = []
+      const INTEREST_LABEL: Record<TripInterest, string> = {
+        Wildlife: 'Wildlife', Wine: 'Wineries', Hiking: 'Hiking',
+        History: 'History', Food: 'Cafes & food', Adventure: 'Adventure',
+        Scenic: 'Scenic views', Art: 'Art & culture', Pubs: 'Pubs & breweries',
+      }
       for (const interest of interests) {
         const interestKeys = INTEREST_THEMES[interest].map((t) => t.toLowerCase())
         const subMatch = interestKeys.some((t) => subThemes.some((at) => at.includes(t)))
@@ -1502,16 +1516,29 @@ export function matchDestinations(opts: {
         // (which inherits cluster 'Wellness'/'Spa' themes without actually having hot springs)
         if (interest === 'HotSprings') {
           const nameMatch = /hot spring|thermal|mineral spring|bathhouse/.test(subNameLower)
-          if (subMatch || nameMatch) { score += 15; activityMatches++ }
+          if (subMatch || nameMatch) { score += 15; activityMatches++; matchedInterestLabels.push(INTEREST_LABEL[interest]) }
           // no points for cluster-only match on HotSprings
         } else if (subMatch) {
-          score += 10; activityMatches++
+          // If we have DB counts for this interest, only count as a match if there's actual content
+          const dbCount = dbCounts?.[sub.id] ?? -1
+          const hasDbContent = dbCount !== 0 // -1 = no DB data (fall back to themes), 0 = confirmed empty
+          if (hasDbContent) {
+            score += 10; activityMatches++; matchedInterestLabels.push(INTEREST_LABEL[interest])
+          }
+          // confirmed 0 in DB → no points, won't appear in Recommended
         } else if (clusterOnlyMatch) {
           score += 4 // partial credit for cluster theme only
         }
       }
-      if (activityMatches >= 2) matchReasons.push('Matches your interests')
-      else if (activityMatches === 1) matchReasons.push("Has what you're after")
+      if (matchedInterestLabels.length > 0) {
+        matchReasons.push(matchedInterestLabels.slice(0, 3).join(' · '))
+      }
+
+      // Boost by actual DB count for the selected interest categories
+      if (dbCounts && activityMatches > 0) {
+        const dbCount = dbCounts[sub.id] ?? 0
+        score += dbCount * 3 // 3 pts per actual venue in DB
+      }
 
       if (hasKids) {
         const kidsThemes = ['wildlife', 'family', 'beach', 'history', 'nature']
@@ -1526,7 +1553,7 @@ export function matchDestinations(opts: {
 
       if (isOvernight && actualDriveHours >= 2) score += 5
 
-      results.push({ sub, cluster, score, matchReasons })
+      results.push({ sub, cluster, score, matchReasons, activityMatches })
     }
   }
 

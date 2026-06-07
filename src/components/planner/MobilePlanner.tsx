@@ -70,7 +70,7 @@ function formatDrive(hours: number): string {
   return m === 0 ? `${h}h` : `${h}h ${m}m`
 }
 
-type FilterTab = 'explore' | 'food' | 'stay' | 'plan' | 'fuel'
+type FilterTab = 'overview' | 'explore' | 'food' | 'stay' | 'plan' | 'fuel'
 
 const CAT_LABEL: Record<string, string> = {
   nature: '🌿 Nature', viewpoint: '🌄 Views', history: '🏛️ History',
@@ -133,11 +133,13 @@ export function MobilePlanner() {
   const d = usePlannerData()
   const clearItinerary = useAppStore((s) => s.clearItinerary)
   const setDisplayedMapPins = useAppStore((s) => s.setDisplayedMapPins)
-  const [tab, setTab] = useState<FilterTab>('explore')
+  const [tab, setTab] = useState<FilterTab>('overview')
   const [catFilter, setCatFilter] = useState('all')
   const [mapVisible, setMapVisible] = useState(true)
   const [expandedCardId, setExpandedCardId] = useState<string | null>(null)
   const scrollRef = React.useRef<HTMLDivElement>(null)
+  const panelRef = React.useRef<HTMLDivElement>(null)
+  const dragRef = React.useRef<{ startY: number; lastY: number; lastT: number } | null>(null)
 
   interface MFuelStop { label: string; station: { name: string; brand: string; address: string; lat: number; lng: number; pricePerLitre: number; distanceKm: number } | null; brandNotFound?: boolean }
   const [fuelStops, setFuelStops] = useState<MFuelStop[]>([])
@@ -337,18 +339,51 @@ export function MobilePlanner() {
       </div>
 
       {/* ── Bottom sheet panel ── */}
-      <div style={{
+      <div ref={panelRef} style={{
         flex: 1, display: 'flex', flexDirection: 'column',
         background: '#fff',
         borderRadius: '20px 20px 0 0',
         boxShadow: '0 -4px 24px rgba(0,0,0,0.1)',
         overflow: 'hidden',
         transition: 'transform 0.35s cubic-bezier(0.4, 0, 0.2, 1)',
-        marginTop: -20, // overlap map slightly for seamless look
+        marginTop: -20,
         zIndex: 5,
       }}>
-        {/* Drag handle */}
-        <div style={{ display: 'flex', justifyContent: 'center', padding: '10px 0 4px', flexShrink: 0 }}>
+        {/* Drag handle — touch here to expand/collapse map */}
+        <div
+          style={{ display: 'flex', justifyContent: 'center', padding: '10px 0 4px', flexShrink: 0, cursor: 'grab', touchAction: 'none' }}
+          onTouchStart={(e) => {
+            const t = e.touches[0]
+            dragRef.current = { startY: t.clientY, lastY: t.clientY, lastT: Date.now() }
+            if (panelRef.current) panelRef.current.style.transition = 'none'
+          }}
+          onTouchMove={(e) => {
+            if (!dragRef.current || !panelRef.current) return
+            const t = e.touches[0]
+            const dy = t.clientY - dragRef.current.startY
+            dragRef.current.lastY = t.clientY
+            dragRef.current.lastT = Date.now()
+            // Clamp: dragging down (positive dy) only makes sense when map is hidden
+            // Dragging up (negative dy) only makes sense when map is visible
+            if (mapVisible && dy < 0) {
+              panelRef.current.style.transform = `translateY(${Math.max(dy, -window.innerHeight * 0.5)}px)`
+            } else if (!mapVisible && dy > 0) {
+              panelRef.current.style.transform = `translateY(${Math.min(dy, window.innerHeight * 0.5)}px)`
+            }
+          }}
+          onTouchEnd={() => {
+            if (!dragRef.current || !panelRef.current) return
+            const dy = dragRef.current.lastY - dragRef.current.startY
+            const dt = Date.now() - dragRef.current.lastT + 1
+            const velocity = dy / dt // px/ms — positive = dragging down
+            panelRef.current.style.transition = ''
+            panelRef.current.style.transform = ''
+            dragRef.current = null
+            // Snap: fast swipe up OR moved up >60px → hide map; fast swipe down OR moved down >60px → show map
+            if ((velocity < -0.3 || dy < -60) && mapVisible) setMapVisible(false)
+            else if ((velocity > 0.3 || dy > 60) && !mapVisible) setMapVisible(true)
+          }}
+        >
           <div style={{ width: 36, height: 4, borderRadius: 2, background: '#E0DDD8' }} />
         </div>
 
@@ -359,6 +394,7 @@ export function MobilePlanner() {
           display: 'flex', gap: 8, overflowX: 'auto',
         }}>
           {([
+            ['overview', '🏠 Overview'],
             ['explore', '🗺 Explore'],
             ...((d.dbFood?.length ?? 0) > 0 ? [['food', '🍽 Food & Drinks']] : []),
             ['stay', '🏨 Stay'],
@@ -379,12 +415,24 @@ export function MobilePlanner() {
           ))}
         </div>
 
-      {/* ── Scrollable content — hides map when scrolled down ── */}
+      {/* ── Scrollable content ── */}
       <div
         ref={scrollRef}
+        onTouchStart={(e) => {
+          ;(scrollRef.current as any)._touchStartY = e.touches[0].clientY
+        }}
+        onTouchMove={(e) => {
+          const el = scrollRef.current
+          if (!el) return
+          const startY = (el as any)._touchStartY ?? e.touches[0].clientY
+          const dy = e.touches[0].clientY - startY
+          // Swipe up while map visible → collapse map
+          if (mapVisible && dy < -10) setMapVisible(false)
+          // Swipe down while at top of scroll and map hidden → restore map
+          if (!mapVisible && dy > 30 && el.scrollTop === 0) setMapVisible(true)
+        }}
         onScroll={(e) => {
-          const el = e.currentTarget
-          if (el.scrollTop > 40 && mapVisible) setMapVisible(false)
+          if (mapVisible) { e.currentTarget.scrollTop = 0; setMapVisible(false) }
         }}
         style={{ flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}
       >
@@ -396,40 +444,141 @@ export function MobilePlanner() {
           </div>
         )}
 
-        {/* ── EXPLORE tab ── */}
+        {/* ── OVERVIEW tab ── */}
+        {tab === 'overview' && (
+          <div style={{ padding: '12px 12px 0' }}>
+            {(() => {
+              const FOOD_EMOJI: Record<string, string> = { Winery: '🍷', Brewery: '🍺', Distillery: '🥃', Pub: '🍻', Cafe: '☕', Bakery: '🥐', Restaurant: '🍽️' }
+              const foodCats = [...new Set((d.dbFood ?? []).map(f => f.category))].sort((a, b) => {
+                const order = ['Winery','Brewery','Distillery','Pub','Restaurant','Cafe','Bakery']
+                return order.indexOf(a) - order.indexOf(b)
+              })
+              const foodCountByCat = (d.dbFood ?? []).reduce<Record<string,number>>((acc, f) => { acc[f.category] = (acc[f.category] ?? 0) + 1; return acc }, {})
+              const accomCount = d.accommodationPOIs?.length ?? 0
+              const tile: React.CSSProperties = {
+                background: '#fff', borderRadius: 18, border: '1px solid rgba(0,0,0,0.07)',
+                padding: '18px 18px 16px', boxShadow: '0 1px 4px rgba(0,0,0,0.06)', marginBottom: 12,
+              }
+              return (
+                <div>
+                  {tripDayForecast && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10, padding: '0 2px' }}>
+                      <span style={{ fontSize: 20 }}>{tripDayForecast.emoji}</span>
+                      <span style={{ fontSize: 13, fontWeight: 600, color: '#374151' }}>{tripDayForecast.label}</span>
+                      <span style={{ fontSize: 13, color: '#9CA3AF' }}>{tripDayForecast.maxTemp}°/{tripDayForecast.minTemp}°</span>
+                      {tripDayForecast.precipMm > 0 && <span style={{ fontSize: 12, color: '#3B82F6', fontWeight: 600 }}>💧{tripDayForecast.precipMm}mm</span>}
+                    </div>
+                  )}
+                  {topCats.length > 0 && (
+                    <div style={tile}>
+                      <div style={{ fontSize: 11, fontWeight: 700, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 12 }}>
+                        🗺 Things to Do · {allActivities.length}
+                      </div>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                        {topCats.map(cat => {
+                          const tag = CAT_TAG[cat] ?? { label: cat, color: '#374151', bg: '#F3F4F6' }
+                          const emoji = CAT_LABEL[cat]?.split(' ')[0] ?? '📍'
+                          const label = (CAT_LABEL[cat] ?? cat).replace(/^\S+\s/, '')
+                          return (
+                            <button key={cat} onClick={() => { setTab('explore'); setCatFilter(cat) }} style={{
+                              borderRadius: 12, border: 'none', background: tag.bg, cursor: 'pointer',
+                              padding: '14px 12px', textAlign: 'left',
+                              boxShadow: `inset 0 0 0 1.5px ${tag.color}33, 0 1px 3px rgba(0,0,0,0.08)`,
+                              WebkitTapHighlightColor: 'transparent', position: 'relative', overflow: 'hidden',
+                            }}>
+                              <div style={{ fontSize: 26, marginBottom: 8 }}>{emoji}</div>
+                              <div style={{ fontSize: 15, fontWeight: 700, color: tag.color, lineHeight: 1.2 }}>{label}</div>
+                              <div style={{ position: 'absolute', top: 10, right: 10, background: tag.color, color: '#fff', borderRadius: 8, padding: '2px 7px', fontSize: 11, fontWeight: 800 }}>{catCounts.get(cat)}</div>
+                            </button>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  )}
+                  {foodCats.length > 0 && (
+                    <div style={tile}>
+                      <div style={{ fontSize: 11, fontWeight: 700, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 12 }}>
+                        🍽 Food & Drinks · {(d.dbFood ?? []).length}
+                      </div>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                        {foodCats.map(cat => {
+                          const FOOD_COLOR: Record<string,{color:string;bg:string}> = {
+                            Winery:{ color:'#7E22CE', bg:'#FAF5FF' }, Brewery:{ color:'#92400E', bg:'#FEF3C7' },
+                            Distillery:{ color:'#374151', bg:'#F3F4F6' }, Pub:{ color:'#1D4ED8', bg:'#EFF6FF' },
+                            Restaurant:{ color:'#B45309', bg:'#FFFBEB' }, Cafe:{ color:'#0369A1', bg:'#E0F2FE' },
+                            Bakery:{ color:'#047857', bg:'#ECFDF5' },
+                          }
+                          const fc = FOOD_COLOR[cat] ?? { color: '#374151', bg: '#F3F4F6' }
+                          return (
+                            <button key={cat} onClick={() => { setTab('food'); setFoodFilter(cat) }} style={{
+                              borderRadius: 12, border: 'none', background: fc.bg, cursor: 'pointer',
+                              padding: '14px 12px', textAlign: 'left',
+                              boxShadow: `inset 0 0 0 1.5px ${fc.color}33, 0 1px 3px rgba(0,0,0,0.08)`,
+                              WebkitTapHighlightColor: 'transparent', position: 'relative', overflow: 'hidden',
+                            }}>
+                              <div style={{ fontSize: 26, marginBottom: 8 }}>{FOOD_EMOJI[cat] ?? '🍴'}</div>
+                              <div style={{ fontSize: 15, fontWeight: 700, color: fc.color, lineHeight: 1.2 }}>{cat}</div>
+                              <div style={{ position: 'absolute', top: 10, right: 10, background: fc.color, color: '#fff', borderRadius: 8, padding: '2px 7px', fontSize: 11, fontWeight: 800 }}>{foodCountByCat[cat]}</div>
+                            </button>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  )}
+                  {accomCount > 0 && (
+                    <button onClick={() => setTab('stay')} style={{
+                      ...tile, width: '100%', display: 'flex', alignItems: 'center',
+                      justifyContent: 'space-between', cursor: 'pointer', textAlign: 'left',
+                      WebkitTapHighlightColor: 'transparent',
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+                        <span style={{ fontSize: 32 }}>🏨</span>
+                        <div>
+                          <div style={{ fontSize: 11, fontWeight: 700, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 3 }}>Stay</div>
+                          <div style={{ fontSize: 15, fontWeight: 700, color: '#1C1B1F' }}>{accomCount} places nearby</div>
+                        </div>
+                      </div>
+                      <span style={{ color: '#C4C4C4', fontSize: 22, fontWeight: 300 }}>›</span>
+                    </button>
+                  )}
+                  <div style={{ height: 24 }} />
+                </div>
+              )
+            })()}
+          </div>
+        )}
+
+        {/* ── EXPLORE tab — full activity list with category filter chips ── */}
         {tab === 'explore' && (
           <div style={{ padding: '12px 12px 0' }}>
-
-            {/* About snippet */}
-            {d.wikiSummary && (
-              <div style={{ background: '#fff', borderRadius: 18, padding: '14px 16px', marginBottom: 12, border: '1px solid rgba(0,0,0,0.06)' }}>
-                <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.09em', color: '#9CA3AF', marginBottom: 8 }}>About {d.shortDest}</div>
-                <p style={{ margin: 0, fontSize: 13.5, color: '#374151', lineHeight: 1.75 }}>
-                  {d.wikiSummary}
-                </p>
-              </div>
-            )}
-
             {/* Category filter chips */}
-            {topCats.length > 1 && (
-              <div style={{ display: 'flex', gap: 7, overflowX: 'auto', marginBottom: 12, paddingBottom: 2 }}>
-                <MPill label="All" color={catFilter === 'all' ? '#fff' : '#6B7280'} bg={catFilter === 'all' ? '#1C1B1F' : '#fff'} border={catFilter === 'all' ? '#1C1B1F' : 'rgba(0,0,0,0.12)'} onClick={() => setCatFilter('all')} />
-                {topCats.map((cat) => (
-                  <MPill key={cat} label={CAT_LABEL[cat] ?? cat}
-                    color={catFilter === cat ? '#fff' : '#6B7280'}
-                    bg={catFilter === cat ? '#1C1B1F' : '#fff'}
-                    border={catFilter === cat ? '#1C1B1F' : 'rgba(0,0,0,0.12)'}
-                    onClick={() => setCatFilter(cat)}
-                  />
-                ))}
+            {topCats.length > 0 && (
+              <div style={{ display: 'flex', gap: 6, overflowX: 'auto', marginBottom: 12, paddingBottom: 2, scrollbarWidth: 'none' }}>
+                <button onClick={() => setCatFilter('all')} style={{
+                  padding: '5px 12px', borderRadius: 20, flexShrink: 0, border: 'none', cursor: 'pointer',
+                  background: catFilter === 'all' ? '#1C1B1F' : '#F3F4F6',
+                  color: catFilter === 'all' ? '#fff' : '#374151',
+                  fontSize: 12, fontWeight: 600,
+                }}>All</button>
+                {topCats.map(cat => {
+                  const tag = CAT_TAG[cat] ?? { label: cat, color: '#374151', bg: '#F3F4F6' }
+                  const emoji = CAT_LABEL[cat]?.split(' ')[0] ?? '📍'
+                  return (
+                    <button key={cat} onClick={() => setCatFilter(cat)} style={{
+                      padding: '5px 12px', borderRadius: 20, flexShrink: 0, border: 'none', cursor: 'pointer',
+                      background: catFilter === cat ? tag.color : '#F3F4F6',
+                      color: catFilter === cat ? '#fff' : '#374151',
+                      fontSize: 12, fontWeight: 600,
+                    }}>{emoji} {(CAT_LABEL[cat] ?? cat).replace(/^\S+\s/, '')}</button>
+                  )
+                })}
               </div>
             )}
-
             {/* Activity cards */}
             {d.dbLoading && allActivities.length === 0
               ? <div style={{ fontSize: 13, color: '#9CA3AF', padding: '8px 0' }}>Loading activities…</div>
               : filteredActivities.length === 0
-                ? <div style={{ fontSize: 13, color: '#9CA3AF', padding: '8px 0' }}>No activities found for this filter.</div>
+                ? <div style={{ fontSize: 13, color: '#9CA3AF', padding: '8px 0' }}>No activities found.</div>
                 : <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                     {(() => {
                       const rated = filteredActivities.filter(a => a.rating)

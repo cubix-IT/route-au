@@ -1,6 +1,13 @@
 import { useState, useEffect } from 'react'
 import type { Coordinate } from '@/types'
 
+export interface HourForecast {
+  hour: number          // 0–23
+  temp: number
+  emoji: string
+  precipProb: number    // 0–100
+}
+
 export interface DayForecast {
   date: string          // 'YYYY-MM-DD'
   maxTemp: number
@@ -9,6 +16,7 @@ export interface DayForecast {
   weatherCode: number
   emoji: string
   label: string
+  hours: HourForecast[] // 24 entries
 }
 
 export interface WeatherData {
@@ -43,6 +51,7 @@ export function useWeather(coord: Coordinate | null): WeatherData | null {
       `https://api.open-meteo.com/v1/forecast` +
       `?latitude=${coord.lat}&longitude=${coord.lng}` +
       `&daily=weathercode,temperature_2m_max,temperature_2m_min,precipitation_sum` +
+      `&hourly=temperature_2m,weathercode,precipitation_probability` +
       `&current_weather=true` +
       `&timezone=Australia%2FMelbourne` +
       `&forecast_days=7`
@@ -53,9 +62,27 @@ export function useWeather(coord: Coordinate | null): WeatherData | null {
         if (cancelled) return
         const cw = json.current_weather
         const daily = json.daily
+        const hourly = json.hourly
         if (!cw || !daily) return
 
         const current = decodeCode(cw.weathercode)
+
+        // Build hourly lookup: date → HourForecast[]
+        const hoursByDate = new Map<string, HourForecast[]>()
+        if (hourly?.time) {
+          (hourly.time as string[]).forEach((iso: string, i: number) => {
+            const [date, timePart] = iso.split('T')
+            const hour = parseInt(timePart.split(':')[0])
+            if (!hoursByDate.has(date)) hoursByDate.set(date, [])
+            hoursByDate.get(date)!.push({
+              hour,
+              temp: Math.round(hourly.temperature_2m[i]),
+              emoji: decodeCode(hourly.weathercode[i]).emoji,
+              precipProb: hourly.precipitation_probability?.[i] ?? 0,
+            })
+          })
+        }
+
         const forecast: DayForecast[] = (daily.time as string[]).map((date: string, i: number) => {
           const code = daily.weathercode[i]
           const { emoji, label } = decodeCode(code)
@@ -67,6 +94,7 @@ export function useWeather(coord: Coordinate | null): WeatherData | null {
             weatherCode: code,
             emoji,
             label,
+            hours: hoursByDate.get(date) ?? [],
           }
         })
 

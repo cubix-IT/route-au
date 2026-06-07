@@ -745,7 +745,7 @@ export function ExperiencePanel({ hideTimeline = false }: { hideTimeline?: boole
                 {/* Drink venues: Wineries, Breweries, Distilleries — shown first */}
                 {showDrinks.length > 0 && (
                   <>
-                    {filter === 'food' && foodCatFilter === 'all' && (
+                    {filter === 'food' && foodGroupFilter === 'all' && (
                       <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 8, marginTop: 4 }}>
                         🍷 Cellar Doors & Craft Drinks
                       </div>
@@ -759,7 +759,7 @@ export function ExperiencePanel({ hideTimeline = false }: { hideTimeline?: boole
                 {/* Food venues: Pubs, Restaurants, Cafes — shown after drink venues */}
                 {showFood.length > 0 && (
                   <>
-                    {filter === 'food' && foodCatFilter === 'all' && drinkVenues.length > 0 && (
+                    {filter === 'food' && foodGroupFilter === 'all' && drinkVenues.length > 0 && (
                       <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.07em', marginTop: 4, marginBottom: 8 }}>
                         🍽️ Places to Eat
                       </div>

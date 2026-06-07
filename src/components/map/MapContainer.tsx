@@ -96,7 +96,11 @@ export function MapContainer() {
       const emoji = pin.emoji ?? '📍'
 
       const el = document.createElement('div')
-      el.style.cssText = `
+      // Outer el is MapLibre's positioning anchor — never modify its transform
+      el.style.cssText = `display: flex; align-items: center; justify-content: center;`
+
+      const inner = document.createElement('div')
+      inner.style.cssText = `
         min-width: 30px; height: 30px; padding: 0 6px;
         border-radius: 15px; background: white;
         border: 2.5px solid #374151;
@@ -106,7 +110,8 @@ export function MapContainer() {
         transition: transform 0.12s, box-shadow 0.12s;
         white-space: nowrap;
       `
-      el.textContent = emoji
+      inner.textContent = emoji
+      el.appendChild(inner)
 
       const popup = new maplibregl.Popup({ offset: 18, closeButton: true, maxWidth: '220px', closeOnClick: false })
         .setHTML(`
@@ -127,22 +132,16 @@ export function MapContainer() {
 
       el.addEventListener('click', (e) => {
         e.stopPropagation()
-        popup.addTo(map)
+        marker.togglePopup()
         setSelectedPinId(pin.id)
-        highlightMarker(el)
+        highlightMarker(inner)
       })
 
       bounds.extend([pin.lng, pin.lat])
-      poiMarkersRef.current.push({ marker, el, id: pin.id })
+      poiMarkersRef.current.push({ marker, el: inner, id: pin.id })
     }
 
-    // Fit map to show all pins
-    if (!bounds.isEmpty()) {
-      map.fitBounds(bounds, {
-        padding: { top: 70, bottom: 70, left: 50, right: 50 },
-        maxZoom: 15, duration: 700,
-      })
-    }
+    // Keep map centred on destination — don't fly to POI pins (mobile UX: city stays in frame)
   }, [displayedMapPins]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Highlight selected pin when changed from card click ───────────────────
@@ -158,7 +157,7 @@ export function MapContainer() {
 
     // Fly to it and open popup
     map.flyTo({ center: [entry.marker.getLngLat().lng, entry.marker.getLngLat().lat], zoom: Math.max(map.getZoom(), 14), duration: 500 })
-    entry.marker.getPopup()?.addTo(map)
+    if (!entry.marker.getPopup()?.isOpen()) entry.marker.togglePopup()
   }, [selectedPinId])
 
   // ── Fuel markers ──────────────────────────────────────────────────────────

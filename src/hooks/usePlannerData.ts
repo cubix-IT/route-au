@@ -297,10 +297,7 @@ export function usePlannerData() {
       setDbLoading(false)
       useAppStore.getState().setTripDataReady(true)
 
-      // Always fetch live POIs for drink venues (wineries/breweries) — not in Supabase enrichment
-      fetchLivePOIs(destId, destCoord.lat, destCoord.lng).then((pois) => {
-        if (!signal.aborted) setLivePOIs(pois)
-      }).catch(() => { if (!signal.aborted) setLivePOIs([]) })
+      // Overpass fallback removed — all data now served from Supabase enrichment
 
       // Wiki summary fallback if not in DB
       if (!result?.wikiSummary) {

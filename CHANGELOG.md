@@ -1,5 +1,17 @@
 # Changelog
 
+## 7 June 2026 (3451d14)
+
+- **DX skills — cost check, mapcheck, issue-sync**
+  npm run cost:
+
+## 7 June 2026 (6417c0d)
+
+- **What's here modal — 2-column card grid on desktop**
+  Things to Do and Food & Drinks tabs now display ResultCards in a
+- **DX skills + What's here modal parity with results page**
+  Skills (closes #59, closes #60):
+
 ## 6 June 2026 (b4387fa)
 
 - **Generating screen — Victorian landscape animation with 4WD**

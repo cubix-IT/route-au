@@ -1,13 +1,12 @@
-import { GREEN, WARM, SECONDARY } from '@/lib/brand'
-import logoSrc from '@/assets/logo.png'
+import { GREEN } from '@/lib/brand'
 
-const p: React.CSSProperties = { margin: '0 0 16px', lineHeight: 1.8 }
+const p: React.CSSProperties = { margin: '0 0 16px', lineHeight: 1.8, color: 'var(--text-secondary)' }
 
 export function PrivacyPage({ onBack }: { onBack: () => void }) {
   return (
-    <div style={{ minHeight: '100vh', background: '#F8F7F4', color: '#1C1C1A', fontFamily: 'inherit' }}>
+    <div style={{ minHeight: '100vh', background: 'var(--bg-base)', color: 'var(--text-primary)', fontFamily: 'inherit' }}>
 
-      {/* Nav */}
+      {/* Nav — identical to LandingPage */}
       <nav style={{
         position: 'sticky', top: 0, zIndex: 50,
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
@@ -18,27 +17,40 @@ export function PrivacyPage({ onBack }: { onBack: () => void }) {
         borderBottom: '1px solid rgba(0,0,0,0.07)',
         boxShadow: '0 1px 0 rgba(0,0,0,0.04)',
       }}>
-        <button onClick={onBack} style={{
-          display: 'flex', alignItems: 'center', gap: 10,
-          background: 'none', border: 'none', cursor: 'pointer', padding: 0,
-        }}>
-          <span style={{ fontSize: 18, color: '#8C8A87', lineHeight: 1 }}>←</span>
-          <div style={{ fontFamily: "'Fraunces', Georgia, serif", fontSize: 16, fontWeight: 700, color: '#1C1C1A', letterSpacing: '-0.02em' }}>
+        <a href="/" style={{ textDecoration: 'none' }}>
+          <div style={{ fontFamily: "'Fraunces', Georgia, serif", fontSize: 16, fontWeight: 700, color: 'var(--text-primary)', lineHeight: 1.2, letterSpacing: '-0.02em' }}>
             Unplanned<span style={{ color: GREEN }}> Escapes</span>
-            <span style={{ color: '#8C8A87', fontWeight: 400, fontSize: 13 }}> Victoria</span>
+            <span style={{ color: 'var(--text-muted)', fontWeight: 400, fontSize: 13 }}> Victoria</span>
           </div>
+        </a>
+        <button onClick={onBack} style={{
+          padding: '7px 16px', borderRadius: 9,
+          background: GREEN, border: 'none',
+          color: '#fff', fontSize: 13, fontWeight: 600,
+          cursor: 'pointer', letterSpacing: '-0.01em',
+        }}>
+          Plan a trip
         </button>
       </nav>
 
-      {/* Content */}
-      <div style={{ maxWidth: 720, margin: '0 auto', padding: '56px 28px 80px' }}>
+      {/* Page hero — same padding/treatment as landing sections */}
+      <section style={{
+        padding: 'clamp(40px, 6vw, 72px) 28px clamp(32px, 5vw, 56px)',
+        borderBottom: '1px solid var(--border)',
+        background: 'var(--bg-base)',
+      }}>
+        <div style={{ maxWidth: 720, margin: '0 auto' }}>
+          <h1 style={{ fontFamily: "'Fraunces', Georgia, serif", fontSize: 'clamp(28px, 4vw, 44px)', fontWeight: 700, letterSpacing: '-0.03em', lineHeight: 1.15, color: 'var(--text-primary)', margin: '0 0 12px' }}>
+            About &amp; Privacy
+          </h1>
+          <p style={{ fontSize: 15, color: 'var(--text-muted)', lineHeight: 1.6, margin: 0 }}>
+            Last updated: June 2026 · A passion project helping Victorians discover their backyard.
+          </p>
+        </div>
+      </section>
 
-        <h1 style={{ fontFamily: "'Fraunces', Georgia, serif", fontSize: 36, fontWeight: 700, letterSpacing: '-0.03em', marginBottom: 6, color: '#1C1C1A' }}>
-          About &amp; Privacy
-        </h1>
-        <p style={{ fontSize: 13, color: '#8C8A87', marginBottom: 48, lineHeight: 1.6 }}>
-          Last updated: June 2026
-        </p>
+      {/* Content */}
+      <div style={{ maxWidth: 720, margin: '0 auto', padding: '48px 28px 80px' }}>
 
         <Section title="Why Unplanned Escapes Exists">
           <p style={p}>
@@ -130,11 +142,12 @@ export function PrivacyPage({ onBack }: { onBack: () => void }) {
 
           <SourceGroup label="Live Information">
             <SourceEntry
-              name="Open-Meteo"
-              url="https://open-meteo.com"
-              what="Weather forecasts for your destination. Only the destination coordinates are sent — no personal data."
-              licence="Free for non-commercial use"
-              licenceUrl="https://open-meteo.com/en/terms"
+              name="MET Norway (api.met.no)"
+              url="https://api.met.no"
+              what="Weather forecasts for your destination from the Norwegian Meteorological Institute. Freely available worldwide — only destination coordinates are sent, no personal data."
+              licence="Norwegian Licence for Open Government Data (NLOD)"
+              licenceUrl="https://api.met.no/doc/License"
+              attribution="Weather forecast from MET Norway"
             />
             <SourceEntry
               name="Service Victoria — Fair Fuel Open Data"
@@ -219,24 +232,34 @@ export function PrivacyPage({ onBack }: { onBack: () => void }) {
 
       </div>
 
-      {/* Footer */}
-      <footer style={{ background: GREEN, padding: '28px 28px' }}>
-        <div style={{ maxWidth: 720, margin: '0 auto' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12, marginBottom: 16 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <img src={logoSrc} alt="Unplanned Escapes" width={36} height={36} style={{ objectFit: 'contain', filter: 'brightness(0) invert(1)', opacity: 0.9 }} />
-              <span style={{ fontFamily: "'Fraunces', Georgia, serif", fontSize: 14, fontWeight: 700, color: '#fff', letterSpacing: '-0.02em' }}>Unplanned Escapes</span>
+      {/* Footer — matches LandingPage exactly */}
+      <footer style={{ background: GREEN, padding: '32px 28px 24px' }}>
+        <div style={{ maxWidth: 1100, margin: '0 auto' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 16, marginBottom: 20 }}>
+            <div style={{ fontFamily: "'Fraunces', Georgia, serif", fontSize: 16, fontWeight: 700, color: '#fff', letterSpacing: '-0.02em', lineHeight: 1.2 }}>
+              Unplanned Escapes
+              <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.55)', letterSpacing: '0.09em', textTransform: 'uppercase', fontWeight: 500, marginTop: 1 }}>Victoria</div>
             </div>
+            <div style={{ display: 'flex', gap: 20, alignItems: 'center' }}>
+              <a href="/changelog" style={{ color: 'rgba(255,255,255,0.7)', fontSize: 12.5, textDecoration: 'none', letterSpacing: '-0.01em' }}>What's new</a>
+              <a href="/privacy" style={{ color: 'rgba(255,255,255,0.7)', fontSize: 12.5, textDecoration: 'none', letterSpacing: '-0.01em' }}>Privacy &amp; About</a>
+            </div>
+          </div>
+          <div style={{ marginBottom: 16, fontSize: 11.5, color: 'rgba(255,255,255,0.5)', lineHeight: 1.7 }}>
+            Map data © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer" style={{ color: 'rgba(255,255,255,0.75)' }}>OpenStreetMap contributors</a>
+            {' '}(ODbL) · Map tiles © <a href="https://carto.com/attributions" target="_blank" rel="noopener noreferrer" style={{ color: 'rgba(255,255,255,0.75)' }}>CARTO</a>
+            {' '}· Destination content © <a href="https://en.wikipedia.org" target="_blank" rel="noopener noreferrer" style={{ color: 'rgba(255,255,255,0.75)' }}>Wikipedia contributors</a>
+            {' '}(CC BY-SA) · Trail data © <a href="https://www.data.vic.gov.au" target="_blank" rel="noopener noreferrer" style={{ color: 'rgba(255,255,255,0.75)' }}>DataVic</a>
+            {' '}(CC BY 4.0) · Heritage data © <a href="https://vhd.heritagecouncil.vic.gov.au" target="_blank" rel="noopener noreferrer" style={{ color: 'rgba(255,255,255,0.75)' }}>Heritage Council Victoria</a>
+            {' '}(CC BY 4.0) · Fuel data © State of Victoria · Weather by{' '}
+            <a href="https://api.met.no" target="_blank" rel="noopener noreferrer" style={{ color: 'rgba(255,255,255,0.75)' }}>MET Norway</a>
+          </div>
+          <div style={{ borderTop: '1px solid rgba(255,255,255,0.12)', paddingTop: 14, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
+            <span style={{ fontSize: 11.5, color: 'rgba(255,255,255,0.5)' }}>Helping Victorians escape, one weekend at a time.</span>
             <span style={{ fontSize: 11.5, color: 'rgba(255,255,255,0.5)' }}>
               Created by <span style={{ color: 'rgba(255,255,255,0.8)', fontWeight: 600 }}>Cubix IT Solutions</span>
             </span>
           </div>
-          <p style={{ margin: 0, fontSize: 11.5, color: 'rgba(255,255,255,0.55)', lineHeight: 1.7 }}>
-            Map data © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer" style={{ color: 'rgba(255,255,255,0.75)' }}>OpenStreetMap contributors</a> (ODbL) ·{' '}
-            Map tiles © <a href="https://carto.com/attributions" target="_blank" rel="noopener noreferrer" style={{ color: 'rgba(255,255,255,0.75)' }}>CARTO</a> ·{' '}
-            Destination summaries © <a href="https://en.wikipedia.org" target="_blank" rel="noopener noreferrer" style={{ color: 'rgba(255,255,255,0.75)' }}>Wikipedia contributors</a> (CC BY-SA) ·{' '}
-            Fuel data © State of Victoria
-          </p>
         </div>
       </footer>
     </div>
@@ -246,10 +269,14 @@ export function PrivacyPage({ onBack }: { onBack: () => void }) {
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <section style={{ marginBottom: 52 }}>
-      <h2 style={{ fontFamily: "'Fraunces', Georgia, serif", fontSize: 22, fontWeight: 700, letterSpacing: '-0.02em', color: '#002112', marginBottom: 18, borderBottom: '2px solid #B7EDCA', paddingBottom: 12 }}>
+      <h2 style={{
+        fontFamily: "'Fraunces', Georgia, serif", fontSize: 22, fontWeight: 700,
+        letterSpacing: '-0.02em', color: 'var(--text-primary)',
+        marginBottom: 18, borderBottom: '1px solid var(--border)', paddingBottom: 14,
+      }}>
         {title}
       </h2>
-      <div style={{ fontSize: 15, lineHeight: 1.8, color: '#3A3835' }}>
+      <div style={{ fontSize: 15, lineHeight: 1.8, color: 'var(--text-secondary)' }}>
         {children}
       </div>
     </section>
@@ -259,7 +286,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 function SourceGroup({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div style={{ marginBottom: 28 }}>
-      <div style={{ fontSize: 11, fontWeight: 700, color: '#8C8A87', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 10 }}>
+      <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 10 }}>
         {label}
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -274,18 +301,18 @@ function SourceEntry({ name, url, what, licence, licenceUrl, attribution }: {
   licence: string; licenceUrl: string; attribution?: string
 }) {
   return (
-    <div style={{ background: '#F2F5F1', borderRadius: 16, border: 'none', padding: '16px 20px' }}>
+    <div style={{ background: 'var(--bg-muted)', borderRadius: 'var(--radius-md)', padding: '14px 18px' }}>
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, marginBottom: 6, flexWrap: 'wrap' }}>
         <a href={url} target="_blank" rel="noopener noreferrer" style={{ fontWeight: 700, fontSize: 14, color: GREEN, textDecoration: 'none' }}>
           {name} ↗
         </a>
-        <a href={licenceUrl} target="_blank" rel="noopener noreferrer" style={{ fontSize: 11, color: '#8C8A87', background: '#F3F2F0', padding: '2px 8px', borderRadius: 20, textDecoration: 'none', whiteSpace: 'nowrap' }}>
+        <a href={licenceUrl} target="_blank" rel="noopener noreferrer" style={{ fontSize: 11, color: 'var(--text-muted)', background: 'var(--bg-subtle)', padding: '2px 8px', borderRadius: 20, textDecoration: 'none', whiteSpace: 'nowrap' }}>
           {licence}
         </a>
       </div>
-      <p style={{ margin: 0, fontSize: 13.5, color: '#3A3835', lineHeight: 1.65 }}>{what}</p>
+      <p style={{ margin: 0, fontSize: 13.5, color: 'var(--text-secondary)', lineHeight: 1.65 }}>{what}</p>
       {attribution && (
-        <p style={{ margin: '6px 0 0', fontSize: 12, color: '#8C8A87' }}>{attribution}</p>
+        <p style={{ margin: '6px 0 0', fontSize: 12, color: 'var(--text-muted)' }}>{attribution}</p>
       )}
     </div>
   )
