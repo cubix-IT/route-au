@@ -40,3 +40,4 @@
 {"run_at":"2026-06-07T21:56:56.700Z","completed_at":"2026-06-07T22:02:19.645Z","duration_sec":323,"mode":"slug:warburton","destinations":1,"upserted":51,"pbf_source":"geofabrik","results":[{"slug":"warburton","upserted":51}]}
 {"run_at":"2026-06-07T22:00:02.703Z","completed_at":"2026-06-07T22:06:17.761Z","duration_sec":375,"mode":"slug:bendigo-town","destinations":1,"upserted":110,"pbf_source":"geofabrik","results":[{"slug":"bendigo-town","upserted":110}]}
 {"run_at":"2026-06-07T22:00:02.810Z","completed_at":"2026-06-07T22:06:21.470Z","duration_sec":379,"mode":"slug:apollo-bay","destinations":1,"upserted":34,"pbf_source":"geofabrik","results":[{"slug":"apollo-bay","upserted":34}]}
+{"run_at":"2026-06-07T22:00:03.014Z","completed_at":"2026-06-07T22:06:24.252Z","duration_sec":381,"mode":"slug:bright-town","destinations":1,"upserted":52,"pbf_source":"geofabrik","results":[{"slug":"bright-town","upserted":52}]}
