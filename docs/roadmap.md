@@ -32,6 +32,15 @@
 - [x] Scrollbar hidden on horizontal chip rows (mobile)
 - [x] Sub-destination tabs on cluster cards match unified chip spec
 
+## Phase 1.6 — Mobile UX + M3 Polish ✅ (2026-06-07)
+- [x] Removed wikiSummary "About" section everywhere (was showing unreliable content)
+- [x] Mobile landing: overview tiles replace About — Things to Do + Food & Drinks (M3 2-col tonal card grid) + Stay row + slim weather bar
+- [x] Category tiles tap → filtered activity list with ‹ Back to overview
+- [x] Wizard date strip: 3 days/page on mobile, weather emoji + max°/min° per day, compact card height
+- [x] Loading screen: centred M3 layout, wave shimmer linear progress bar
+- [x] useWeather hook: added hourly forecast data (temperature, weathercode, precip probability)
+- [x] Desktop: wikiSummary removed from ThingsTile, TripSummaryPanel, ItineraryPanel
+
 ## Phase 2 — Auth + Domain (next)
 - [ ] **Run migration 006 in Supabase SQL Editor** (`supabase/migrations/006_auth_profiles_trips.sql`)
 - [ ] **Enable Google OAuth in Supabase Dashboard**
