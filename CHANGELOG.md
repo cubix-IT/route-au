@@ -1,6 +1,11 @@
 # Changelog
 
-## 8 June 2026 (pending)
+## 8 June 2026 (bbc6fd5)
+
+- **Wizard step 3 two-col layout + generating screen discovery grid**
+  - Step 3: destination/stats left, fuel right — no scroll needed
+
+## 8 June 2026 (bbc6fd5)
 
 - **Wizard Step 3 two-column layout + generating screen discovery grid**
   - Step 3 (Review): destination hero + stats grid on left (55%), fuel stops on right (45%) — fits without scrolling
