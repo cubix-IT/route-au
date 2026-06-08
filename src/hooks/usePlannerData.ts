@@ -264,6 +264,7 @@ export function usePlannerData() {
     setWikiSummary(null)
     setDbLoading(true)
     useAppStore.getState().setTripDataReady(false)
+    useAppStore.getState().setLoadingCounts({})
 
     // Primary: fetch everything from Supabase DB (instant, no per-user API cost)
     fetchDestinationFromDB(destId, destCoord ?? undefined).then((result) => {
@@ -275,6 +276,12 @@ export function usePlannerData() {
         setDbFood(result.food)
         setDbAccommodation(result.accommodation)
         if (result.wikiSummary) setWikiSummary(result.wikiSummary)
+        const counts: Record<string, number> = {}
+        result.activities.forEach((a) => { counts[a.category.toLowerCase()] = (counts[a.category.toLowerCase()] ?? 0) + 1 })
+        result.nature.forEach((n) => { const k = (n.type ?? 'nature').toLowerCase(); counts[k] = (counts[k] ?? 0) + 1 })
+        result.food.forEach((f) => { const k = f.category.toLowerCase(); counts[k] = (counts[k] ?? 0) + 1 })
+        result.accommodation.forEach((a) => { const k = (a.type ?? 'hotel').toLowerCase(); counts[k] = (counts[k] ?? 0) + 1 })
+        useAppStore.getState().setLoadingCounts(counts)
 
         // Async: compute drive times from destCoord to all POIs (OSRM table — one request)
         // Used to filter far-away POIs (>45 min) and annotate cards with distance

@@ -1522,93 +1522,99 @@ function StepSummary({ effectiveDest, startDate, endDate, tripType, crewType, ve
   const vehicleLabel = ({ Sedan: 'Sedan', AWD: 'SUV / AWD', HighClearance4WD: '4WD', '4WD_WithCaravan': 'Van / Caravan', Electric: 'Electric' } as Record<string, string>)[vehicleType] ?? vehicleType
   const fuelLabel = ({ Unleaded95: 'Unleaded 95', Unleaded98: 'Unleaded 98', Diesel: 'Diesel', Electric: 'Electric' } as Record<string, string>)[fuelType] ?? fuelType
 
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-      <div>
-        <h2 style={{ fontSize: 20, fontWeight: 800, color: 'var(--text-primary)', letterSpacing: '-0.03em', marginBottom: 4 }}>
-          Review your trip
-        </h2>
-        <p style={{ fontSize: 13, color: 'var(--text-muted)' }}>Everything look right? Hit the button to build your itinerary.</p>
+  const fuelSection = skipFuel ? (
+    <div style={{ padding: '12px 14px', background: 'var(--bg-muted)', borderRadius: 12, color: 'var(--text-muted)', fontSize: 13 }}>
+      Fuel preferences skipped — fill up wherever suits you
+    </div>
+  ) : vehicleType === 'Electric' ? (
+    <div style={{ padding: '12px 14px', background: 'var(--bg-muted)', borderRadius: 12, color: 'var(--text-muted)', fontSize: 13 }}>
+      No fuel stops needed for your electric vehicle
+    </div>
+  ) : (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+      <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.07em', display: 'flex', alignItems: 'center', gap: 8 }}>
+        Fuel near your route
+        {estCost !== null && <span style={{ color: GREEN, fontWeight: 700, textTransform: 'none', letterSpacing: 0, fontSize: 12 }}>· Est. ~${estCost}</span>}
       </div>
-
-      {/* Destination hero */}
-      <div style={{
-        borderRadius: 16, background: '#ECF0EB',
-        padding: '18px 20px',
-      }}>
-        <div style={{ fontSize: 10, fontWeight: 700, color: GREEN, textTransform: 'uppercase', letterSpacing: '0.09em', marginBottom: 6 }}>
-          Destination
-        </div>
-        <div style={{ fontSize: 20, fontWeight: 900, color: '#1C1B1F', letterSpacing: '-0.025em', lineHeight: 1.15 }}>
-          {effectiveDest?.name ?? '—'}
-        </div>
-        <div style={{ fontSize: 12, color: '#6B7280', marginTop: 4 }}>
-          from {originName} · ~{estKm} km one way
-        </div>
-      </div>
-
-      {/* Stats grid */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-        <SummaryTile label="Date" value={startDate ? fmtDate(startDate) : 'Not set'} />
-        {tripType === 'multiday' && endDate
-          ? <SummaryTile label="Return" value={fmtDate(endDate)} />
-          : <SummaryTile label="Trip type" value={tripType === 'day' ? 'Day trip' : 'Overnight+'} />
-        }
-        <SummaryTile label="Crew" value={{ solo: 'Solo', couple: 'Couple', family: 'Family', group: 'Group' }[crewType] ?? crewType} />
-        <SummaryTile label="Vehicle" value={vehicleLabel} />
-        {vehicleType !== 'Electric' && <SummaryTile label="Fuel type" value={fuelLabel} />}
-        <SummaryTile label="Est. round trip" value={`~${estKmRound} km`} />
-      </div>
-
-      {/* Fuel stops */}
-      {skipFuel ? (
-        <div style={{ padding: '12px 16px', background: 'var(--bg-muted)', borderRadius: 12, color: 'var(--text-muted)', fontSize: 13 }}>
-          Fuel preferences skipped — fill up wherever suits you
-        </div>
-      ) : vehicleType === 'Electric' ? (
-        <div style={{ padding: '12px 16px', background: 'var(--bg-muted)', borderRadius: 12, color: 'var(--text-muted)', fontSize: 13 }}>
-          No fuel stops needed for your electric vehicle
-        </div>
+      {loadingFuel ? (
+        <div style={{ textAlign: 'center', padding: 14, color: 'var(--text-muted)', fontSize: 12 }}>Finding stations…</div>
+      ) : fuelStations.length === 0 ? (
+        <div style={{ textAlign: 'center', padding: 14, color: 'var(--text-muted)', fontSize: 12 }}>No station data for this route</div>
       ) : (
-        <div>
-          <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
-            Fuel near your route
-            {estCost !== null && <span style={{ color: GREEN, fontWeight: 700, textTransform: 'none', letterSpacing: 0, fontSize: 12 }}>· Est. ~${estCost}</span>}
-          </div>
-          {loadingFuel ? (
-            <div style={{ textAlign: 'center', padding: 14, color: 'var(--text-muted)', fontSize: 12 }}>Finding stations near your route…</div>
-          ) : fuelStations.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: 14, color: 'var(--text-muted)', fontSize: 12 }}>No station data available for this route</div>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-              {fuelStations.map((st, i) => (
-                <div key={st.id} style={{
-                  display: 'flex', alignItems: 'center', gap: 10,
-                  padding: '10px 12px', borderRadius: 10,
-                  background: '#fff', border: '1px solid var(--border)',
-                }}>
-                  <div style={{
-                    width: 30, height: 30, borderRadius: '50%',
-                    background: RANK_COLORS[i], color: '#fff',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    fontSize: 10, fontWeight: 800, flexShrink: 0,
-                  }}>{RANK_LABELS[i]}</div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {st.name}
-                    </div>
-                    <div style={{ fontSize: 10, color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{st.address}</div>
-                  </div>
-                  <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                    <div style={{ fontSize: 15, fontWeight: 800, color: RANK_COLORS[i] }}>${st.pricePerLitre.toFixed(3)}</div>
-                    <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>{st.distanceKm} km away</div>
-                  </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          {fuelStations.map((st, i) => (
+            <div key={st.id} style={{
+              display: 'flex', alignItems: 'center', gap: 10,
+              padding: '10px 12px', borderRadius: 10,
+              background: '#fff', border: '1px solid var(--border)',
+            }}>
+              <div style={{
+                width: 28, height: 28, borderRadius: '50%',
+                background: RANK_COLORS[i], color: '#fff',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: 10, fontWeight: 800, flexShrink: 0,
+              }}>{RANK_LABELS[i]}</div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {st.name}
                 </div>
-              ))}
+                <div style={{ fontSize: 10, color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{st.address}</div>
+              </div>
+              <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                <div style={{ fontSize: 14, fontWeight: 800, color: RANK_COLORS[i] }}>${st.pricePerLitre.toFixed(3)}</div>
+                <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>{st.distanceKm} km</div>
+              </div>
             </div>
-          )}
+          ))}
         </div>
       )}
+    </div>
+  )
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 14, height: '100%' }}>
+      {/* Header */}
+      <div>
+        <h2 style={{ fontSize: 20, fontWeight: 800, color: 'var(--text-primary)', letterSpacing: '-0.03em', marginBottom: 2 }}>
+          Review your trip
+        </h2>
+        <p style={{ fontSize: 13, color: 'var(--text-muted)', margin: 0 }}>Everything look right? Hit the button to build your itinerary.</p>
+      </div>
+
+      {/* Two-column body */}
+      <div style={{ display: 'flex', gap: 16, flex: 1, minHeight: 0 }}>
+        {/* Left — destination + stats */}
+        <div style={{ flex: '0 0 55%', display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <div style={{ borderRadius: 16, background: '#ECF0EB', padding: '14px 16px' }}>
+            <div style={{ fontSize: 10, fontWeight: 700, color: GREEN, textTransform: 'uppercase', letterSpacing: '0.09em', marginBottom: 4 }}>
+              Destination
+            </div>
+            <div style={{ fontSize: 20, fontWeight: 900, color: '#1C1B1F', letterSpacing: '-0.025em', lineHeight: 1.15 }}>
+              {effectiveDest?.name ?? '—'}
+            </div>
+            <div style={{ fontSize: 12, color: '#6B7280', marginTop: 3 }}>
+              from {originName} · ~{estKm} km one way
+            </div>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+            <SummaryTile label="Date" value={startDate ? fmtDate(startDate) : 'Not set'} />
+            {tripType === 'multiday' && endDate
+              ? <SummaryTile label="Return" value={fmtDate(endDate)} />
+              : <SummaryTile label="Trip type" value={tripType === 'day' ? 'Day trip' : 'Overnight+'} />
+            }
+            <SummaryTile label="Crew" value={{ solo: 'Solo', couple: 'Couple', family: 'Family', group: 'Group' }[crewType] ?? crewType} />
+            <SummaryTile label="Vehicle" value={vehicleLabel} />
+            {vehicleType !== 'Electric' && <SummaryTile label="Fuel type" value={fuelLabel} />}
+            <SummaryTile label="Est. round trip" value={`~${estKmRound} km`} />
+          </div>
+        </div>
+
+        {/* Right — fuel */}
+        <div style={{ flex: 1, minWidth: 0 }}>
+          {fuelSection}
+        </div>
+      </div>
     </div>
   )
 }
@@ -1815,6 +1821,76 @@ function StepPlanningDetails({
   )
 }
 
+// ── Discovery grid shown during generation ────────────────────────
+
+const DISCOVERY_CATS: { key: string; label: string; emoji: string }[] = [
+  { key: 'nature',        label: 'Nature',       emoji: '🌿' },
+  { key: 'viewpoint',     label: 'Viewpoints',   emoji: '🌄' },
+  { key: 'active',        label: 'Active',       emoji: '🏄' },
+  { key: 'wildlife',      label: 'Wildlife',     emoji: '🦘' },
+  { key: 'history',       label: 'History',      emoji: '🏛️' },
+  { key: 'art',           label: 'Art',          emoji: '🎨' },
+  { key: 'relaxation',    label: 'Relax',        emoji: '🧖' },
+  { key: 'entertainment', label: 'Entertainment',emoji: '🎵' },
+  { key: 'winery',        label: 'Wineries',     emoji: '🍷' },
+  { key: 'brewery',       label: 'Breweries',    emoji: '🍺' },
+  { key: 'cafe',          label: 'Cafes',        emoji: '☕' },
+  { key: 'restaurant',    label: 'Restaurants',  emoji: '🍽️' },
+  { key: 'hotel',         label: 'Hotels',       emoji: '🏨' },
+  { key: 'campsite',      label: 'Camping',      emoji: '⛺' },
+]
+
+// progress 0–100, counts: final values from DB
+// Each tile shows Math.round(progress/100 * finalCount) — synced to progress bar
+// Color intensity scales with progress: background and text get darker/brighter as bar fills
+function DiscoveryGrid({ counts, progress }: { counts: Record<string, number>; progress: number }) {
+  const pct = Math.min(progress / 100, 1)
+
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(86px, 1fr))', gap: 7 }}>
+      {DISCOVERY_CATS.map(({ key, label, emoji }) => {
+        const final = counts[key] ?? 0
+        const display = final > 0 ? Math.max(1, Math.round(pct * final)) : 0
+        // Interpolate bg: #ECF0EB → #B7EDCA, text: #C5CAC4 → GREEN
+        // Use pct only when final > 0 (category has data)
+        const intensity = final > 0 ? pct : 0
+        // bg: mix(#ECF0EB, #B7EDCA, intensity)
+        const r = Math.round(0xEC + (0xB7 - 0xEC) * intensity)
+        const g = Math.round(0xF0 + (0xED - 0xF0) * intensity)
+        const b = Math.round(0xEB + (0xCA - 0xEB) * intensity)
+        const bg = `rgb(${r},${g},${b})`
+        // number color: mix(#C5CAC4, GREEN=#3A6B4F, intensity)
+        const nr = Math.round(0xC5 + (0x3A - 0xC5) * intensity)
+        const ng = Math.round(0xCA + (0x6B - 0xCA) * intensity)
+        const nb = Math.round(0xC4 + (0x4F - 0xC4) * intensity)
+        const numColor = `rgb(${nr},${ng},${nb})`
+
+        return (
+          <div key={key} style={{
+            padding: '10px 8px 8px', borderRadius: 12,
+            background: bg,
+            display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 2,
+          }}>
+            <div style={{ fontSize: 15, lineHeight: 1, opacity: final > 0 ? 1 : 0.35 }}>{emoji}</div>
+            <div style={{
+              fontSize: 17, fontWeight: 900, letterSpacing: '-0.02em', lineHeight: 1.1,
+              color: numColor, minHeight: 20,
+            }}>
+              {final > 0 ? display : '—'}
+            </div>
+            <div style={{
+              fontSize: 9.5, fontWeight: 600, lineHeight: 1.2,
+              color: final > 0 ? `rgb(${Math.round(0x9C + (0x2E - 0x9C) * intensity)},${Math.round(0xA3 + (0x5F - 0xA3) * intensity)},${Math.round(0xAF + (0x44 - 0xAF) * intensity)})` : '#C0C7BF',
+            }}>
+              {label}
+            </div>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
 // ── Generating screen ─────────────────────────────────────────────
 
 function GeneratingScreen({ step, messages, destName, originName, crewType, startDate, tripType }: {
@@ -1823,6 +1899,7 @@ function GeneratingScreen({ step, messages, destName, originName, crewType, star
   crewType: CrewType; startDate: string; tripType: TripType
 }) {
   const progress = ((step + 1) / messages.length) * 100
+  const loadingCounts = useAppStore((s) => s.loadingCounts)
 
   const crewLabel: Record<CrewType, string> = { solo: 'Solo', couple: 'Couple', family: 'Family', group: 'Group' }
   const tripLabel = tripType === 'day' ? 'Day trip' : 'Overnight'
@@ -1873,7 +1950,7 @@ function GeneratingScreen({ step, messages, destName, originName, crewType, star
         </div>
       </div>
 
-      {/* Progress + step list */}
+      {/* Progress + counts */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 16, flex: 1, justifyContent: 'center' }}>
         {/* Current step label */}
         <div style={{ fontSize: 14, fontWeight: 500, color: '#6B7280' }}>
@@ -1889,37 +1966,8 @@ function GeneratingScreen({ step, messages, destName, originName, crewType, star
           }} />
         </div>
 
-        {/* Step list */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          {messages.map((msg, i) => {
-            const done = i < step
-            const active = i === step
-            return (
-              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                <div style={{
-                  width: 22, height: 22, borderRadius: '50%', flexShrink: 0,
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  background: done ? '#DCF0E4' : active ? GREEN : '#ECF0EB',
-                  transition: 'background 0.3s',
-                }}>
-                  {done
-                    ? <svg width="11" height="11" viewBox="0 0 12 12" fill="none"><path d="M2 6l3 3 5-5" stroke={GREEN} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                    : active
-                    ? <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#fff' }} />
-                    : <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#C5CAC4' }} />
-                  }
-                </div>
-                <span style={{
-                  fontSize: 13, fontWeight: active ? 600 : 400,
-                  color: done ? GREEN : active ? '#1C1B1F' : '#9CA3AF',
-                  transition: 'color 0.3s',
-                }}>
-                  {msg}
-                </span>
-              </div>
-            )
-          })}
-        </div>
+        {/* Live discovery tiles — one per category, counts scale with progress */}
+        <DiscoveryGrid counts={loadingCounts} progress={progress} />
       </div>
     </div>
   )

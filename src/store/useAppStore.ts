@@ -154,6 +154,10 @@ interface AppState {
   tripDataReady: boolean
   setTripDataReady: (v: boolean) => void
 
+  // Live loading counts per category — updated as data arrives; shown in GeneratingScreen
+  loadingCounts: Record<string, number>
+  setLoadingCounts: (c: Record<string, number>) => void
+
   // Overpass/OSM data mode
   placesLimitedMode: boolean
   setPlacesLimitedMode: (v: boolean) => void
@@ -279,6 +283,9 @@ export const useAppStore = create<AppState>()(
 
       tripDataReady: false,
       setTripDataReady: (v) => set({ tripDataReady: v }),
+
+      loadingCounts: {},
+      setLoadingCounts: (c) => set({ loadingCounts: c }),
 
       placesLimitedMode: false,
       setPlacesLimitedMode: (v) => set({ placesLimitedMode: v }),

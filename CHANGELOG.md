@@ -1,5 +1,19 @@
 # Changelog
 
+## 8 June 2026 (pending)
+
+- **Wizard Step 3 two-column layout + generating screen discovery grid**
+  - Step 3 (Review): destination hero + stats grid on left (55%), fuel stops on right (45%) — fits without scrolling
+  - GeneratingScreen: replaced step list with 14 category discovery tiles (Nature, Viewpoints, Active, Wildlife, History, Art, Relax, Entertainment, Wineries, Breweries, Cafes, Restaurants, Hotels, Camping)
+  - Counts animate from 0 → final in sync with the progress bar (display = round(progress% × finalCount))
+  - Tile background and text colour interpolate from muted grey-green → vivid bright green as progress fills — categories with zero results stay permanently grey
+  - Per-category counts pushed to Zustand store from usePlannerData as data arrives; reset to `{}` on each new trip build
+
+## 8 June 2026 (57ac308)
+
+- **Desktop Overview tab + hourly weather, M3 slider, loading screen, wizard polish**
+  - ExperiencePanel: replace All tab with Overview — 3-col category tiles for
+
 ## 8 June 2026 (817cbf1)
 
 - **Wizard UI polish, theme/recommendation engine, map marker fix**
