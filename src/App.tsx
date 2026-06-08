@@ -13,6 +13,7 @@ import { useOfflineSync } from '@/hooks/useOfflineSync'
 import { useAuth } from '@/hooks/useAuth'
 import { useAppStore } from '@/store/useAppStore'
 import { AuthModal } from '@/components/auth/AuthModal'
+import { VICTORIAN_CLUSTERS } from '@/data/victorianClusters'
 
 type View = 'landing' | 'planner'
 
@@ -62,6 +63,20 @@ function App() {
   const activeItinerary = useAppStore((s) => s.activeItinerary)
   const isMobile = useIsMobile()
   const isWide   = useIsWide()
+
+  // Deep-link from SEO pages: /?dest=healesville&cluster=yarra-valley
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const destId = params.get('dest')
+    const clusterId = params.get('cluster')
+    if (!destId || !clusterId) return
+    const cluster = VICTORIAN_CLUSTERS.find(c => c.id === clusterId)
+    const sub = cluster?.subDests.find(s => s.id === destId)
+    if (!sub || !cluster) return
+    useAppStore.getState().setPreselectedDest({ corridorId: cluster.id, destId: sub.id, destName: sub.name, destCoord: sub.coord })
+    useAppStore.getState().setWizardOpen(true)
+    window.history.replaceState({}, '', window.location.pathname)
+  }, [])
 
   const [view, setView] = useState<View>(() => activeItinerary ? 'planner' : 'landing')
   useEffect(() => {
