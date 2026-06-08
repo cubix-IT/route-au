@@ -1571,6 +1571,8 @@ function StepSummary({ effectiveDest, startDate, endDate, tripType, crewType, ve
     </div>
   )
 
+  const isMobile = typeof window !== 'undefined' && window.innerWidth < 600
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14, height: '100%' }}>
       {/* Header */}
@@ -1581,10 +1583,10 @@ function StepSummary({ effectiveDest, startDate, endDate, tripType, crewType, ve
         <p style={{ fontSize: 13, color: 'var(--text-muted)', margin: 0 }}>Everything look right? Hit the button to build your itinerary.</p>
       </div>
 
-      {/* Two-column body */}
-      <div style={{ display: 'flex', gap: 16, flex: 1, minHeight: 0 }}>
-        {/* Left — destination + stats */}
-        <div style={{ flex: '0 0 55%', display: 'flex', flexDirection: 'column', gap: 10 }}>
+      {/* Body — two columns on desktop, stacked on mobile */}
+      <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: 16, flex: 1, minHeight: 0 }}>
+        {/* Destination + stats */}
+        <div style={{ flex: isMobile ? 'none' : '0 0 55%', display: 'flex', flexDirection: 'column', gap: 10 }}>
           <div style={{ borderRadius: 16, background: '#ECF0EB', padding: '14px 16px' }}>
             <div style={{ fontSize: 10, fontWeight: 700, color: GREEN, textTransform: 'uppercase', letterSpacing: '0.09em', marginBottom: 4 }}>
               Destination
@@ -1610,7 +1612,7 @@ function StepSummary({ effectiveDest, startDate, endDate, tripType, crewType, ve
           </div>
         </div>
 
-        {/* Right — fuel */}
+        {/* Fuel */}
         <div style={{ flex: 1, minWidth: 0 }}>
           {fuelSection}
         </div>
@@ -1845,9 +1847,10 @@ const DISCOVERY_CATS: { key: string; label: string; emoji: string }[] = [
 // Color intensity scales with progress: background and text get darker/brighter as bar fills
 function DiscoveryGrid({ counts, progress }: { counts: Record<string, number>; progress: number }) {
   const pct = Math.min(progress / 100, 1)
+  const isMobile = typeof window !== 'undefined' && window.innerWidth < 600
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(86px, 1fr))', gap: 7 }}>
+    <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(4, 1fr)' : 'repeat(auto-fill, minmax(86px, 1fr))', gap: isMobile ? 6 : 7 }}>
       {DISCOVERY_CATS.map(({ key, label, emoji }) => {
         const final = counts[key] ?? 0
         const display = final > 0 ? Math.max(1, Math.round(pct * final)) : 0
@@ -1867,7 +1870,7 @@ function DiscoveryGrid({ counts, progress }: { counts: Record<string, number>; p
 
         return (
           <div key={key} style={{
-            padding: '10px 8px 8px', borderRadius: 12,
+            padding: isMobile ? '8px 6px 6px' : '10px 8px 8px', borderRadius: 12,
             background: bg,
             display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 2,
           }}>
