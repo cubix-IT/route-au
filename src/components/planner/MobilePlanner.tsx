@@ -399,7 +399,6 @@ export function MobilePlanner() {
             ...((d.dbFood?.length ?? 0) > 0 ? [['food', '🍽 Food & Drinks']] : []),
             ['stay', '🏨 Stay'],
             ...(scheduledPlan.items.length > 0 ? [['plan', `Your Plan (${scheduledPlan.items.length})`]] : []),
-            ...(hasFuel ? [['fuel', '⛽ Fuel']] : []),
           ] as [FilterTab, string][]).map(([t, label]) => (
             <button key={t} onClick={() => {
               setTab(t); setCatFilter('all')

@@ -158,7 +158,7 @@ export function ProfileWizard() {
   const [skipFuel, setSkipFuel] = useState(false)
   const [accommodation, setAccommodation] = useState<AccommodationPreference>('Any')
 
-  const totalSteps = isPreselected ? 3 : 5 // 0..2 for preselect, 0..4 for discovery
+  const totalSteps = isPreselected ? 2 : 4 // 0..1 for preselect, 0..3 for discovery
 
   if (!isWizardOpen) return null
 
@@ -179,7 +179,7 @@ export function ProfileWizard() {
   }
 
   const handleNext = async () => {
-    const lastStep = isPreselected ? 2 : 4
+    const lastStep = isPreselected ? 1 : 3
 
     // Step 1 in discovery mode → compute suggestions, derive dining prefs, advance
     if (!isPreselected && step === 1) {
@@ -359,18 +359,16 @@ export function ProfileWizard() {
   const msgs = ['Finding your route…', 'Matching experiences…', 'Building your day…', 'Almost ready…']
 
   // ── Step labels + subtitles (#17) ──
-  const discoveryStepLabels = ['How far & who', 'What you love', 'Pick a spot', 'Your vehicle', 'Trip summary']
+  const discoveryStepLabels = ['How far & who', 'What you love', 'Pick a spot', 'Trip summary']
   const discoveryStepSubtitles = [
     'Tell us how far you want to travel and who\'s coming',
     'We\'ll match destinations to what you enjoy',
     'Choose from your personalised recommendations',
-    'Help us find fuel stops along the way',
     'Review your trip before we build it',
   ]
-  const preselectedStepLabels = ['Your trip details', 'Your vehicle', 'Trip summary']
+  const preselectedStepLabels = ['Your trip details', 'Trip summary']
   const preselectedStepSubtitles = [
     'Set your dates and who\'s coming',
-    'Help us find fuel stops along the way',
     'Review your trip before we build it',
   ]
   const stepLabels = isPreselected ? preselectedStepLabels : discoveryStepLabels
@@ -467,13 +465,6 @@ export function ProfileWizard() {
                 />
               )}
               {step === 1 && (
-                <StepVehicle
-                  vehicleType={vehicleType} setVehicleType={setVehicleType}
-                  fuelType={fuelType} setFuelType={setFuelType}
-                  skipFuel={skipFuel} setSkipFuel={setSkipFuel}
-                />
-              )}
-              {step === 2 && (
                 <StepSummary
                   effectiveDest={effectiveDest}
                   startDate={startDate}
@@ -516,13 +507,6 @@ export function ProfileWizard() {
                 />
               )}
               {step === 3 && (
-                <StepVehicle
-                  vehicleType={vehicleType} setVehicleType={setVehicleType}
-                  fuelType={fuelType} setFuelType={setFuelType}
-                  skipFuel={skipFuel} setSkipFuel={setSkipFuel}
-                />
-              )}
-              {step === 4 && (
                 <StepSummary
                   effectiveDest={effectiveDest}
                   startDate={startDate}
@@ -561,7 +545,7 @@ export function ProfileWizard() {
               cursor: canContinue ? 'pointer' : 'not-allowed',
               transition: 'background 200ms ease, transform 150ms cubic-bezier(0.34,1.4,0.64,1)',
             }}>
-              {step === (isPreselected ? 1 : 4) ? 'Build my trip →' : step === 1 && !isPreselected ? 'Show me options →' : 'Continue →'}
+              {step === (isPreselected ? 1 : 3) ? 'Build my trip →' : step === 1 && !isPreselected ? 'Show me options →' : 'Continue →'}
             </button>
           </div>
         )}

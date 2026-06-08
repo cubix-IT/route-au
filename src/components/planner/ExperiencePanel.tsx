@@ -382,7 +382,6 @@ export function ExperiencePanel({ hideTimeline = false }: { hideTimeline?: boole
           ...((d.dbFood?.length ?? 0) > 0 ? [['food', 'Food & Drinks']] : []),
           ...(trails.length > 0 ? [['trails', 'Trails']] : []),
           ['stay', 'Stay'],
-          ...(d.vehicleProfile && d.vehicleProfile.fuel_type !== 'Electric' && !(d.vehicleProfile as unknown as { skip_fuel?: boolean }).skip_fuel ? [['fuel', 'Fuel']] : []),
         ]) as [string, string][]).map(([f, label]) => (
           <button key={f} onClick={() => handleFilterChange(f as FilterMode)} style={{
             padding: '6px 14px', borderRadius: 20, flexShrink: 0,
