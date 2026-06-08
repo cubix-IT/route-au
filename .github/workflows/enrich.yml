@@ -34,16 +34,16 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Get date for cache key
+        id: date
+        run: echo "date=$(date +'%Y-%m-%d')" >> $GITHUB_OUTPUT
+
       - name: Cache Victoria PBF
         uses: actions/cache@v4
         with:
           path: data/victoria-latest.osm.pbf
           key: victoria-pbf-${{ steps.date.outputs.date }}
           restore-keys: victoria-pbf-
-
-      - name: Get date for cache key
-        id: date
-        run: echo "date=$(date +'%Y-%m-%d')" >> $GITHUB_OUTPUT
 
       - name: Run enrichment
         env:
