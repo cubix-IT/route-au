@@ -352,7 +352,6 @@ export function ExperiencePanel({ hideTimeline = false }: { hideTimeline?: boole
           ['overview',   'Overview'],
           ['activities', 'Things to Do'],
           ...((d.dbFood?.length ?? 0) > 0 ? [['food', 'Food & Drinks']] : []),
-          ...(trails.length > 0 ? [['trails', 'Trails']] : []),
           ['stay', 'Stay'],
           ...(d.vehicleProfile && d.vehicleProfile.fuel_type !== 'Electric' && !(d.vehicleProfile as unknown as { skip_fuel?: boolean }).skip_fuel ? [['fuel', 'Fuel']] : []),
         ]) as [string, string][]).map(([f, label]) => (
@@ -619,11 +618,13 @@ export function ExperiencePanel({ hideTimeline = false }: { hideTimeline?: boole
           for (const a of allThingsToDo) {
             catCounts.set(a.category, (catCounts.get(a.category) ?? 0) + 1)
           }
-          const topCats = [...catCounts.entries()]
+          let topCats = [...catCounts.entries()]
             .filter(([cat]) => cat !== 'family')
             .sort((a, b) => b[1] - a[1])
             .slice(0, 6)
             .map(([cat]) => cat)
+          // Great Trails Victoria live under the walks chip — make sure it shows
+          if (trails.length > 0 && !topCats.includes('walks')) topCats = ['walks', ...topCats]
 
           // Filter by drive time — exclude POIs >45 min from destination (only when OSRM has loaded)
           const MAX_DRIVE_MIN = 45
@@ -933,8 +934,8 @@ export function ExperiencePanel({ hideTimeline = false }: { hideTimeline?: boole
         })()}
 
         {/* ── Trails ── */}
-        {trails.length > 0 && (filter === 'trails' || (hikingSelected && filter === 'activities')) && (
-          <SectionBlock id="section-trails" title="Trails" icon="🥾" count={trails.length} loading={false} empty={false}>
+        {trails.length > 0 && filter === 'activities' && (actCategoryFilter === 'walks' || (hikingSelected && actCategoryFilter === 'all')) && (
+          <SectionBlock id="section-trails" title="Great Trails Victoria" icon="⭐" count={trails.length} loading={false} empty={false}>
             <div style={{ padding: '0 16px', display: 'flex', flexDirection: 'column', gap: 10 }}>
               {trails.map((trail) => {
                 const typeLabel = trail.type === 'walk' ? 'Walking' : trail.type === 'cycle' ? 'Cycling' : 'Mountain Bike'
@@ -952,7 +953,7 @@ export function ExperiencePanel({ hideTimeline = false }: { hideTimeline?: boole
                     <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10 }}>
                       <div>
                         <div style={{ fontSize: 14, fontWeight: 700, color: '#1C1C1A', letterSpacing: '-0.01em', marginBottom: 4 }}>
-                          {trail.name}
+                          ⭐ {trail.name}
                         </div>
                         <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
                           <span style={{ fontSize: 11, fontWeight: 600, color: typeColor, background: typeBg, padding: '2px 8px', borderRadius: 6 }}>

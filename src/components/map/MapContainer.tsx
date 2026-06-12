@@ -36,9 +36,11 @@ export function MapContainer() {
   // ── Legend: pin types currently on the map; tap to hide/show a type ──────
   const [hiddenTypes, setHiddenTypes] = useState<Set<string>>(new Set())
   useEffect(() => { setHiddenTypes(new Set()) }, [activePOIFilter]) // reset per tab
+  // Legend lists ALL pin types (including hidden ones, so they can be
+  // re-enabled) — derived from displayedMapPins, never visiblePins
   const legendEntries = useMemo(() => {
     const byType = new Map<string, { emoji: string; count: number }>()
-    for (const pin of visiblePins) {
+    for (const pin of displayedMapPins) {
       const cur = byType.get(pin.type)
       if (cur) cur.count++
       else byType.set(pin.type, { emoji: pin.emoji ?? '📍', count: 1 })

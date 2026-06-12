@@ -27,7 +27,9 @@ interface AISummary { summary: string | null; bestFor: string[] }
 // ── Maps URL helpers (mirrors ExperiencePanel) ────────────────────────────────
 
 function coordMapsUrl(name: string, lat?: number | null, lng?: number | null): string {
-  if (lat && lng) return `https://www.google.com/maps/maps?q=${lat},${lng}+(${encodeURIComponent(name)})`
+  // maps.google.com/maps — the /maps/maps double-path breaks Google's label
+  // parsing and shows raw DMS coordinates (the "38°12'53.3\"S" bug)
+  if (lat && lng) return `https://maps.google.com/maps?q=${lat},${lng}+(${encodeURIComponent(name)})`
   return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(name + ' Victoria')}`
 }
 

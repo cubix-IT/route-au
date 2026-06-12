@@ -4,6 +4,7 @@ import { MapContainer } from '@/components/map/MapContainer'
 import { usePlannerData } from '@/hooks/usePlannerData'
 import { useAppStore } from '@/store/useAppStore'
 import { useWeather } from '@/hooks/useWeather'
+import { useTrails } from '@/hooks/useTrails'
 import { useDrivingRoute } from '@/hooks/useDrivingRoute'
 import { findCheapestOnRoute, type RouteFuelStation } from '@/lib/fuelOnRoute'
 import type { LivePOI } from '@/lib/overpass'
@@ -51,6 +52,7 @@ const POI_TAG: Record<LivePOI['type'], { emoji: string; label: string; color: st
 }
 
 const CAT_TAG: Record<string, { label: string; color: string; bg: string }> = {
+  walks: { label: 'Trails & Walks', color: '#2F6B4F', bg: '#DCF0E4' },
   nature:     { label: 'Nature',        color: '#2D7A4A', bg: '#E8F5EE' },
   active:     { label: 'Outdoor',       color: '#2563EB', bg: '#EFF6FF' },
   wildlife:   { label: 'Wildlife',      color: '#047857', bg: '#ECFDF5' },
@@ -175,6 +177,7 @@ export function MobilePlanner() {
   const destCoord = useAppStore((s) => s.destCoord)
   const startDate = useAppStore((s) => s.startDate)
   const weather = useWeather(destCoord)
+  const { trails } = useTrails(destCoord, d.userProfile?.preferred_vibe ?? [])
   const tripDayForecast = useMemo(() => {
     if (!weather || !startDate) return null
     return weather.forecast.find((f) => f.date === startDate) ?? weather.forecast[0] ?? null
@@ -326,7 +329,9 @@ export function MobilePlanner() {
   // Category chips
   const catCounts = new Map<string, number>()
   for (const a of allActivities) catCounts.set(a.category, (catCounts.get(a.category) ?? 0) + 1)
-  const topCats = [...catCounts.entries()].filter(([c]) => c !== 'family').sort((a, b) => b[1] - a[1]).slice(0, 6).map(([c]) => c)
+  let topCats = [...catCounts.entries()].filter(([c]) => c !== 'family').sort((a, b) => b[1] - a[1]).slice(0, 6).map(([c]) => c)
+  // Great Trails Victoria live under the walks chip — ensure it shows
+  if (trails.length > 0 && !topCats.includes('walks')) topCats = ['walks', ...topCats]
   const filteredActivities = catFilter === 'all' ? allActivities : allActivities.filter((a) => a.category === catFilter)
 
   const panelExpanded = !mapVisible
@@ -624,6 +629,31 @@ export function MobilePlanner() {
                     }}>{emoji} {(CAT_LABEL[cat] ?? cat).replace(/^\S+\s/, '')}</button>
                   )
                 })}
+              </div>
+            )}
+            {/* Great Trails Victoria — shown under the walks chip */}
+            {catFilter === 'walks' && trails.length > 0 && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 12 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+                  ⭐ Great Trails Victoria · {trails.length}
+                </div>
+                {trails.map((trail) => (
+                  <div key={trail.slug} style={{ background: '#fff', borderRadius: 18, border: '1.5px solid #E8C898', padding: '14px 16px', boxShadow: '0 1px 6px rgba(0,0,0,0.05)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10 }}>
+                      <div>
+                        <div style={{ fontSize: 14, fontWeight: 700, color: '#1C1C1A', marginBottom: 3 }}>⭐ {trail.name}</div>
+                        <div style={{ fontSize: 12, color: '#6B7280' }}>
+                          {trail.type === 'walk' ? 'Walking' : trail.type === 'cycle' ? 'Cycling' : 'Mountain bike'} · {trail.distance_km} km · {trail.region}
+                        </div>
+                      </div>
+                      <a href={`https://maps.google.com/maps?q=${trail.waypoints?.[0]?.lat},${trail.waypoints?.[0]?.lng}+(${encodeURIComponent(trail.name)})`}
+                        target="_blank" rel="noopener noreferrer"
+                        style={{ flexShrink: 0, fontSize: 12, fontWeight: 600, color: '#2F6B4F', textDecoration: 'none', padding: '4px 10px', border: '1px solid #2F6B4F', borderRadius: 8 }}>
+                        Maps →
+                      </a>
+                    </div>
+                  </div>
+                ))}
               </div>
             )}
             {/* Activity cards */}
@@ -1039,7 +1069,7 @@ function MActivityCard({ act, isAdded, onAdd, onRemove }: {
 
 function MFoodCard({ f, emoji, cfg }: { f: import('@/hooks/usePlannerData').DbFoodPlace; emoji: string; cfg: { color: string; bg: string } }) {
   const website = (f.attributes as Record<string,unknown>)?.website_uri as string | undefined ?? f.website ?? undefined
-  const mapsUrl = f.lat && f.lng ? `https://www.google.com/maps/maps?q=${f.lat},${f.lng}+(${encodeURIComponent(f.name)})` : undefined
+  const mapsUrl = f.lat && f.lng ? `https://maps.google.com/maps?q=${f.lat},${f.lng}+(${encodeURIComponent(f.name)})` : undefined
   return (
     <div style={{ background: '#fff', borderRadius: 16, border: '1px solid rgba(0,0,0,0.07)', padding: '14px', boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>

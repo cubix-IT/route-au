@@ -101,7 +101,7 @@ if (violations === 0) {
 } else {
   console.log(`🚨 ${violations} violation(s) found — fix before deploying`)
   console.log('\nFix SQL:')
-  console.log(`  UPDATE activities SET maps_url = 'https://www.google.com/maps/maps?q=' || lat || ',' || lng || '+(' || name || ')' WHERE maps_url ~ '\\?q=-?\\d+\\.\\d+,-?\\d+\\.\\d+$';`)
+  console.log(`  UPDATE activities SET maps_url = 'https://maps.google.com/maps?q=' || lat || ',' || lng || '+(' || name || ')' WHERE maps_url ~ '\\?q=-?\\d+\\.\\d+,-?\\d+\\.\\d+$';`)
   console.log('')
   process.exit(1)
 }

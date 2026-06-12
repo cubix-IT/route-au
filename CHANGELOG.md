@@ -1,4 +1,10 @@
 # Changelog
+## 14 June 2026 — HOTFIX: planner crash + DMS coordinate links
+
+- **Planner crash fixed** — map legend's `legendEntries` referenced `visiblePins` before its declaration (TDZ "Cannot access 'te' before initialization"); legend now derives from all pins (so hidden types stay re-enableable) and is declared in the right order
+- **"38°12'53.3"S" coordinate links fixed** — four `google.com/maps/maps?q=` double-path URLs (DestinationModal, MobilePlanner food links, VHD heritage in enrich.ts, map-check) broke Google's label parsing and showed raw DMS coords; 330 affected DB rows repaired, mapcheck clean
+- **Great Trails merged into Trails & Walks** — the separate Trails tab is gone; Great Trails Victoria appear ⭐-marked at the top of the 🥾 Trails & Walks chip (desktop + mobile; chip shows even when a destination has no OSM walks)
+
 ## 13 June 2026 (a2c7b45)
 
 - **Trails & Walks category, map legend, fuel reasons, Kinglake QA fixes**
