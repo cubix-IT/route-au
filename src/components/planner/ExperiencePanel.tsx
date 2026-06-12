@@ -202,7 +202,7 @@ export function ExperiencePanel({ hideTimeline = false }: { hideTimeline?: boole
 
 
   const CAT_EMOJI_MAP: Record<string, string> = {
-    nature: '🌿', viewpoint: '🌄', history: '🏛️', art: '🎨', active: '🏄',
+    walks: '🥾', nature: '🌿', viewpoint: '🌄', history: '🏛️', art: '🎨', active: '🏄',
     wildlife: '🦘', relaxation: '🧖', wellness: '♨️', beach: '🏖️',
     entertainment: '🎵', markets: '🛒', family: '👨‍👩‍👧', hiking: '🥾',
     Winery: '🍷', Brewery: '🍺', Distillery: '🥃', Pub: '🍻',
@@ -434,6 +434,26 @@ export function ExperiencePanel({ hideTimeline = false }: { hideTimeline?: boole
           return (
             <div style={{ padding: '16px 16px 32px', display: 'flex', flexDirection: 'column', gap: 20 }}>
 
+              {/* ── Trip at a glance — mirrors the panel below the map ── */}
+              <div style={{ background: '#fff', borderRadius: 18, border: '1px solid rgba(0,0,0,0.07)', padding: '16px 18px', boxShadow: '0 1px 4px rgba(0,0,0,0.05)' }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 12 }}>
+                  Your trip at a glance
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(110px, 1fr))', gap: 12 }}>
+                  {([
+                    ['🚗 Drive', d.driveHours ? `${Math.round(d.driveHours * 60) >= 60 ? `${Math.floor(d.driveHours)}h ${Math.round((d.driveHours % 1) * 60)}m` : `${Math.round(d.driveHours * 60)} min`}` : '—'],
+                    ['📏 Distance', d.totalKm ? `${d.totalKm} km` : '—'],
+                    ['⛽ Fuel', d.fuelCost ?? '—'],
+                    ['🗓 Trip', d.dayLabel],
+                  ] as [string, string][]).map(([label, value]) => (
+                    <div key={label}>
+                      <div style={{ fontSize: 10, fontWeight: 700, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 3 }}>{label}</div>
+                      <div style={{ fontSize: 16, fontWeight: 800, color: '#1C1C1A', letterSpacing: '-0.02em' }}>{value}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
               {/* ── Hourly weather strip ── */}
               {dayHours.length > 0 && (
                 <div style={{ background: '#fff', borderRadius: 18, border: '1px solid rgba(0,0,0,0.07)', padding: '16px 18px', boxShadow: '0 1px 4px rgba(0,0,0,0.05)' }}>
@@ -625,7 +645,7 @@ export function ExperiencePanel({ hideTimeline = false }: { hideTimeline?: boole
             : rangeFiltered.filter((a) => a.category === actCategoryFilter)
 
           const CAT_LABEL: Record<string, string> = {
-            nature: '🌿 Nature', viewpoint: '🌄 Viewpoints', history: '🏛️ History',
+            walks: '🥾 Trails & Walks', nature: '🌿 Nature', viewpoint: '🌄 Viewpoints', history: '🏛️ History',
             art: '🎨 Art', active: '🏄 Active', wildlife: '🦘 Wildlife',
             relaxation: '🧖 Relax', wellness: '♨️ Wellness', beach: '🏖️ Beach',
             entertainment: '🎵 Entertainment', markets: '🛒 Markets', family: '👨‍👩‍👧 Family',
@@ -1079,6 +1099,11 @@ export function ExperiencePanel({ hideTimeline = false }: { hideTimeline?: boole
                           {st.address && <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{st.address}</div>}
                           <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
                             {st.kmFromRoute <= 0.5 ? 'Right on your route' : `${st.kmFromRoute} km off your route`}
+                          </div>
+                          <div style={{ fontSize: 11, color: '#4B7A60', marginTop: 4, lineHeight: 1.4 }}>
+                            Why: {st.isCheapestOverall
+                              ? 'cheapest price along your entire route'
+                              : `cheapest option on the ${st.legLabel.toLowerCase().replace('near ', '')} leg of your drive`}
                           </div>
                         </div>
                         <a

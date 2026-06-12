@@ -1,4 +1,4 @@
-import { useEffect, useRef, useCallback } from 'react'
+import { useEffect, useRef, useCallback, useState, useMemo } from 'react'
 import maplibregl from 'maplibre-gl'
 import { MapView } from './MapView'
 import { useAppStore } from '@/store/useAppStore'
@@ -32,6 +32,23 @@ export function MapContainer() {
   const handleMapReady = useCallback((m: maplibregl.Map) => {
     mapRef.current = m
   }, [])
+
+  // ── Legend: pin types currently on the map; tap to hide/show a type ──────
+  const [hiddenTypes, setHiddenTypes] = useState<Set<string>>(new Set())
+  useEffect(() => { setHiddenTypes(new Set()) }, [activePOIFilter]) // reset per tab
+  const legendEntries = useMemo(() => {
+    const byType = new Map<string, { emoji: string; count: number }>()
+    for (const pin of visiblePins) {
+      const cur = byType.get(pin.type)
+      if (cur) cur.count++
+      else byType.set(pin.type, { emoji: pin.emoji ?? '📍', count: 1 })
+    }
+    return [...byType.entries()].sort((a, b) => b[1].count - a[1].count)
+  }, [displayedMapPins])
+  const visiblePins = useMemo(
+    () => displayedMapPins.filter((p) => !hiddenTypes.has(p.type)),
+    [displayedMapPins, hiddenTypes],
+  )
 
   // ── Route line — the actual roads, not a straight line ───────────────────
   useEffect(() => {
@@ -130,7 +147,7 @@ export function MapContainer() {
     poiMarkersRef.current.forEach(({ marker }) => marker.remove())
     poiMarkersRef.current = []
 
-    if (displayedMapPins.length === 0) {
+    if (visiblePins.length === 0) {
       // No tab selected — re-centre on destination
       const destCoord = activeItinerary?.route?.waypoints.at(-1)?.coord
       if (destCoord) {
@@ -147,7 +164,7 @@ export function MapContainer() {
     const destCoord = activeItinerary?.route?.waypoints.at(-1)?.coord
     if (destCoord) bounds.extend([destCoord.lng, destCoord.lat])
 
-    for (const pin of displayedMapPins) {
+    for (const pin of visiblePins) {
       const emoji = pin.emoji ?? '📍'
 
       const el = document.createElement('div')
@@ -201,7 +218,7 @@ export function MapContainer() {
     }
 
     // Keep map centred on destination — don't fly to POI pins (mobile UX: city stays in frame)
-  }, [displayedMapPins]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [visiblePins]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Highlight selected pin when changed from card click ───────────────────
   useEffect(() => {
@@ -323,7 +340,45 @@ export function MapContainer() {
     }
   }, [activeHazards]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  return <MapView onMapReady={handleMapReady} />
+  return (
+    <div style={{ position: 'absolute', inset: 0 }}>
+      <MapView onMapReady={handleMapReady} />
+      {legendEntries.length > 0 && (
+        <div style={{
+          position: 'absolute', left: 8, right: 8, bottom: 26, zIndex: 5,
+          display: 'flex', gap: 6, flexWrap: 'wrap', justifyContent: 'flex-start',
+          pointerEvents: 'none',
+        }}>
+          {legendEntries.map(([type, { emoji, count }]) => {
+            const off = hiddenTypes.has(type)
+            const label = type.length <= 3 ? type.toUpperCase() : type.charAt(0).toUpperCase() + type.slice(1)
+            return (
+              <button
+                key={type}
+                onClick={() => setHiddenTypes((prev) => {
+                  const next = new Set(prev)
+                  if (next.has(type)) next.delete(type); else next.add(type)
+                  return next
+                })}
+                style={{
+                  pointerEvents: 'auto',
+                  display: 'flex', alignItems: 'center', gap: 4,
+                  padding: '4px 9px', borderRadius: 14, fontSize: 11, fontWeight: 600,
+                  background: off ? 'rgba(255,255,255,0.65)' : 'rgba(255,255,255,0.95)',
+                  color: off ? '#9CA3AF' : '#1C1C1A',
+                  border: `1.5px solid ${off ? 'rgba(0,0,0,0.08)' : 'rgba(0,0,0,0.15)'}`,
+                  boxShadow: '0 1px 4px rgba(0,0,0,0.12)', cursor: 'pointer',
+                  textDecoration: off ? 'line-through' : 'none',
+                }}
+              >
+                <span style={{ opacity: off ? 0.4 : 1 }}>{emoji}</span> {label} · {count}
+              </button>
+            )
+          })}
+        </div>
+      )}
+    </div>
+  )
 }
 
 function highlightMarker(el: HTMLElement) {

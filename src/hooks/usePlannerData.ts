@@ -274,7 +274,13 @@ export function usePlannerData() {
       if (signal.aborted) return
       if (result) {
         console.log('[usePlannerData] food:', result.food.length, 'accom:', result.accommodation.length, 'activities:', result.activities.length)
-        setDbActivities(result.activities)
+        // OSM walking trails (attributes.kind === 'walk') surface as their own
+        // "Trails & Walks" category — stored as 'active' in the DB (CHECK
+        // constraint), remapped here so chips/filters/pins pick it up
+        setDbActivities(result.activities.map((a) => {
+          const attrs = a.attributes as Record<string, unknown> | null
+          return attrs?.kind === 'walk' ? { ...a, category: 'walks' } : a
+        }))
         setDbNature(result.nature)
         setDbFood(result.food)
         setDbAccommodation(result.accommodation)

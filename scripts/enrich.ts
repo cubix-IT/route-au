@@ -65,7 +65,7 @@ const ACT_TOURISM = new Set(['attraction','museum','artwork','gallery','viewpoin
 const ACT_LEISURE = new Set(['miniature_golf','marina','picnic_ground','water_park','amusement_arcade','climbing','sports_centre'])
 // Local member-only clubs tourists cannot join — never collect these
 const LOCAL_CLUB_BLACKLIST = /\b(tennis club|cricket club|football club|netball club|soccer club|rugby club|hockey club|basketball club|squash club|racing club|harness racing|greyhound|rifle range|gun club|pistol club|judo club|martial arts|gymnastics club|volleyball club|recreation reserve|sporting reserve|recreation club|sports ground|racecourse|raceway|swim(?:ming)? club|surf club)\b/i
-const NON_TOURIST_BLACKLIST = /\b(gym|gymnasium|fitness centre|health club|yoga|pilates|crossfit|personal training|swimming lessons|aquamoves|physiotherapy|chiropractic)\b/i
+const NON_TOURIST_BLACKLIST = /\b(gym|gymnasium|fitness centre|health club|yoga|pilates|crossfit|personal training|swimming lessons|aquamoves|physiotherapy|chiropractic|education area|education centre|school camp|scout camp|girl guides|outdoor education)\b/i
 // Tourist-accessible recreation — keep these (public entry, pay-and-play)
 const TOURIST_RECREATION = /\b(bowling alley|tenpin|ten.?pin|lawn bowls|barefoot bowls|aquatic centre|swimming pool|splash park|water park|mini.?golf|go.?kart|laser.?tag|escape room|trampoline|indoor climb)\b/i
 const ACT_AMENITY = new Set(['theatre','cinema','arts_centre','library','marketplace','spa'])
@@ -181,6 +181,8 @@ function activityCategory(tags: Record<string,string>, name: string): string {
   if (/aquatic centre|swimming pool|splash park|water park|public pool/.test(n)) return 'active'
   if (/lawn bowls|barefoot bowls/.test(n)) return 'entertainment'
   if (/winery|cellar door|vineyard|wine tasting|brewery|brewpub|brew house|craft beer|distillery|\bgin\b|whisky|whiskey|spirits/.test(n)) return 'drink'
+  // Fruit picking / pick-your-own farms — family outings, not nature spots
+  if (/\bberry\b|berries|raspberr|strawberr|blueberr|cherry farm|cherries|fruit pick|pick your own|\bpyo\b|orchard/.test(n)) return 'family'
   // Food-named attractions (cheese factory, dairy, farm shop etc.) → food, not nature
   if (/cheese|dairy|\bfarm\b|cider|olive|honey|chocolate|confection|providore|deli|pantry|smokehouse|preserves/.test(n)) return 'food'
   return 'nature'
@@ -211,10 +213,14 @@ function natureType(tags: Record<string,string>): string {
 
 // Accommodation tags — these belong in the accommodation table, not activities or food
 const ACCOM_TAGS = new Set(['hotel','motel','guest_house','hostel','apartment','chalet','alpine_hut'])
-const ACCOM_NAME = /\b(hotel|motel|lodge|resort|inn\b|b&b|bed.and.breakfast|caravan park|campground|glamping|retreat|holiday park|motor inn|country club|house.?boats?|boat hire|river.*stay|holiday.*cabin|holiday.*cottage)\b/i
+const ACCOM_NAME = /\b(hotel|motel|lodge|resort|inn\b|b&b|bed.and.breakfast|caravan park|campground|glamping|retreat|holiday park|motor inn|country club|house.?boats?|boat hire|river.*stay|holiday.*cabin|holiday.*cottage|estate spa|spa estate)\b/i
 
 function isAccommodation(tags: Record<string,string>): boolean {
-  return ACCOM_TAGS.has(tags.tourism) || ACCOM_NAME.test(tags.name || '')
+  return ACCOM_TAGS.has(tags.tourism)
+    || ACCOM_NAME.test(tags.name || '')
+    // Spa estates/resorts (e.g. Balgownie Estate) are places you stay, not day activities
+    || (tags.amenity === 'spa' && /\b(estate|resort|retreat|lodge)\b/i.test(tags.name || ''))
+    || tags.tourism === 'camp_site' || tags.tourism === 'caravan_site' || tags.tourism === 'resort'
 }
 
 function foodQualifies(tags: Record<string,string>): boolean {
@@ -680,6 +686,7 @@ async function enrichSubDest(
   const activities: any[] = []
   const foods: any[] = []
   const nature: any[] = []
+  const stays: any[] = []
   const seenSlugs = new Set<string>()
   // Walk segments accumulate here (one trail = many OSM way segments sharing
   // a name) and are merged into single activities after the element loop
@@ -705,6 +712,8 @@ async function enrichSubDest(
     if (name_.trim().length < 4 || /^\d+$/.test(name_.trim())) continue
     // Skip closed/former/demolished places
     if (/\bclosed\b|\(closed\)|\bformer\b|\bdemolished\b|\bderelict\b|\babandon/i.test(name_)) continue
+    // Skip school/institutional facilities — not visitor destinations (any table)
+    if (/\beducation (area|centre|center)\b|school camp|scout camp|girl guides|\bcampus\b/i.test(name_)) continue
 
     // Walking trails — accumulate segments by name, merged after the loop
     if (el.walkKm !== undefined && isWalk(tags)) {
@@ -745,8 +754,36 @@ async function enrichSubDest(
     const ZOO_ENCLOSURE = /^(dingo|koala|kangaroo|wallaby|platypus|wombat|echidna|emu|quoll|tasmanian devil|lyre bird|cassowary|crocodile|snake|lizard|possum|bandicoot|bilby|numbat|bettong|potoroo|pademelon|glider|parrot|cockatoo|lorikeet|pelican|penguin|seal|dingo)\s*\d*$/i
     if (ZOO_ENCLOSURE.test(name_.trim())) continue
 
-    // Skip accommodation entirely — belongs in accommodation table, not enrichment
-    if (isAccommodation(tags)) continue
+    // Accommodation → stays table, but only with a website. A stay we can't
+    // link to is a dead end for the user (no booking path) — skip those.
+    if (isAccommodation(tags)) {
+      const stayWebsite = tags.website || tags['contact:website'] || null
+      if (!stayWebsite) continue
+      // elSlug was already added to seenSlugs above — same element, no re-check
+      const staySlug = `osm-${el.type}-${el.id}`
+      const stayType =
+        tags.tourism === 'camp_site' ? 'campsite'
+        : tags.tourism === 'caravan_site' ? 'caravan_park'
+        : tags.tourism === 'chalet' || tags.tourism === 'alpine_hut' ? 'cabin'
+        : tags.tourism === 'guest_house' ? 'bnb'
+        : tags.tourism === 'hostel' ? 'hostel'
+        : tags.tourism === 'apartment' ? 'apartment'
+        : tags.tourism === 'motel' ? 'motel'
+        : 'hotel'
+      stays.push({
+        slug: staySlug, sub_dest_id: subDestId, name: name_, type: stayType,
+        description: tags.description || '',
+        lat: el.lat, lng: el.lon,
+        address: tags['addr:full'] || (tags['addr:street']
+          ? `${tags['addr:housenumber'] ? tags['addr:housenumber'] + ' ' : ''}${tags['addr:street']}, ${tags['addr:suburb'] || tags['addr:city'] || ''}`.trim()
+          : null),
+        stars: tags.stars ? parseFloat(tags.stars) : null,
+        website: stayWebsite, phone: tags.phone || tags['contact:phone'] || null,
+        attributes: { opening_hours_text: tags.opening_hours || null },
+        source: 'static',
+      })
+      continue
+    }
 
     // Individual artworks (tourism=artwork) need Wikipedia/Wikidata notability.
     // Sculpture trails map every piece as its own node ("Untitled (I Love You)",
@@ -935,8 +972,16 @@ async function enrichSubDest(
     if (!error) upserted += qualityNature.length
     else console.error('  [err] nature:', error.message)
   }
+  // Stays: replace this destination's OSM-sourced rows with the
+  // website-verified set (legacy no-website rows cleaned up separately)
+  if (stays.length > 0) {
+    await db.from('accommodation').delete().eq('sub_dest_id', subDestId).eq('source', 'static')
+    const { error } = await db.from('accommodation').upsert(stays, { onConflict: 'slug', ignoreDuplicates: false })
+    if (!error) upserted += stays.length
+    else console.error('  [err] stays:', error.message)
+  }
 
-  console.log(`  activities: ${activities.length} found, ${qualityActivities.length} with desc | food: ${foods.length} | nature: ${nature.length} → ${qualityNature.length} with desc | upserted: ${upserted}`)
+  console.log(`  activities: ${activities.length} found, ${qualityActivities.length} with desc | food: ${foods.length} | nature: ${nature.length} → ${qualityNature.length} with desc | stays: ${stays.length} w/ website | upserted: ${upserted}`)
   return upserted
 }
 

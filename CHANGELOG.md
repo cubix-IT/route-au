@@ -1,4 +1,15 @@
 # Changelog
+## 14 June 2026 — Kinglake QA fixes + Trails & Walks + map legend
+
+- **Trails & Walks category** — OSM walks now appear under their own 🥾 "Trails & Walks" chip in Things to Do (DB stays `active`; remapped client-side via `attributes.kind`)
+- **Map legend with filters** — pin-type chips at the bottom of the map (count per type, tap to hide/show)
+- **Overview = trip at a glance** — drive time, distance, fuel cost and trip type now on the Overview tab (desktop + mobile)
+- **Fuel tab: route + reasons** — mobile now fits the map to the route like desktop; every station card explains *why* it was suggested (cheapest overall vs cheapest on that leg)
+- **Mobile cards highlight pins** — tapping a card flies the map to its pin (was desktop-only)
+- **Kinglake QA fixes** — Kinglake Raspberries → 👨‍👩‍👧 family (fruit-picking rule); Education Areas excluded; Balgownie Estate moved to Stay (spa-estate rule)
+- **Stays need a booking link** — accommodation capture now requires a website (no link = dead end); Kinglake's 20 no-website rows removed (pilot), state-wide cleanup at rollout
+- **Summaries prompt** — destination overviews must focus on the visitor experience; bushfires/disasters/death tolls explicitly banned (the Kinglake "death toll" overview)
+
 ## 13 June 2026 — Smoothness & mobile fixes
 
 - **Wizard flash fixed** — lazy wizard/auth modals get their own Suspense boundaries (suspending no longer blanks the whole page for a frame); overlay backdrop eases in

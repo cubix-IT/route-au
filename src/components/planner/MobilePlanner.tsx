@@ -75,6 +75,7 @@ function formatDrive(hours: number): string {
 type FilterTab = 'overview' | 'explore' | 'food' | 'stay' | 'plan' | 'fuel'
 
 const CAT_LABEL: Record<string, string> = {
+  walks: '🥾 Trails & Walks',
   nature: '🌿 Nature', viewpoint: '🌄 Views', history: '🏛️ History',
   art: '🎨 Art', active: '🏄 Active', wildlife: '🦘 Wildlife',
   relaxation: '🧖 Relax', wellness: '♨️ Wellness', beach: '🏖️ Beach',
@@ -241,7 +242,7 @@ export function MobilePlanner() {
   // Map pins follow the active tab (was: nature-only, which is ~empty since
   // the nature_spots cleanup — mobile maps showed no places at all)
   const MOB_EMOJI: Record<string, string> = {
-    nature: '🌿', viewpoint: '🌄', history: '🏛️', art: '🎨', active: '🏄',
+    walks: '🥾', nature: '🌿', viewpoint: '🌄', history: '🏛️', art: '🎨', active: '🏄',
     wildlife: '🦘', relaxation: '🧖', wellness: '♨️', beach: '🏖️',
     entertainment: '🎵', markets: '🛒', family: '👨‍👩‍👧',
     Winery: '🍷', Brewery: '🍺', Distillery: '🥃', Pub: '🍻',
@@ -433,6 +434,8 @@ export function MobilePlanner() {
           ] as [FilterTab, string][]).map(([t, label]) => (
             <button key={t} onClick={() => {
               setTab(t); setCatFilter('all')
+              // Map reacts to this: fuel tab -> fit map to the full route line
+              useAppStore.getState().setActivePOIFilter(t)
               if (t === 'fuel' && fuelStops.length === 0) fetchFuel()
             }} style={{
               padding: '6px 14px', borderRadius: 20, flexShrink: 0, whiteSpace: 'nowrap',
@@ -491,6 +494,25 @@ export function MobilePlanner() {
               }
               return (
                 <div>
+                  {/* Trip at a glance — same stats shown under the desktop map */}
+                  <div style={tile}>
+                    <div style={{ fontSize: 10, fontWeight: 700, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 10 }}>
+                      Your trip at a glance
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 12 }}>
+                      {([
+                        ['🚗 Drive', d.driveHours ? (d.driveHours >= 1 ? `${Math.floor(d.driveHours)}h ${Math.round((d.driveHours % 1) * 60)}m` : `${Math.round(d.driveHours * 60)} min`) : '—'],
+                        ['📏 Distance', d.totalKm ? `${d.totalKm} km` : '—'],
+                        ['⛽ Fuel', d.fuelCost ?? '—'],
+                        ['🗓 Trip', d.dayLabel],
+                      ] as [string, string][]).map(([label, value]) => (
+                        <div key={label}>
+                          <div style={{ fontSize: 10, fontWeight: 700, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 2 }}>{label}</div>
+                          <div style={{ fontSize: 15, fontWeight: 800, color: '#1C1C1A' }}>{value}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
                   {tripDayForecast && (
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10, padding: '0 2px' }}>
                       <span style={{ fontSize: 20 }}>{tripDayForecast.emoji}</span>
@@ -624,6 +646,7 @@ export function MobilePlanner() {
                         return (
                           <ResultCard
                             key={act.id}
+                            onMapPin={() => useAppStore.getState().setSelectedPinId(act.id)}
                             name={act.name}
                             categoryLabel={tag.label}
                             categoryColor={tag.color}
@@ -790,7 +813,7 @@ export function MobilePlanner() {
                       const emoji = FOOD_EMOJI[f.category] ?? '🍽️'
                       const cfg = FOOD_COLOR[f.category] ?? { color: '#374151', bg: '#F9FAFB' }
                       const cardId = String(f.food_place_id)
-                      return <ResultCard key={cardId} name={f.name} categoryLabel={f.category} categoryColor={cfg.color} categoryBg={cfg.bg} emoji={emoji} description={f.description ?? undefined} website={(f.attributes as any)?.website_uri ?? f.website ?? undefined} mapsUrl={f.lat && f.lng ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(f.name + ", " + d.shortDest)}&ll=${f.lat},${f.lng}` : ""} phone={f.phone ?? undefined} driveMinutes={d.driveMinutes.get(f.slug) ?? null} expanded={expandedCardId === cardId} onExpand={() => setExpandedCardId(expandedCardId === cardId ? null : cardId)} />
+                      return <ResultCard key={cardId} onMapPin={() => useAppStore.getState().setSelectedPinId(cardId)} name={f.name} categoryLabel={f.category} categoryColor={cfg.color} categoryBg={cfg.bg} emoji={emoji} description={f.description ?? undefined} website={(f.attributes as any)?.website_uri ?? f.website ?? undefined} mapsUrl={f.lat && f.lng ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(f.name + ", " + d.shortDest)}&ll=${f.lat},${f.lng}` : ""} phone={f.phone ?? undefined} driveMinutes={d.driveMinutes.get(f.slug) ?? null} expanded={expandedCardId === cardId} onExpand={() => setExpandedCardId(expandedCardId === cardId ? null : cardId)} />
                     })}
                   </>
                 )}
@@ -801,7 +824,7 @@ export function MobilePlanner() {
                       const emoji = FOOD_EMOJI[f.category] ?? '🍽️'
                       const cfg = FOOD_COLOR[f.category] ?? { color: '#374151', bg: '#F9FAFB' }
                       const cardId = String(f.food_place_id)
-                      return <ResultCard key={cardId} name={f.name} categoryLabel={f.category} categoryColor={cfg.color} categoryBg={cfg.bg} emoji={emoji} description={f.description ?? undefined} website={(f.attributes as any)?.website_uri ?? f.website ?? undefined} mapsUrl={f.lat && f.lng ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(f.name + ", " + d.shortDest)}&ll=${f.lat},${f.lng}` : ""} phone={f.phone ?? undefined} driveMinutes={d.driveMinutes.get(f.slug) ?? null} expanded={expandedCardId === cardId} onExpand={() => setExpandedCardId(expandedCardId === cardId ? null : cardId)} />
+                      return <ResultCard key={cardId} onMapPin={() => useAppStore.getState().setSelectedPinId(cardId)} name={f.name} categoryLabel={f.category} categoryColor={cfg.color} categoryBg={cfg.bg} emoji={emoji} description={f.description ?? undefined} website={(f.attributes as any)?.website_uri ?? f.website ?? undefined} mapsUrl={f.lat && f.lng ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(f.name + ", " + d.shortDest)}&ll=${f.lat},${f.lng}` : ""} phone={f.phone ?? undefined} driveMinutes={d.driveMinutes.get(f.slug) ?? null} expanded={expandedCardId === cardId} onExpand={() => setExpandedCardId(expandedCardId === cardId ? null : cardId)} />
                     })}
                   </>
                 )}
@@ -868,6 +891,11 @@ export function MobilePlanner() {
                       {st.address && <div style={{ fontSize: 11, color: '#9CA3AF' }}>{st.address}</div>}
                       <div style={{ fontSize: 11, color: '#9CA3AF', marginTop: 2 }}>
                         {st.kmFromRoute <= 0.5 ? 'Right on your route' : `${st.kmFromRoute} km off your route`}
+                      </div>
+                      <div style={{ fontSize: 11, color: '#4B7A60', marginTop: 4, lineHeight: 1.4 }}>
+                        Why: {st.isCheapestOverall
+                          ? 'cheapest price along your entire route'
+                          : `cheapest option on the ${st.legLabel.toLowerCase().replace('near ', '')} leg of your drive`}
                       </div>
                     </div>
                     <a href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(st.brand + ' ' + st.address)}&ll=${st.lat},${st.lng}`}

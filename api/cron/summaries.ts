@@ -168,8 +168,10 @@ async function refreshSummary(apiKey: string, subDestId: number, name: string): 
         system: [
           {
             type: 'text',
-            text: 'You are a concise travel writer for Victoria, Australia. ' +
-              'Write a 2-sentence engaging travel description of the destination. ' +
+            text: 'You are a concise travel writer for Victoria, Australia, writing for people planning a relaxing weekend getaway. ' +
+              'Write a 2-sentence engaging travel description of the destination focused on what visitors can see, do and enjoy today. ' +
+              'Never mention bushfires, floods, disasters, death tolls, tragedies or crime — even if the context does. ' +
+              'If the context is mostly about a disaster, ignore it and write about the natural beauty and visitor experience instead. ' +
               'Then list who this destination suits best. ' +
               'Respond with valid JSON only, no markdown: ' +
               '{"summary":"2-sentence description here","bestFor":["pick 3-4 from: ' +
