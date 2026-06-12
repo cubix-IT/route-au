@@ -1,4 +1,9 @@
 # Changelog
+## 13 June 2026 (c99d26f)
+
+- **Vehicle step back, fuel spread per leg, honest loading, landing sections**
+  - Wizard: restore StepVehicle (3/5 steps); no more forced AWD/U95
+
 ## 13 June 2026 — Post-launch feedback fixes
 
 - **Vehicle step restored** — "Your vehicle & fuel" is back in the wizard (step 2 of 3 preselected, 4 of 5 discovery). No more forced AWD/U95 defaults; fuel prices match your car.
