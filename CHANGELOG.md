@@ -1,5 +1,11 @@
 # Changelog
 
+## 12 June 2026 — Landing page split
+
+- **Minimal landing page** — page 1 is now just the seasonal hero + search. The full destination grid moved to its own `/explore` page ("or browse all destinations →").
+- **New `/explore` page** — all cluster cards, sorted by seasonal fit, with the same preview/plan flow. Planning deep-links back through `/?dest=&cluster=` so the wizard opens preselected.
+- ClusterCard / SubDestDetail / FromWhereModal extracted to `ClusterCard.tsx`; Photon search helpers shared via `photonSearch.ts`. Landing JS dropped a further 13 KB gzipped.
+
 ## 12 June 2026 — Real routes & fuel on route
 
 - **Real driving routes (OSRM)** — trips now fetch the actual road route, replacing straight-line × 1.3 guesses. Distance and drive-time in results are real road values. Route drawn on the map (green line).

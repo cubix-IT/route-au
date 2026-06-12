@@ -26,10 +26,15 @@ test.describe('Landing page', () => {
     await expect(page.locator('button.mu-btn-primary').filter({ hasText: 'Surprise me' }).first()).toBeVisible({ timeout: 5_000 })
   })
 
-  test('shows destination cards', async ({ page }) => {
-    await page.goto('/')
-    // Destination cards load from Supabase — wait up to 12s
+  test('shows destination cards on explore page', async ({ page }) => {
+    // Cluster grid moved from / to /explore (landing redesign 2026-06-12)
+    await page.goto('/explore')
     await expect(page.locator('.mu-card, .cluster-card, [class*="card"]').first()).toBeVisible({ timeout: 12_000 })
+  })
+
+  test('landing links to explore page', async ({ page }) => {
+    await page.goto('/')
+    await expect(page.locator('a[href="/explore"]')).toBeVisible({ timeout: 5_000 })
   })
 
   test('from-location required validation in surprise mode', async ({ page }) => {
@@ -43,14 +48,15 @@ test.describe('Landing page', () => {
 
   test('destination search dropdown appears in know mode', async ({ page }) => {
     await page.goto('/')
-    // Wait for destinations to load (cards appear = data is ready)
-    await page.locator('.mu-card, [class*="card"], [class*="cluster"]').first().waitFor({ timeout: 12_000 })
     // Destination search is client-side on pre-loaded Supabase data
     const destInput = page.locator('input[placeholder="Search a destination…"]').first()
-    await destInput.waitFor({ timeout: 5_000 })
+    await destInput.waitFor({ timeout: 12_000 })
     await destInput.click()
-    await destInput.pressSequentially('Yarra', { delay: 50 })
-    const dropdown = page.locator('.mu-dropdown-row').first()
-    await expect(dropdown).toBeVisible({ timeout: 5_000 })
+    // Data preloads asynchronously — retry typing until the dropdown appears
+    await expect(async () => {
+      await destInput.fill('')
+      await destInput.pressSequentially('Yarra', { delay: 50 })
+      await expect(page.locator('.mu-dropdown-row').first()).toBeVisible({ timeout: 2_000 })
+    }).toPass({ timeout: 15_000 })
   })
 })

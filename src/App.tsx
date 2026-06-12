@@ -11,6 +11,7 @@ import { VICTORIAN_CLUSTERS } from '@/data/victorianClusters'
 // Landing page renders without any of these.
 const PrivacyPage = lazy(() => import('@/components/PrivacyPage').then(m => ({ default: m.PrivacyPage })))
 const ChangelogPage = lazy(() => import('@/components/ChangelogPage').then(m => ({ default: m.ChangelogPage })))
+const ExplorePage = lazy(() => import('@/components/landing/ExplorePage').then(m => ({ default: m.ExplorePage })))
 const MapContainer = lazy(() => import('@/components/map/MapContainer').then(m => ({ default: m.MapContainer })))
 const ProfileWizard = lazy(() => import('@/components/wizard/ProfileWizard').then(m => ({ default: m.ProfileWizard })))
 const ExperiencePanel = lazy(() => import('@/components/planner/ExperiencePanel').then(m => ({ default: m.ExperiencePanel })))
@@ -122,6 +123,9 @@ function App() {
     else setView('landing')
   }, [activeItinerary])
 
+  if (window.location.pathname === '/explore') {
+    return <Suspense fallback={null}><ExplorePage /></Suspense>
+  }
   if (window.location.pathname === '/privacy') {
     return <Suspense fallback={null}><PrivacyPage onBack={() => { window.history.back() }} /></Suspense>
   }

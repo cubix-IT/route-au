@@ -3,6 +3,7 @@
   "rewrites": [
     { "source": "/privacy",              "destination": "/privacy.html" },
     { "source": "/changelog",            "destination": "/index.html" },
+    { "source": "/explore",              "destination": "/index.html" },
     { "source": "/destinations",         "destination": "/api/destinations/--index--" },
     { "source": "/destinations/:path*",  "destination": "/api/destinations/:path*" },
     { "source": "/api/(.*)",             "destination": "/api/$1" }
