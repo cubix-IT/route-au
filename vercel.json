@@ -1,5 +1,5 @@
 {
-  "alias": ["unplanned-escapes.vercel.app"],
+  "alias": ["unplannedescapes.com.au", "www.unplannedescapes.com.au", "unplanned-escapes.vercel.app"],
   "rewrites": [
     { "source": "/privacy",              "destination": "/privacy.html" },
     { "source": "/changelog",            "destination": "/index.html" },
