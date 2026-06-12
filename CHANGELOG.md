@@ -1,4 +1,13 @@
 # Changelog
+## 13 June 2026 — Post-launch feedback fixes
+
+- **Vehicle step restored** — "Your vehicle & fuel" is back in the wizard (step 2 of 3 preselected, 4 of 5 discovery). No more forced AWD/U95 defaults; fuel prices match your car.
+- **Fuel spread along the route** — picks the cheapest station per leg (near start / midway / near destination) instead of pure price ranking, which clustered everything at the metro end (the Thomastown problem). Overall cheapest flagged 🏆. Verified against prod data for Thomastown → Yarra Glen.
+- **Honest loading screen** — progress now eases continuously and completes when trip data is actually ready (was: 4 fixed 450ms steps hitting 100% before loading even started). Category counts climb with real progress; wizard fades out, results fade in.
+- **Wizard opens instantly** — chunk prefetched while the landing page is idle (was: downloaded on first click — the choppiness).
+- **Landing page filled out** — "One state. Endless escapes." Victoria stats band (130 destinations / 1,800+ things to do / 550+ eat & drink / 15 trails) + "Your weekend, planned in 30 seconds" how-it-works section with CTA.
+- **Route line race fixed** — green route now draws reliably (idle-event fallback when style loads before the listener attaches).
+
 
 ## 12 June 2026 (4ebe24c)
 

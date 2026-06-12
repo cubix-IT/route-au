@@ -98,6 +98,18 @@ function App() {
   useEffect(() => {
     if (isWizardOpen) prefetchPlanner()
   }, [isWizardOpen])
+
+  // Prefetch the wizard chunk while the landing page is idle so the first
+  // "Let's plan" click opens instantly instead of waiting on a download.
+  useEffect(() => {
+    const prefetch = () => { import('@/components/wizard/ProfileWizard') }
+    if ('requestIdleCallback' in window) {
+      const id = requestIdleCallback(prefetch, { timeout: 3000 })
+      return () => cancelIdleCallback(id)
+    }
+    const t = setTimeout(prefetch, 1500)
+    return () => clearTimeout(t)
+  }, [])
   const isAuthModalOpen = useAppStore((s) => s.isAuthModalOpen)
   const activeItinerary = useAppStore((s) => s.activeItinerary)
   const isMobile = useIsMobile()
@@ -140,13 +152,13 @@ function App() {
       {view === 'planner' && (
         isMobile ? (
           /* ── Mobile: full-page scrollable layout ── */
-          <div style={{ display: 'flex', flexDirection: 'column', height: '100dvh', background: '#FAFAF8', overflow: 'hidden' }}>
+          <div className="animate-fade-up" style={{ display: 'flex', flexDirection: 'column', height: '100dvh', background: '#FAFAF8', overflow: 'hidden' }}>
             <Header />
             <MobilePlanner />
           </div>
         ) : isWide ? (
           /* ── 2-Column Wide (≥1280px) ── */
-          <div style={{
+          <div className="animate-fade-up" style={{
             display: 'flex', flexDirection: 'column', height: '100vh',
             background: '#F8F7F4', color: 'var(--text-primary)', overflow: 'hidden',
           }}>
@@ -174,7 +186,7 @@ function App() {
 
         ) : (
           /* ── 2-Column Desktop (768–1279px) ── */
-          <div style={{
+          <div className="animate-fade-up" style={{
             display: 'flex', flexDirection: 'column', height: '100vh',
             background: '#F8F7F4', color: 'var(--text-primary)', overflow: 'hidden',
           }}>

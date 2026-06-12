@@ -160,7 +160,7 @@ export function MobilePlanner() {
     setFuelLoading(true)
     const results = await findCheapestOnRoute(drivingRoute.geometry, d.vehicleProfile.fuel_type, brand, 3)
     setFuelStops(results)
-    if (results[0]) useAppStore.getState().setCheapestFuelPrice(results[0].pricePerLitre)
+    if (results.length) useAppStore.getState().setCheapestFuelPrice(Math.min(...results.map(s => s.pricePerLitre)))
     setFuelLoading(false)
   }
 
@@ -813,15 +813,16 @@ export function MobilePlanner() {
               </div>
             ) : fuelStops.length === 0 ? (
               <div style={{ fontSize: 13, color: '#9CA3AF' }}>No stations found along your route.</div>
-            ) : fuelStops.map((st, i) => {
-              const rankColor = i === 0 ? '#16A34A' : i === 1 ? '#D97706' : '#6B7280'
+            ) : fuelStops.map((st) => {
+              const isTop = st.isCheapestOverall
+              const rankColor = isTop ? '#16A34A' : '#6B7280'
               return (
-                <div key={st.id} style={{ background: '#fff', borderRadius: 18, border: i === 0 ? '1.5px solid #BBF7D0' : '1px solid rgba(0,0,0,0.07)', padding: '14px 16px', boxShadow: '0 1px 6px rgba(0,0,0,0.05)' }}>
+                <div key={st.id} style={{ background: '#fff', borderRadius: 18, border: isTop ? '1.5px solid #BBF7D0' : '1px solid rgba(0,0,0,0.07)', padding: '14px 16px', boxShadow: '0 1px 6px rgba(0,0,0,0.05)' }}>
                   <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: rankColor, marginBottom: 8 }}>
-                    {i === 0 ? '🏆 Cheapest on route' : `#${i + 1} on route`}
+                    {isTop ? `🏆 ${st.legLabel} — cheapest on route` : st.legLabel}
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                    <div style={{ width: 52, height: 52, borderRadius: 12, background: i === 0 ? '#F0FDF4' : '#FAFAF8', border: `1.5px solid ${i === 0 ? '#BBF7D0' : 'rgba(0,0,0,0.07)'}`, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <div style={{ width: 52, height: 52, borderRadius: 12, background: isTop ? '#F0FDF4' : '#FAFAF8', border: `1.5px solid ${isTop ? '#BBF7D0' : 'rgba(0,0,0,0.07)'}`, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                       <span style={{ fontSize: 13, fontWeight: 900, color: rankColor, lineHeight: 1 }}>${st.pricePerLitre.toFixed(3)}</span>
                       <span style={{ fontSize: 8, color: '#6B7280', marginTop: 1 }}>/litre</span>
                     </div>

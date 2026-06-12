@@ -18,6 +18,12 @@ export interface RouteFuelStation {
   pricePerLitre: number
   distanceKm: number      // from the API sample point — replaced below with km off-route
   kmFromRoute: number
+  /** 0..1 — how far along the route the station sits */
+  routeProgress: number
+  /** Human label for where on the trip this stop is */
+  legLabel: 'Near start' | 'Midway' | 'Near destination'
+  /** True for the single cheapest station across the whole route */
+  isCheapestOverall: boolean
 }
 
 const SAMPLE_EVERY_KM = 35
@@ -70,15 +76,53 @@ export async function findCheapestOnRoute(
 
   // Keep only stations close to the actual road (thinned line keeps turf fast)
   const line = thin(geometry, 1)
-  const withDist = [...found.values()].map(st => ({
-    ...st,
-    kmFromRoute: Math.round(distanceToLine({ lat: st.lat, lng: st.lng }, line) * 10) / 10,
-  }))
+  // Cumulative distance along the thinned line — for progress calculation
+  const cum: number[] = [0]
+  for (let i = 1; i < line.length; i++) cum.push(cum[i - 1] + distanceBetween(line[i - 1], line[i]))
+  const totalKm = cum[cum.length - 1] || 1
+
+  const withDist = [...found.values()].map(st => {
+    // Nearest line vertex ≈ position along route (1km resolution is plenty)
+    let best = 0, bestD = Infinity
+    for (let i = 0; i < line.length; i++) {
+      const d = distanceBetween({ lat: st.lat, lng: st.lng }, line[i])
+      if (d < bestD) { bestD = d; best = i }
+    }
+    const routeProgress = cum[best] / totalKm
+    return {
+      ...st,
+      kmFromRoute: Math.round(distanceToLine({ lat: st.lat, lng: st.lng }, line) * 10) / 10,
+      routeProgress,
+      legLabel: (routeProgress < 0.33 ? 'Near start' : routeProgress < 0.7 ? 'Midway' : 'Near destination') as RouteFuelStation['legLabel'],
+      isCheapestOverall: false,
+    }
+  })
 
   let onRoute = withDist.filter(st => st.kmFromRoute <= ON_ROUTE_KM)
   if (onRoute.length < count) onRoute = withDist.filter(st => st.kmFromRoute <= RELAXED_KM)
+  if (onRoute.length === 0) return []
 
-  return onRoute
-    .sort((a, b) => a.priceCents - b.priceCents)
-    .slice(0, count)
+  // Spread the picks along the trip instead of pure price ranking — cheapest
+  // stations cluster in the metro end of a route (e.g. every pick in Thomastown
+  // for Melbourne → Yarra Glen), which is useless for the drive home.
+  // Take the cheapest within each leg (start / mid / destination), then flag
+  // the overall cheapest.
+  const byPrice = [...onRoute].sort((a, b) => a.priceCents - b.priceCents)
+  const legs: RouteFuelStation['legLabel'][] = ['Near start', 'Midway', 'Near destination']
+  const picks: RouteFuelStation[] = []
+  for (const leg of legs) {
+    const cheapestInLeg = byPrice.find(st => st.legLabel === leg && !picks.includes(st))
+    if (cheapestInLeg) picks.push(cheapestInLeg)
+  }
+  // Short routes may have empty legs — top up with the next cheapest overall
+  for (const st of byPrice) {
+    if (picks.length >= count) break
+    if (!picks.includes(st)) picks.push(st)
+  }
+
+  const cheapest = byPrice[0]
+  for (const p of picks) p.isCheapestOverall = p.id === cheapest.id
+
+  // Present in trip order: start → destination
+  return picks.slice(0, count).sort((a, b) => a.routeProgress - b.routeProgress)
 }

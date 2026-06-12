@@ -757,6 +757,97 @@ export function LandingPage() {
         </div>
       </section>
 
+      {/* ── Victoria by the numbers ────────────── */}
+      <section style={{ padding: '64px 24px', maxWidth: 1100, margin: '0 auto' }}>
+        <div style={{ textAlign: 'center', marginBottom: 36 }}>
+          <div style={{ fontSize: 10, fontWeight: 700, color: GREEN, letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 10 }}>
+            All of Victoria, ready to explore
+          </div>
+          <h2 style={{
+            fontFamily: "'Fraunces', Georgia, serif",
+            fontSize: 'clamp(22px, 3vw, 32px)', fontWeight: 700,
+            letterSpacing: '-0.02em', color: '#1C1C1A', margin: 0,
+          }}>
+            One state. Endless escapes.
+          </h2>
+        </div>
+
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
+          gap: 16,
+        }}>
+          {[
+            { n: '130', label: 'destinations', sub: 'from the Alps to the Great Ocean Road' },
+            { n: '1,800+', label: 'things to do', sub: 'waterfalls, lookouts, heritage & wildlife' },
+            { n: '550+', label: 'places to eat & drink', sub: 'wineries, breweries & country pubs' },
+            { n: '15', label: 'iconic trails', sub: 'Great Trails Victoria, mapped' },
+          ].map((s) => (
+            <div key={s.label} className="mu-card" style={{
+              background: '#fff', border: '1px solid var(--border)', borderRadius: 18,
+              padding: '24px 20px', textAlign: 'center',
+              boxShadow: '0 2px 12px rgba(0,0,0,0.04)',
+            }}>
+              <div style={{
+                fontFamily: "'Fraunces', Georgia, serif",
+                fontSize: 'clamp(30px, 4vw, 40px)', fontWeight: 700,
+                color: GREEN, letterSpacing: '-0.03em', lineHeight: 1,
+              }}>{s.n}</div>
+              <div style={{ fontSize: 13.5, fontWeight: 700, color: '#1C1C1A', marginTop: 8 }}>{s.label}</div>
+              <div style={{ fontSize: 11.5, color: '#8C8A87', marginTop: 4, lineHeight: 1.5 }}>{s.sub}</div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* ── How it works ────────────── */}
+      <section style={{ padding: '0 24px 72px', maxWidth: 1100, margin: '0 auto' }}>
+        <div style={{
+          background: '#EFF4EE', borderRadius: 24, padding: 'clamp(28px, 4vw, 44px)',
+        }}>
+          <h2 style={{
+            fontFamily: "'Fraunces', Georgia, serif",
+            fontSize: 'clamp(20px, 2.6vw, 26px)', fontWeight: 700,
+            letterSpacing: '-0.02em', color: '#1C1C1A', margin: '0 0 28px', textAlign: 'center',
+          }}>
+            Your weekend, planned in 30 seconds
+          </h2>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 20 }}>
+            {[
+              { emoji: '📍', title: 'Tell us where you are', body: 'Your suburb sets real drive times — everything is calculated from your front door.' },
+              { emoji: '✨', title: 'Say what you love', body: 'Waterfalls? Wineries? History? We match destinations to your kind of weekend.' },
+              { emoji: '🗺️', title: 'Get the full picture', body: 'Things to do, places to eat, your driving route — even the cheapest fuel along it.' },
+            ].map((step, i) => (
+              <div key={step.title} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <div style={{
+                    width: 38, height: 38, borderRadius: 12, background: '#fff',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 19,
+                    boxShadow: '0 1px 4px rgba(0,0,0,0.06)', flexShrink: 0,
+                  }}>{step.emoji}</div>
+                  <div style={{ fontSize: 11, fontWeight: 800, color: GREEN, letterSpacing: '0.06em' }}>STEP {i + 1}</div>
+                </div>
+                <div style={{ fontSize: 15, fontWeight: 700, color: '#1C1C1A' }}>{step.title}</div>
+                <div style={{ fontSize: 13, color: '#5A5955', lineHeight: 1.6 }}>{step.body}</div>
+              </div>
+            ))}
+          </div>
+          <div style={{ textAlign: 'center', marginTop: 30 }}>
+            <button onClick={openWizard} className="mu-btn-primary" style={{
+              padding: '13px 30px', borderRadius: 28, background: GREEN, border: 'none',
+              color: '#fff', fontSize: 14.5, fontWeight: 700, cursor: 'pointer', letterSpacing: '-0.01em',
+            }}>
+              Plan my escape →
+            </button>
+            <div style={{ marginTop: 12 }}>
+              <a href="/explore" style={{ fontSize: 13, color: '#3F4F42', textDecoration: 'underline' }}>
+                or browse all 130 destinations
+              </a>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* ── Footer ─────────────────────── */}
       <footer style={{
         background: GREEN,

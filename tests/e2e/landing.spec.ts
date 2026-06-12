@@ -34,7 +34,7 @@ test.describe('Landing page', () => {
 
   test('landing links to explore page', async ({ page }) => {
     await page.goto('/')
-    await expect(page.locator('a[href="/explore"]')).toBeVisible({ timeout: 5_000 })
+    await expect(page.locator('a[href="/explore"]').first()).toBeVisible({ timeout: 5_000 })
   })
 
   test('from-location required validation in surprise mode', async ({ page }) => {

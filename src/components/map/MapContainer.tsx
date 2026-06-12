@@ -69,8 +69,16 @@ export function MapContainer() {
       }
     }
 
-    if (map.isStyleLoaded()) draw()
-    else map.once('load', draw)
+    if (map.isStyleLoaded()) {
+      draw()
+    } else {
+      // 'load' won't refire if the style finished before we attached; 'idle'
+      // always fires after the next render pass. draw() is idempotent
+      // (setData on existing source), so firing both is harmless.
+      map.once('load', draw)
+      map.once('idle', draw)
+    }
+    return () => { map.off('load', draw); map.off('idle', draw) }
   }, [route])
 
   // ── Fit to full route when the Fuel tab is active ─────────────────────────
@@ -230,16 +238,15 @@ export function MapContainer() {
 
     findCheapestOnRoute(route.geometry, vehicleProfile.fuel_type, brand, 3).then((stations) => {
       if (cancelled || !mapRef.current) return
-      if (stations[0]) useAppStore.getState().setCheapestFuelPrice(stations[0].pricePerLitre)
+      if (stations.length) useAppStore.getState().setCheapestFuelPrice(Math.min(...stations.map(s => s.pricePerLitre)))
 
-      const RANK = ['#16A34A', '#D97706', '#6B7280'] // cheapest → green, then amber, grey
-      stations.forEach((st, i) => {
-        const color = RANK[i] ?? RANK[2]
+      stations.forEach((st) => {
+        const color = st.isCheapestOverall ? '#16A34A' : '#6B7280' // cheapest green, rest grey
         const el = document.createElement('div')
         el.style.cssText = `background:#fff;border:2px solid ${color};border-radius:8px;padding:3px 7px;display:flex;align-items:center;gap:4px;font-size:11px;font-weight:700;color:${color};cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,0.18);white-space:nowrap;transition:transform 0.12s`
         el.innerHTML = `⛽ $${st.pricePerLitre.toFixed(3)}`
         const popup = new maplibregl.Popup({ offset: 14, closeButton: true, maxWidth: '220px', closeOnClick: false })
-          .setHTML(`<div style="padding:4px 0;font-family:system-ui,sans-serif"><div style="font-size:12px;font-weight:700;color:#1C1C1A">${st.name}</div><div style="font-size:11px;color:#8C8A87;margin-top:2px">${st.address}</div><div style="font-size:18px;font-weight:800;color:${color};margin-top:5px">$${st.pricePerLitre.toFixed(3)}<span style="font-size:10px;font-weight:500;color:#8C8A87">/L</span></div><div style="font-size:10px;color:#8C8A87;margin-top:2px">${i === 0 ? 'Cheapest on your route' : `#${i + 1} on your route`} · ${st.kmFromRoute} km off route</div></div>`)
+          .setHTML(`<div style="padding:4px 0;font-family:system-ui,sans-serif"><div style="font-size:12px;font-weight:700;color:#1C1C1A">${st.name}</div><div style="font-size:11px;color:#8C8A87;margin-top:2px">${st.address}</div><div style="font-size:18px;font-weight:800;color:${color};margin-top:5px">$${st.pricePerLitre.toFixed(3)}<span style="font-size:10px;font-weight:500;color:#8C8A87">/L</span></div><div style="font-size:10px;color:#8C8A87;margin-top:2px">${st.isCheapestOverall ? `🏆 Cheapest on route · ${st.legLabel.toLowerCase()}` : st.legLabel} · ${st.kmFromRoute} km off route</div></div>`)
         const marker = new maplibregl.Marker({ element: el }).setLngLat([st.lng, st.lat]).setPopup(popup).addTo(mapRef.current!)
         el.addEventListener('mouseenter', () => { el.style.transform = 'scale(1.1)'; popup.addTo(mapRef.current!) })
         el.addEventListener('mouseleave', () => { el.style.transform = 'scale(1)'; popup.remove() })

@@ -1,5 +1,5 @@
 import { GREEN, WARM, SECONDARY } from '@/lib/brand'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useAppStore } from '@/store/useAppStore'
 import { useScrollLock } from '@/hooks/useScrollLock'
 
@@ -123,7 +123,8 @@ export function ProfileWizard() {
   // Wizard starts at 0 always; 3-step discovery or 2-step planning
   const [step, setStep] = useState(0)
   const [generating, setGenerating] = useState(false)
-  const [genStep, setGenStep] = useState(0)
+  const [genDone, setGenDone] = useState(false)
+  const [closing, setClosing] = useState(false)
 
   // ── Step 0: How far + who ──
   const [maxDriveHours, setMaxDriveHours] = useState(2)
@@ -160,7 +161,7 @@ export function ProfileWizard() {
   const [skipFuel, setSkipFuel] = useState(false)
   const [accommodation, setAccommodation] = useState<AccommodationPreference>('Any')
 
-  const totalSteps = isPreselected ? 2 : 4 // 0..1 for preselect, 0..3 for discovery
+  const totalSteps = isPreselected ? 3 : 5 // 0..2 for preselect, 0..4 for discovery
 
   if (!isWizardOpen) return null
 
@@ -181,7 +182,7 @@ export function ProfileWizard() {
   }
 
   const handleNext = async () => {
-    const lastStep = isPreselected ? 1 : 3
+    const lastStep = isPreselected ? 2 : 4
 
     // Step 1 in discovery mode → compute suggestions, derive dining prefs, advance
     if (!isPreselected && step === 1) {
@@ -261,14 +262,11 @@ export function ProfileWizard() {
 
     if (step < lastStep) { setStep((s) => s + 1); return }
 
-    // Final step → generate itinerary
+    // Final step → generate itinerary. Real work starts immediately — the
+    // progress bar tracks actual loading (GeneratingScreen eases toward ~92%
+    // and completes when tripDataReady), not a fixed timer.
     if (!effectiveDest) return
     setGenerating(true)
-    const msgs = ['Finding your route…', 'Matching experiences…', 'Building your day…', 'Almost ready…']
-    for (let i = 0; i < msgs.length; i++) {
-      setGenStep(i)
-      await new Promise((r) => setTimeout(r, 450))
-    }
 
     const partySize = crewType === 'solo' ? 1 : crewType === 'couple' ? 2 : crewType === 'family' ? 4 : 6
     const vibes: VibeTag[] = interests
@@ -341,7 +339,15 @@ export function ProfileWizard() {
       check()
     })
 
+    // Let the bar sweep to 100% and the counts land, then fade out into results
+    setGenDone(true)
+    await new Promise((r) => setTimeout(r, 650))
+    setClosing(true)
+    await new Promise((r) => setTimeout(r, 300))
+
     setGenerating(false)
+    setClosing(false)
+    setGenDone(false)
     setWizardOpen(false)
     setPreselectedDest(null)
     setMapView(effectiveDest.coord, 11)
@@ -358,19 +364,20 @@ export function ProfileWizard() {
     return true
   })()
 
-  const msgs = ['Finding your route…', 'Matching experiences…', 'Building your day…', 'Almost ready…']
 
   // ── Step labels + subtitles (#17) ──
-  const discoveryStepLabels = ['How far & who', 'What you love', 'Pick a spot', 'Trip summary']
+  const discoveryStepLabels = ['How far & who', 'What you love', 'Pick a spot', 'Your vehicle', 'Trip summary']
   const discoveryStepSubtitles = [
     'Tell us how far you want to travel and who\'s coming',
     'We\'ll match destinations to what you enjoy',
     'Choose from your personalised recommendations',
+    'So fuel stops and prices match your car',
     'Review your trip before we build it',
   ]
-  const preselectedStepLabels = ['Your trip details', 'Trip summary']
+  const preselectedStepLabels = ['Your trip details', 'Your vehicle', 'Trip summary']
   const preselectedStepSubtitles = [
     'Set your dates and who\'s coming',
+    'So fuel stops and prices match your car',
     'Review your trip before we build it',
   ]
   const stepLabels = isPreselected ? preselectedStepLabels : discoveryStepLabels
@@ -379,7 +386,7 @@ export function ProfileWizard() {
   const isPickStep = !isPreselected && step === 2
 
   return (
-    <div className="wizard-overlay">
+    <div className="wizard-overlay" style={{ opacity: closing ? 0 : 1, transition: 'opacity 0.3s ease' }}>
       <ScrollLock />
       <div className="wizard-card animate-fade-up">
 
@@ -444,7 +451,7 @@ export function ProfileWizard() {
         }}>
           {generating ? (
             <GeneratingScreen
-              step={genStep} messages={msgs}
+              done={genDone}
               destName={effectiveDest?.name ?? ''}
               originName={originName ?? ''}
               crewType={crewType}
@@ -467,6 +474,13 @@ export function ProfileWizard() {
                 />
               )}
               {step === 1 && (
+                <StepVehicle
+                  vehicleType={vehicleType} setVehicleType={setVehicleType}
+                  fuelType={fuelType} setFuelType={setFuelType}
+                  skipFuel={skipFuel} setSkipFuel={setSkipFuel}
+                />
+              )}
+              {step === 2 && (
                 <StepSummary
                   effectiveDest={effectiveDest}
                   startDate={startDate}
@@ -509,6 +523,13 @@ export function ProfileWizard() {
                 />
               )}
               {step === 3 && (
+                <StepVehicle
+                  vehicleType={vehicleType} setVehicleType={setVehicleType}
+                  fuelType={fuelType} setFuelType={setFuelType}
+                  skipFuel={skipFuel} setSkipFuel={setSkipFuel}
+                />
+              )}
+              {step === 4 && (
                 <StepSummary
                   effectiveDest={effectiveDest}
                   startDate={startDate}
@@ -547,7 +568,7 @@ export function ProfileWizard() {
               cursor: canContinue ? 'pointer' : 'not-allowed',
               transition: 'background 200ms ease, transform 150ms cubic-bezier(0.34,1.4,0.64,1)',
             }}>
-              {step === (isPreselected ? 1 : 3) ? 'Build my trip →' : step === 1 && !isPreselected ? 'Show me options →' : 'Continue →'}
+              {step === (isPreselected ? 2 : 4) ? 'Build my trip →' : step === 1 && !isPreselected ? 'Show me options →' : 'Continue →'}
             </button>
           </div>
         )}
@@ -1450,6 +1471,10 @@ interface SummaryFuelStation {
   lng: number
   priceCents: number
   pricePerLitre: number
+  // present when stations came from the on-route search (absent on the
+  // near-origin fallback path)
+  legLabel?: 'Near start' | 'Midway' | 'Near destination'
+  isCheapestOverall?: boolean
   distanceKm: number
 }
 
@@ -1490,18 +1515,21 @@ function StepSummary({ effectiveDest, startDate, endDate, tripType, crewType, ve
     search
       .then((stations) => {
         setFuelStations(stations)
-        if (stations[0]) useAppStore.getState().setCheapestFuelPrice(stations[0].pricePerLitre)
+        if (stations.length) useAppStore.getState().setCheapestFuelPrice(Math.min(...stations.map(s => s.pricePerLitre)))
       })
       .catch(() => {})
       .finally(() => setLoadingFuel(false))
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [destCoord?.lat, destCoord?.lng, originCoord.lat, originCoord.lng, fuelType, fuelBrand, vehicleType, skipFuel, route?.key])
 
-  const cheapestPrice = fuelStations[0]?.pricePerLitre
+  const cheapestPrice = fuelStations.length ? Math.min(...fuelStations.map(s => s.pricePerLitre)) : undefined
   const estCost = cheapestPrice ? Math.round(fuelUsedL * cheapestPrice) : null
 
-  const RANK_COLORS = ['#16A34A', '#D97706', '#6B7280']
-  const RANK_LABELS = ['1st', '2nd', '3rd']
+  const LEG_SHORT: Record<string, string> = { 'Near start': 'Start', 'Midway': 'Mid', 'Near destination': 'End' }
+  const stColor = (st: SummaryFuelStation, i: number) =>
+    (st.isCheapestOverall ?? i === 0) ? '#16A34A' : '#6B7280'
+  const stBadge = (st: SummaryFuelStation, i: number) =>
+    st.legLabel ? LEG_SHORT[st.legLabel] : ['1st', '2nd', '3rd'][i]
 
   const fmtDate = (iso: string) =>
     new Date(iso + 'T00:00:00').toLocaleDateString('en-AU', { weekday: 'short', day: 'numeric', month: 'short' })
@@ -1537,10 +1565,10 @@ function StepSummary({ effectiveDest, startDate, endDate, tripType, crewType, ve
             }}>
               <div style={{
                 width: 28, height: 28, borderRadius: '50%',
-                background: RANK_COLORS[i], color: '#fff',
+                background: stColor(st, i), color: '#fff',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
-                fontSize: 10, fontWeight: 800, flexShrink: 0,
-              }}>{RANK_LABELS[i]}</div>
+                fontSize: 9, fontWeight: 800, flexShrink: 0,
+              }}>{stBadge(st, i)}</div>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                   {st.name}
@@ -1548,7 +1576,7 @@ function StepSummary({ effectiveDest, startDate, endDate, tripType, crewType, ve
                 <div style={{ fontSize: 10, color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{st.address}</div>
               </div>
               <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                <div style={{ fontSize: 14, fontWeight: 800, color: RANK_COLORS[i] }}>${st.pricePerLitre.toFixed(3)}</div>
+                <div style={{ fontSize: 14, fontWeight: 800, color: stColor(st, i) }}>${st.pricePerLitre.toFixed(3)}</div>
                 <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>{st.distanceKm} km</div>
               </div>
             </div>
@@ -1883,12 +1911,38 @@ function DiscoveryGrid({ counts, progress }: { counts: Record<string, number>; p
 
 // ── Generating screen ─────────────────────────────────────────────
 
-function GeneratingScreen({ step, messages, destName, originName, crewType, startDate, tripType }: {
-  step: number; messages: string[]
+const GEN_MESSAGES = ['Finding your route…', 'Discovering experiences…', 'Checking what\'s open…', 'Building your day…']
+
+function GeneratingScreen({ done, destName, originName, crewType, startDate, tripType }: {
+  done: boolean
   destName: string; originName: string
   crewType: CrewType; startDate: string; tripType: TripType
 }) {
-  const progress = ((step + 1) / messages.length) * 100
+  // Continuous eased progress: climbs quickly at first, approaches ~92%
+  // asymptotically while real data loads, sweeps to 100% when `done`.
+  // Category counts scale with this same value, so numbers tick upward the
+  // whole time — it feels like places are being gathered, because they are.
+  const [progress, setProgress] = useState(0)
+  const doneRef = useRef(done)
+  doneRef.current = done
+  useEffect(() => {
+    let raf = 0
+    const t0 = performance.now()
+    const tick = (t: number) => {
+      const elapsed = (t - t0) / 1000
+      setProgress((p) => {
+        const target = doneRef.current ? 100 : 92 * (1 - Math.exp(-elapsed / 1.8))
+        const next = p + (target - p) * (doneRef.current ? 0.16 : 0.06)
+        return next > 99.7 ? 100 : next
+      })
+      raf = requestAnimationFrame(tick)
+    }
+    raf = requestAnimationFrame(tick)
+    return () => cancelAnimationFrame(raf)
+  }, [])
+
+  const msgIdx = progress >= 100 ? -1 : Math.min(GEN_MESSAGES.length - 1, Math.floor((progress / 100) * GEN_MESSAGES.length))
+  const message = progress >= 100 ? 'Ready — opening your escape ✓' : GEN_MESSAGES[msgIdx]
   const loadingCounts = useAppStore((s) => s.loadingCounts)
 
   const crewLabel: Record<CrewType, string> = { solo: 'Solo', couple: 'Couple', family: 'Family', group: 'Group' }
@@ -1943,16 +1997,15 @@ function GeneratingScreen({ step, messages, destName, originName, crewType, star
       {/* Progress + counts */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 16, flex: 1, justifyContent: 'center' }}>
         {/* Current step label */}
-        <div style={{ fontSize: 14, fontWeight: 500, color: '#6B7280' }}>
-          {messages[step]}
+        <div style={{ fontSize: 14, fontWeight: 500, color: progress >= 100 ? GREEN : '#6B7280', transition: 'color 0.3s ease' }}>
+          {message}
         </div>
 
-        {/* M3 determinate linear progress */}
+        {/* Continuous progress — driven by real loading, not a timer */}
         <div style={{ width: '100%', height: 4, borderRadius: 2, background: `${GREEN}22`, overflow: 'hidden', position: 'relative' }}>
           <div style={{
             position: 'absolute', top: 0, left: 0, height: '100%',
             width: `${progress}%`, background: GREEN, borderRadius: 2,
-            transition: 'width 0.5s cubic-bezier(0.4, 0, 0.2, 1)',
           }} />
         </div>
 

@@ -231,10 +231,10 @@ export function ExperiencePanel({ hideTimeline = false }: { hideTimeline?: boole
       return
     }
     if (_f === 'fuel') {
-      setDisplayedMapPins((stops ?? []).map((st, i) => ({
+      setDisplayedMapPins((stops ?? []).map((st) => ({
         id: `fuel-${st.id}`, lat: st.lat, lng: st.lng,
         type: 'fuel', emoji: '⛽',
-        name: `${st.brand} — $${st.pricePerLitre.toFixed(3)}/L${i === 0 ? ' (cheapest on route)' : ''}`,
+        name: `${st.brand} — $${st.pricePerLitre.toFixed(3)}/L (${st.isCheapestOverall ? 'cheapest on route' : st.legLabel.toLowerCase()})`,
       })))
       return
     }
@@ -290,7 +290,7 @@ export function ExperiencePanel({ hideTimeline = false }: { hideTimeline?: boole
     const brand = (d.vehicleProfile as unknown as { fuel_brand?: string | null }).fuel_brand
     const results = await findCheapestOnRoute(drivingRoute.geometry, d.vehicleProfile.fuel_type, brand, 3)
     setFuelStops(results)
-    if (results[0]) useAppStore.getState().setCheapestFuelPrice(results[0].pricePerLitre)
+    if (results.length) useAppStore.getState().setCheapestFuelPrice(Math.min(...results.map(s => s.pricePerLitre)))
     setFuelLoading(false)
     return results
   }, [d.activeItinerary, d.vehicleProfile, drivingRoute])
@@ -1047,20 +1047,21 @@ export function ExperiencePanel({ hideTimeline = false }: { hideTimeline?: boole
               </div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 10 }}>
-                {fuelStops.map((st, i) => {
-                  const rankColor = i === 0 ? '#16A34A' : i === 1 ? '#D97706' : '#6B7280'
-                  const rankLabel = i === 0 ? '🏆 Cheapest on route' : `#${i + 1} on route`
+                {fuelStops.map((st) => {
+                  const isTop = st.isCheapestOverall
+                  const rankColor = isTop ? '#16A34A' : '#6B7280'
+                  const rankLabel = isTop ? `🏆 ${st.legLabel} — cheapest on route` : st.legLabel
                   return (
                     <div key={st.id} style={{
                       background: '#fff', borderRadius: 14,
-                      border: i === 0 ? '1.5px solid #BBF7D0' : '1px solid var(--border)',
+                      border: isTop ? '1.5px solid #BBF7D0' : '1px solid var(--border)',
                       padding: '14px 16px', boxShadow: '0 1px 4px rgba(0,0,0,0.05)',
                     }}>
                       <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: rankColor, marginBottom: 6 }}>{rankLabel}</div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                         <div style={{
-                          width: 52, height: 52, borderRadius: 12, background: i === 0 ? 'var(--green-light)' : 'var(--bg-base)',
-                          border: `1.5px solid ${i === 0 ? '#BBF7D0' : 'var(--border)'}`, display: 'flex', flexDirection: 'column',
+                          width: 52, height: 52, borderRadius: 12, background: isTop ? 'var(--green-light)' : 'var(--bg-base)',
+                          border: `1.5px solid ${isTop ? '#BBF7D0' : 'var(--border)'}`, display: 'flex', flexDirection: 'column',
                           alignItems: 'center', justifyContent: 'center', flexShrink: 0,
                         }}>
                           <span style={{ fontSize: 13, fontWeight: 900, color: rankColor, lineHeight: 1 }}>${st.pricePerLitre.toFixed(3)}</span>
