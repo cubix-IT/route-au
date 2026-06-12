@@ -5,6 +5,7 @@ import { detectNearbyPOIs } from '@/modules/poi'
 import { runGuardrailPipeline } from '@/modules/guardrails'
 import { validateRouteConstraints } from '@/modules/routing'
 import { saveItinerary, savePOIsCache } from '@/store/db'
+import { routeKeyFor } from '@/lib/osrmRoute'
 import type { Itinerary, ItineraryDay, DiningPref } from '@/types'
 import { buildDaySchedule } from '@/utils/scheduleBuilder'
 
@@ -33,6 +34,14 @@ export function useItineraryBuilder() {
 
       const prefs = diningPrefs ?? storeDiningPrefs
       const route = buildRoute(originCoord, destCoord, true, vehicleProfile)
+
+      // Real driving route (OSRM) was fetched on the wizard summary step —
+      // replace the straight-line × 1.3 estimates with actual road values.
+      const { routeData } = useAppStore.getState()
+      if (routeData && routeData.key === routeKeyFor(originCoord, destCoord)) {
+        route.total_distance_km = routeData.distanceKm
+        route.estimated_drive_hours = routeData.durationHours
+      }
 
       // Fix waypoint labels to use real place names instead of generic Start/End
       const destLabel = storeDestName || 'Destination'

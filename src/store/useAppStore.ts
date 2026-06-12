@@ -114,6 +114,14 @@ interface AppState {
   patchRouteDistances: (distKm: number, durHours: number) => void
   clearItinerary: () => void
 
+  // Real driving route (OSRM) — fetched once per origin/dest pair, shared by
+  // wizard summary, map (route line) and fuel-on-route search. Not persisted.
+  routeData: { key: string; geometry: Coordinate[]; distanceKm: number; durationHours: number } | null
+  setRouteData: (rd: AppState['routeData']) => void
+  // $/L of the cheapest on-route station found — used for the fuel cost estimate
+  cheapestFuelPrice: number | null
+  setCheapestFuelPrice: (p: number | null) => void
+
   // User-chosen dining stops (interactive explorer)
   addedDiningStops: AddedDiningStop[]
   addDiningStop: (stop: AddedDiningStop) => void
@@ -231,6 +239,11 @@ export const useAppStore = create<AppState>()(
         }
       }),
       clearItinerary: () => set({ activeItinerary: null, addedDiningStops: [], addedActivities: [] }),
+
+      routeData: null,
+      setRouteData: (rd) => set({ routeData: rd }),
+      cheapestFuelPrice: null,
+      setCheapestFuelPrice: (p) => set({ cheapestFuelPrice: p }),
 
       addedDiningStops: [],
       addDiningStop: (stop) =>

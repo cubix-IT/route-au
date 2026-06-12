@@ -2,13 +2,8 @@ import { useEffect, useRef, useCallback } from 'react'
 import maplibregl from 'maplibre-gl'
 import { MapView } from './MapView'
 import { useAppStore } from '@/store/useAppStore'
-import { CORRIDORS } from '@/data/corridors.ts'
-import type { Coordinate } from '@/types'
-
-interface FuelStation {
-  id: string; name: string; brand: string; address: string
-  lat: number; lng: number; priceCents: number; pricePerLitre: number; distanceKm: number
-}
+import { useDrivingRoute } from '@/hooks/useDrivingRoute'
+import { findCheapestOnRoute } from '@/lib/fuelOnRoute'
 
 // Stable ref to avoid re-creating markers on every render
 type MarkerEntry = { marker: maplibregl.Marker; el: HTMLElement; id: string }
@@ -28,12 +23,64 @@ export function MapContainer() {
   const {
     activeItinerary, nearbyPOIs, displayedMapPins,
     vehicleProfile, setSelectedPOI, selectedPinId, setSelectedPinId,
-    activeHazards,
+    activeHazards, activePOIFilter, originCoord, destCoord,
   } = useAppStore()
+
+  // Real driving route — fetched once per trip (usually already cached from the wizard)
+  const route = useDrivingRoute(activeItinerary ? originCoord : null, activeItinerary ? destCoord : null)
 
   const handleMapReady = useCallback((m: maplibregl.Map) => {
     mapRef.current = m
   }, [])
+
+  // ── Route line — the actual roads, not a straight line ───────────────────
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map) return
+
+    const draw = () => {
+      const src = map.getSource('ue-route') as maplibregl.GeoJSONSource | undefined
+      const data: GeoJSON.Feature = {
+        type: 'Feature',
+        properties: {},
+        geometry: {
+          type: 'LineString',
+          coordinates: route ? route.geometry.map((c) => [c.lng, c.lat]) : [],
+        },
+      }
+      if (src) {
+        src.setData(data)
+      } else {
+        map.addSource('ue-route', { type: 'geojson', data })
+        map.addLayer({
+          id: 'ue-route-casing',
+          type: 'line',
+          source: 'ue-route',
+          layout: { 'line-cap': 'round', 'line-join': 'round' },
+          paint: { 'line-color': '#ffffff', 'line-width': 7, 'line-opacity': 0.9 },
+        })
+        map.addLayer({
+          id: 'ue-route-line',
+          type: 'line',
+          source: 'ue-route',
+          layout: { 'line-cap': 'round', 'line-join': 'round' },
+          paint: { 'line-color': '#2F6B4F', 'line-width': 3.5, 'line-opacity': 0.85 },
+        })
+      }
+    }
+
+    if (map.isStyleLoaded()) draw()
+    else map.once('load', draw)
+  }, [route])
+
+  // ── Fit to full route when the Fuel tab is active ─────────────────────────
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map || activePOIFilter !== 'fuel' || !route) return
+    const bounds = new maplibregl.LngLatBounds()
+    for (const c of route.geometry) bounds.extend([c.lng, c.lat])
+    map.fitBounds(bounds, { padding: { top: 60, bottom: 60, left: 45, right: 45 }, duration: 800 })
+  }, [activePOIFilter, route])
 
   // ── Destination pin + initial centering ──────────────────────────────────
   useEffect(() => {
@@ -118,7 +165,7 @@ export function MapContainer() {
           <div style="padding:4px 0;font-family:system-ui,sans-serif">
             <div style="font-size:13px;font-weight:700;color:#1C1C1A;line-height:1.3;margin-bottom:4px">${pin.name}</div>
             <div style="font-size:11px;color:#8C8A87;margin-bottom:8px">${emoji} ${pin.type}</div>
-            <a href="https://www.google.com/maps/maps?q=${pin.lat},${pin.lng}+(${encodeURIComponent(pin.name)})" target="_blank" rel="noopener noreferrer"
+            <a href="https://maps.google.com/maps?q=${pin.lat},${pin.lng}+(${encodeURIComponent(pin.name)})" target="_blank" rel="noopener noreferrer"
               style="display:inline-block;font-size:11px;font-weight:700;color:#fff;background:#1C1B1F;padding:5px 10px;border-radius:6px;text-decoration:none">
               Open in Maps ↗
             </a>
@@ -167,10 +214,10 @@ export function MapContainer() {
     if (!entry.marker.getPopup()?.isOpen()) entry.marker.togglePopup()
   }, [selectedPinId])
 
-  // ── Fuel markers ──────────────────────────────────────────────────────────
+  // ── Fuel markers — cheapest stations on the actual driving route ──────────
   useEffect(() => {
     const map = mapRef.current
-    if (!map || !activeItinerary || !vehicleProfile) return
+    if (!map || !activeItinerary || !vehicleProfile || !route) return
 
     fuelMarkersRef.current.forEach((m) => m.remove())
     fuelMarkersRef.current = []
@@ -178,45 +225,31 @@ export function MapContainer() {
     if (vehicleProfile.fuel_type === 'Electric') return
     if ((vehicleProfile as { skip_fuel?: boolean }).skip_fuel) return
 
-    const waypoints = activeItinerary.route?.waypoints
-    if (!waypoints || waypoints.length < 2) return
+    let cancelled = false
+    const brand = (vehicleProfile as { fuel_brand?: string | null }).fuel_brand
 
-    const origin = waypoints[0].coord
-    const dest = waypoints[waypoints.length - 1].coord
-    const corridorIds = activeItinerary.route?.corridor_ids ?? []
-    const roadPath: Coordinate[] = corridorIds.flatMap(id =>
-      CORRIDORS.find(c => c.id === id)?.path_coordinates ?? []
-    )
-    const pathToSample = roadPath.length >= 3 ? roadPath : [origin, dest]
-    const q1 = pathToSample[Math.floor(pathToSample.length * 0.33)]
-    const q2 = pathToSample[Math.floor(pathToSample.length * 0.67)]
+    findCheapestOnRoute(route.geometry, vehicleProfile.fuel_type, brand, 3).then((stations) => {
+      if (cancelled || !mapRef.current) return
+      if (stations[0]) useAppStore.getState().setCheapestFuelPrice(stations[0].pricePerLitre)
 
-    ;[
-      { coord: q1, label: 'early on route' },
-      { coord: q2, label: 'later on route' },
-      { coord: dest, label: 'near destination' },
-    ].forEach(({ coord, label }) => {
-      const brand = (vehicleProfile as { fuel_brand?: string | null }).fuel_brand
-      const brandQ = brand && brand !== 'Any' ? `&brand=${encodeURIComponent(brand)}` : ''
-      fetch(`/api/fuel?lat=${coord.lat}&lng=${coord.lng}&fuelType=${vehicleProfile.fuel_type}&limit=1&radius=40${brandQ}`)
-        .then((r) => r.json())
-        .then((data) => {
-          const st: FuelStation | undefined = (data as { stations: FuelStation[] }).stations?.[0]
-          if (!st || !mapRef.current) return
-          const el = document.createElement('div')
-          el.style.cssText = `background:#fff;border:2px solid #16A34A;border-radius:8px;padding:3px 7px;display:flex;align-items:center;gap:4px;font-size:11px;font-weight:700;color:#16A34A;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,0.18);white-space:nowrap;transition:transform 0.12s`
-          el.innerHTML = `⛽ $${st.pricePerLitre.toFixed(3)}`
-          const popup = new maplibregl.Popup({ offset: 14, closeButton: true, maxWidth: '220px', closeOnClick: false })
-            .setHTML(`<div style="padding:4px 0;font-family:system-ui,sans-serif"><div style="font-size:12px;font-weight:700;color:#1C1C1A">${st.name}</div><div style="font-size:11px;color:#8C8A87;margin-top:2px">${st.address}</div><div style="font-size:18px;font-weight:800;color:#16A34A;margin-top:5px">$${st.pricePerLitre.toFixed(3)}<span style="font-size:10px;font-weight:500;color:#8C8A87">/L</span></div><div style="font-size:10px;color:#8C8A87;margin-top:2px">Cheapest ${label} · ${st.distanceKm} km away</div></div>`)
-          const marker = new maplibregl.Marker({ element: el }).setLngLat([st.lng, st.lat]).setPopup(popup).addTo(mapRef.current)
-          el.addEventListener('mouseenter', () => { el.style.transform = 'scale(1.1)'; popup.addTo(mapRef.current!) })
-          el.addEventListener('mouseleave', () => { el.style.transform = 'scale(1)'; popup.remove() })
-          el.addEventListener('click', (e) => { e.stopPropagation(); popup.addTo(mapRef.current!) })
-          fuelMarkersRef.current.push(marker)
-        })
-        .catch(() => {})
+      const RANK = ['#16A34A', '#D97706', '#6B7280'] // cheapest → green, then amber, grey
+      stations.forEach((st, i) => {
+        const color = RANK[i] ?? RANK[2]
+        const el = document.createElement('div')
+        el.style.cssText = `background:#fff;border:2px solid ${color};border-radius:8px;padding:3px 7px;display:flex;align-items:center;gap:4px;font-size:11px;font-weight:700;color:${color};cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,0.18);white-space:nowrap;transition:transform 0.12s`
+        el.innerHTML = `⛽ $${st.pricePerLitre.toFixed(3)}`
+        const popup = new maplibregl.Popup({ offset: 14, closeButton: true, maxWidth: '220px', closeOnClick: false })
+          .setHTML(`<div style="padding:4px 0;font-family:system-ui,sans-serif"><div style="font-size:12px;font-weight:700;color:#1C1C1A">${st.name}</div><div style="font-size:11px;color:#8C8A87;margin-top:2px">${st.address}</div><div style="font-size:18px;font-weight:800;color:${color};margin-top:5px">$${st.pricePerLitre.toFixed(3)}<span style="font-size:10px;font-weight:500;color:#8C8A87">/L</span></div><div style="font-size:10px;color:#8C8A87;margin-top:2px">${i === 0 ? 'Cheapest on your route' : `#${i + 1} on your route`} · ${st.kmFromRoute} km off route</div></div>`)
+        const marker = new maplibregl.Marker({ element: el }).setLngLat([st.lng, st.lat]).setPopup(popup).addTo(mapRef.current!)
+        el.addEventListener('mouseenter', () => { el.style.transform = 'scale(1.1)'; popup.addTo(mapRef.current!) })
+        el.addEventListener('mouseleave', () => { el.style.transform = 'scale(1)'; popup.remove() })
+        el.addEventListener('click', (e) => { e.stopPropagation(); popup.addTo(mapRef.current!) })
+        fuelMarkersRef.current.push(marker)
+      })
     })
-  }, [activeItinerary, vehicleProfile]) // eslint-disable-line react-hooks/exhaustive-deps
+
+    return () => { cancelled = true }
+  }, [activeItinerary, vehicleProfile, route]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Legacy scored POI markers ─────────────────────────────────────────────
   useEffect(() => {

@@ -5,6 +5,8 @@ import { useScrollLock } from '@/hooks/useScrollLock'
 
 function ScrollLock() { useScrollLock(); return null }
 import { useItineraryBuilder } from '@/hooks/useItineraryBuilder'
+import { useDrivingRoute } from '@/hooks/useDrivingRoute'
+import { findCheapestOnRoute } from '@/lib/fuelOnRoute'
 import { matchDestinations, getNearbySubDests, VICTORIAN_CLUSTERS } from '@/data/victorianClusters.ts'
 import type { InterestDbCounts } from '@/data/victorianClusters.ts'
 import { supabase } from '@/lib/supabase'
@@ -1468,31 +1470,32 @@ function StepSummary({ effectiveDest, startDate, endDate, tripType, crewType, ve
   const [loadingFuel, setLoadingFuel] = useState(false)
 
   const destCoord = effectiveDest?.coord
+  // Real driving route (OSRM) — shared with map/planner via the store
+  const route = useDrivingRoute(originCoord, destCoord ?? null)
   const straightKm = destCoord ? haversinKm(originCoord, destCoord) : 0
-  const estKm = Math.round(straightKm * 1.3)
+  const estKm = route ? Math.round(route.distanceKm) : Math.round(straightKm * 1.3)
   const estKmRound = estKm * 2
   const fuelUsedL = vehicleType === 'Electric' || skipFuel ? 0 : (estKmRound * 10) / 100
 
   useEffect(() => {
     if (skipFuel || vehicleType === 'Electric' || !destCoord) return
-    const lat = (originCoord.lat + destCoord.lat) / 2
-    const lng = (originCoord.lng + destCoord.lng) / 2
     setLoadingFuel(true)
-    const brandParam = fuelBrand && fuelBrand !== 'Any' ? `&brand=${encodeURIComponent(fuelBrand)}` : ''
-    // Try midpoint first with 40km radius; fallback to near origin if empty
-    fetch(`/api/fuel?lat=${lat}&lng=${lng}&fuelType=${fuelType}&limit=3&radius=40${brandParam}`, { signal: AbortSignal.timeout(10_000) })
-      .then((r) => r.json())
-      .then(async (data) => {
-        const stations = (data as { stations: SummaryFuelStation[] }).stations ?? []
-        if (stations.length > 0) return setFuelStations(stations)
-        // Midpoint (possibly over water) found nothing — try near origin
-        const fallback = await fetch(`/api/fuel?lat=${originCoord.lat}&lng=${originCoord.lng}&fuelType=${fuelType}&limit=3&radius=25${brandParam}`, { signal: AbortSignal.timeout(10_000) }).then((r) => r.json())
-        setFuelStations((fallback as { stations: SummaryFuelStation[] }).stations ?? [])
+    const search = route
+      // Cheapest stations genuinely on the driving route
+      ? findCheapestOnRoute(route.geometry, fuelType, fuelBrand, 3)
+      // OSRM unavailable — fall back to stations near the origin (still real roads nearby)
+      : fetch(`/api/fuel?lat=${originCoord.lat}&lng=${originCoord.lng}&fuelType=${fuelType}&limit=3&radius=25${fuelBrand && fuelBrand !== 'Any' ? `&brand=${encodeURIComponent(fuelBrand)}` : ''}`, { signal: AbortSignal.timeout(10_000) })
+          .then((r) => r.json())
+          .then((data) => (data as { stations: SummaryFuelStation[] }).stations ?? [])
+    search
+      .then((stations) => {
+        setFuelStations(stations)
+        if (stations[0]) useAppStore.getState().setCheapestFuelPrice(stations[0].pricePerLitre)
       })
       .catch(() => {})
       .finally(() => setLoadingFuel(false))
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [destCoord?.lat, destCoord?.lng, originCoord.lat, originCoord.lng, fuelType, vehicleType])
+  }, [destCoord?.lat, destCoord?.lng, originCoord.lat, originCoord.lng, fuelType, fuelBrand, vehicleType, skipFuel, route?.key])
 
   const cheapestPrice = fuelStations[0]?.pricePerLitre
   const estCost = cheapestPrice ? Math.round(fuelUsedL * cheapestPrice) : null

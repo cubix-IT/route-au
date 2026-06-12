@@ -4,6 +4,8 @@ import { usePlannerData } from '@/hooks/usePlannerData'
 import { useAppStore } from '@/store/useAppStore'
 import { useTrails } from '@/hooks/useTrails'
 import { useWeather } from '@/hooks/useWeather'
+import { useDrivingRoute } from '@/hooks/useDrivingRoute'
+import { findCheapestOnRoute, type RouteFuelStation } from '@/lib/fuelOnRoute'
 import { CORRIDORS } from '@/data/corridors.ts'
 import { VICTORIAN_CLUSTERS } from '@/data/victorianClusters.ts'
 import type { Coordinate } from '@/types'
@@ -82,16 +84,6 @@ const ACCOM_POI_CFG: Record<AccommodationPOI['type'], { emoji: string; label: st
 }
 
 type FilterMode = 'overview' | 'activities' | 'food' | 'stay' | 'fuel' | 'trails'
-
-interface FuelStop {
-  coord: { lat: number; lng: number }
-  label: string
-  brandNotFound?: boolean
-  station: {
-    id: string; name: string; brand: string; address: string
-    lat: number; lng: number; pricePerLitre: number; distanceKm: number
-  } | null
-}
 
 type AccomPref = 'Hotel' | 'Glamping' | 'CaravanPark' | 'FreeCamping' | 'Any'
 
@@ -199,8 +191,11 @@ export function ExperiencePanel({ hideTimeline = false }: { hideTimeline?: boole
   const [expandedCardId, setExpandedCardId] = useState<string | null>(null)
   const [showAllAccom, setShowAllAccom] = useState(false)
   const [showAllActivities, setShowAllActivities] = useState(false)
-  const [fuelStops, setFuelStops] = useState<FuelStop[]>([])
+  const [fuelStops, setFuelStops] = useState<RouteFuelStation[]>([])
   const [fuelLoading, setFuelLoading] = useState(false)
+  const originCoord = useAppStore((s) => s.originCoord)
+  // Real driving route — usually cached in the store from the wizard summary
+  const drivingRoute = useDrivingRoute(originCoord, destCoord)
 
   const RESULT_LIMIT = 10
 
@@ -229,17 +224,17 @@ export function ExperiencePanel({ hideTimeline = false }: { hideTimeline?: boole
     [tripDayForecast]
   )
 
-  const syncMapPins = useCallback((_f: FilterMode, _pois: LivePOI[], stops?: FuelStop[]) => {
+  const syncMapPins = useCallback((_f: FilterMode, _pois: LivePOI[], stops?: RouteFuelStation[]) => {
     if (_f === 'overview') {
       // Default view — no POI pins, just destination centred
       setDisplayedMapPins([])
       return
     }
     if (_f === 'fuel') {
-      setDisplayedMapPins((stops ?? []).filter((s) => s.station).map((s) => ({
-        id: `fuel-${s.label}`, lat: s.station!.lat, lng: s.station!.lng,
+      setDisplayedMapPins((stops ?? []).map((st, i) => ({
+        id: `fuel-${st.id}`, lat: st.lat, lng: st.lng,
         type: 'fuel', emoji: '⛽',
-        name: `${s.station!.brand} — $${s.station!.pricePerLitre.toFixed(3)}/L (${s.label})`,
+        name: `${st.brand} — $${st.pricePerLitre.toFixed(3)}/L${i === 0 ? ' (cheapest on route)' : ''}`,
       })))
       return
     }
@@ -287,47 +282,18 @@ export function ExperiencePanel({ hideTimeline = false }: { hideTimeline?: boole
   }, [d.dbActivities, d.dbNature, d.dbFood, d.accommodationPOIs]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const fetchFuelStops = useCallback(async () => {
-    if (!d.activeItinerary || !d.vehicleProfile) return
+    if (!d.activeItinerary || !d.vehicleProfile || !drivingRoute) return
     if (d.vehicleProfile.fuel_type === 'Electric') return
     if ((d.vehicleProfile as unknown as { skip_fuel?: boolean }).skip_fuel) return
-    const waypoints = d.activeItinerary.route?.waypoints
-    if (!waypoints || waypoints.length < 2) return
-
-    const origin = waypoints[0].coord
-    const dest = waypoints[waypoints.length - 1].coord
-
-    // Use corridor path_coordinates — actual road geometry, not straight-line guesses
-    const corridorIds = d.activeItinerary.route?.corridor_ids ?? []
-    const roadPath: Coordinate[] = corridorIds.flatMap(id =>
-      CORRIDORS.find(c => c.id === id)?.path_coordinates ?? []
-    )
-    const pathToSample = roadPath.length >= 3 ? roadPath : [origin, dest]
-    const q1 = pathToSample[Math.floor(pathToSample.length * 0.33)]
-    const q2 = pathToSample[Math.floor(pathToSample.length * 0.67)]
-    const spots = [
-      { coord: q1,   label: 'Early on route' },
-      { coord: q2,   label: 'Later on route' },
-      { coord: dest, label: 'Near destination' },
-    ]
 
     setFuelLoading(true)
     const brand = (d.vehicleProfile as unknown as { fuel_brand?: string | null }).fuel_brand
-    const brandQ = brand && brand !== 'Any' ? `&brand=${encodeURIComponent(brand)}` : ''
-
-    const results = await Promise.all(spots.map(async ({ coord, label }) => {
-      try {
-        // radius=15km — tight enough to stay on-route, wide enough to find stations
-        const r = await fetch(`/api/fuel?lat=${coord.lat}&lng=${coord.lng}&fuelType=${d.vehicleProfile!.fuel_type}&limit=1&radius=15${brandQ}`)
-        const data = await r.json() as { stations?: FuelStop['station'][]; brandNotFound?: boolean }
-        return { coord, label, station: data.stations?.[0] ?? null, brandNotFound: data.brandNotFound } as FuelStop
-      } catch {
-        return { coord, label, station: null } as FuelStop
-      }
-    }))
+    const results = await findCheapestOnRoute(drivingRoute.geometry, d.vehicleProfile.fuel_type, brand, 3)
     setFuelStops(results)
+    if (results[0]) useAppStore.getState().setCheapestFuelPrice(results[0].pricePerLitre)
     setFuelLoading(false)
     return results
-  }, [d.activeItinerary, d.vehicleProfile])
+  }, [d.activeItinerary, d.vehicleProfile, drivingRoute])
 
   const handleFilterChange = async (f: FilterMode) => {
     setFilter(f)
@@ -382,6 +348,7 @@ export function ExperiencePanel({ hideTimeline = false }: { hideTimeline?: boole
           ...((d.dbFood?.length ?? 0) > 0 ? [['food', 'Food & Drinks']] : []),
           ...(trails.length > 0 ? [['trails', 'Trails']] : []),
           ['stay', 'Stay'],
+          ...(d.vehicleProfile && d.vehicleProfile.fuel_type !== 'Electric' && !(d.vehicleProfile as unknown as { skip_fuel?: boolean }).skip_fuel ? [['fuel', 'Fuel']] : []),
         ]) as [string, string][]).map(([f, label]) => (
           <button key={f} onClick={() => handleFilterChange(f as FilterMode)} style={{
             padding: '6px 14px', borderRadius: 20, flexShrink: 0,
@@ -1067,52 +1034,57 @@ export function ExperiencePanel({ hideTimeline = false }: { hideTimeline?: boole
         {/* ── Fuel Stops ── */}
         {filter === 'fuel' && (
           <div style={{ padding: '16px 16px 0' }}>
-            <SectionHeader title="Best Fuel Along Your Route" icon="⛽" count={0} />
-            {fuelLoading ? (
-              <div style={{ padding: '20px 0', textAlign: 'center', fontSize: 13, color: 'var(--text-muted)' }}>Finding stations…</div>
+            <SectionHeader title="Cheapest Fuel On Your Route" icon="⛽" count={fuelStops.length} />
+            {fuelLoading || (!drivingRoute && fuelStops.length === 0) ? (
+              <div style={{ padding: '20px 0', textAlign: 'center', fontSize: 13, color: 'var(--text-muted)' }}>
+                {drivingRoute ? 'Finding the cheapest stations on your route…' : 'Calculating your driving route…'}
+              </div>
             ) : fuelStops.length === 0 ? (
-              <div style={{ padding: '20px 0', textAlign: 'center', fontSize: 13, color: 'var(--text-muted)' }}>No fuel data available.</div>
+              <div style={{ padding: '20px 0', textAlign: 'center', fontSize: 13, color: 'var(--text-muted)' }}>
+                No stations found along your route.
+                {(d.vehicleProfile as unknown as { fuel_brand?: string }).fuel_brand && (d.vehicleProfile as unknown as { fuel_brand?: string }).fuel_brand !== 'Any'
+                  ? ' Try selecting "Any" brand in trip settings.' : ''}
+              </div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 10 }}>
-                {fuelStops.map((stop) => (
-                  <div key={stop.label} style={{
-                    background: '#fff', borderRadius: 14, border: '1px solid var(--border)',
-                    padding: '14px 16px', boxShadow: '0 1px 4px rgba(0,0,0,0.05)',
-                  }}>
-                    <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--text-muted)', marginBottom: 6 }}>{stop.label}</div>
-                    {stop.brandNotFound ? (
-                      <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
-                        No {(d.vehicleProfile as unknown as { fuel_brand?: string }).fuel_brand} stations found nearby — try selecting "Any" brand in trip settings.
-                      </div>
-                    ) : stop.station ? (
+                {fuelStops.map((st, i) => {
+                  const rankColor = i === 0 ? '#16A34A' : i === 1 ? '#D97706' : '#6B7280'
+                  const rankLabel = i === 0 ? '🏆 Cheapest on route' : `#${i + 1} on route`
+                  return (
+                    <div key={st.id} style={{
+                      background: '#fff', borderRadius: 14,
+                      border: i === 0 ? '1.5px solid #BBF7D0' : '1px solid var(--border)',
+                      padding: '14px 16px', boxShadow: '0 1px 4px rgba(0,0,0,0.05)',
+                    }}>
+                      <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: rankColor, marginBottom: 6 }}>{rankLabel}</div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                         <div style={{
-                          width: 52, height: 52, borderRadius: 12, background: 'var(--green-light)',
-                          border: '1.5px solid #BBF7D0', display: 'flex', flexDirection: 'column',
+                          width: 52, height: 52, borderRadius: 12, background: i === 0 ? 'var(--green-light)' : 'var(--bg-base)',
+                          border: `1.5px solid ${i === 0 ? '#BBF7D0' : 'var(--border)'}`, display: 'flex', flexDirection: 'column',
                           alignItems: 'center', justifyContent: 'center', flexShrink: 0,
                         }}>
-                          <span style={{ fontSize: 13, fontWeight: 900, color: '#16A34A', lineHeight: 1 }}>${stop.station.pricePerLitre.toFixed(3)}</span>
+                          <span style={{ fontSize: 13, fontWeight: 900, color: rankColor, lineHeight: 1 }}>${st.pricePerLitre.toFixed(3)}</span>
                           <span style={{ fontSize: 8, color: 'var(--text-muted)', marginTop: 1 }}>/litre</span>
                         </div>
                         <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ fontSize: 14, fontWeight: 700, color: '#1C1C1A', marginBottom: 1 }}>{stop.station.name}</div>
-                          <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 2 }}>{stop.station.brand} · Service Station</div>
-                          {stop.station.address && <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{stop.station.address}</div>}
-                          <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>{stop.station.distanceKm} km from your route</div>
+                          <div style={{ fontSize: 14, fontWeight: 700, color: '#1C1C1A', marginBottom: 1 }}>{st.name}</div>
+                          <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 2 }}>{st.brand} · Service Station</div>
+                          {st.address && <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{st.address}</div>}
+                          <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
+                            {st.kmFromRoute <= 0.5 ? 'Right on your route' : `${st.kmFromRoute} km off your route`}
+                          </div>
                         </div>
                         <a
-                          href={coordMapsUrl(stop.station.brand + ' ' + stop.station.address, stop.station.lat, stop.station.lng)}
-                         
-                          style={{ fontSize: 11, fontWeight: 700, color: '#fff', background: '#16A34A', padding: '7px 11px', borderRadius: 9, textDecoration: 'none', flexShrink: 0 }}
+                          href={coordMapsUrl(st.brand + ' ' + st.address, st.lat, st.lng)}
+                          target="_blank" rel="noopener noreferrer"
+                          style={{ fontSize: 11, fontWeight: 700, color: '#fff', background: rankColor, padding: '7px 11px', borderRadius: 9, textDecoration: 'none', flexShrink: 0 }}
                         >Maps ↗</a>
                       </div>
-                    ) : (
-                      <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>No stations found nearby.</div>
-                    )}
-                  </div>
-                ))}
+                    </div>
+                  )
+                })}
                 <div style={{ fontSize: 11, color: 'var(--text-muted)', textAlign: 'center', paddingBottom: 4 }}>
-                  Prices from Service Victoria — updated daily
+                  Prices from Service Victoria — updated daily · Route via OSRM
                 </div>
               </div>
             )}

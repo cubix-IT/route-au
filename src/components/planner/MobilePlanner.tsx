@@ -4,6 +4,8 @@ import { MapContainer } from '@/components/map/MapContainer'
 import { usePlannerData } from '@/hooks/usePlannerData'
 import { useAppStore } from '@/store/useAppStore'
 import { useWeather } from '@/hooks/useWeather'
+import { useDrivingRoute } from '@/hooks/useDrivingRoute'
+import { findCheapestOnRoute, type RouteFuelStation } from '@/lib/fuelOnRoute'
 import type { LivePOI } from '@/lib/overpass'
 import type { HazardAlert } from '@/lib/vicEmergency'
 import type { Activity } from '@/data/victorianActivities.ts'
@@ -141,32 +143,24 @@ export function MobilePlanner() {
   const panelRef = React.useRef<HTMLDivElement>(null)
   const dragRef = React.useRef<{ startY: number; lastY: number; lastT: number } | null>(null)
 
-  interface MFuelStop { label: string; station: { name: string; brand: string; address: string; lat: number; lng: number; pricePerLitre: number; distanceKm: number } | null; brandNotFound?: boolean }
-  const [fuelStops, setFuelStops] = useState<MFuelStop[]>([])
+  const [fuelStops, setFuelStops] = useState<RouteFuelStation[]>([])
   const [fuelLoading, setFuelLoading] = useState(false)
   const [foodFilter, setFoodFilter] = useState('all')
 
   const hasFuel = !!(d.vehicleProfile && d.vehicleProfile.fuel_type !== 'Electric' && !(d.vehicleProfile as unknown as { skip_fuel?: boolean }).skip_fuel)
 
+  const originCoord = useAppStore((s) => s.originCoord)
+  const mDestCoord = useAppStore((s) => s.destCoord)
+  // Real driving route — usually already cached in the store from the wizard
+  const drivingRoute = useDrivingRoute(originCoord, mDestCoord)
+
   const fetchFuel = async () => {
-    if (!d.activeItinerary || !d.vehicleProfile || !hasFuel) return
-    const wp = d.activeItinerary.route?.waypoints
-    if (!wp || wp.length < 2) return
-    const origin = wp[0].coord
-    const dest = wp[wp.length - 1].coord
-    const mid = { lat: (origin.lat + dest.lat) / 2, lng: (origin.lng + dest.lng) / 2 }
-    const spots = [{ coord: origin, label: 'Near start' }, { coord: mid, label: 'En route' }, { coord: dest, label: 'Near destination' }]
+    if (!d.activeItinerary || !d.vehicleProfile || !hasFuel || !drivingRoute) return
     const brand = (d.vehicleProfile as unknown as { fuel_brand?: string | null }).fuel_brand
-    const brandQ = brand && brand !== 'Any' ? `&brand=${encodeURIComponent(brand)}` : ''
     setFuelLoading(true)
-    const results = await Promise.all(spots.map(async ({ coord, label }) => {
-      try {
-        const r = await fetch(`/api/fuel?lat=${coord.lat}&lng=${coord.lng}&fuelType=${d.vehicleProfile!.fuel_type}&limit=1&radius=50${brandQ}`)
-        const data = await r.json() as { stations?: MFuelStop['station'][]; brandNotFound?: boolean }
-        return { label, station: data.stations?.[0] ?? null, brandNotFound: data.brandNotFound }
-      } catch { return { label, station: null } }
-    }))
+    const results = await findCheapestOnRoute(drivingRoute.geometry, d.vehicleProfile.fuel_type, brand, 3)
     setFuelStops(results)
+    if (results[0]) useAppStore.getState().setCheapestFuelPrice(results[0].pricePerLitre)
     setFuelLoading(false)
   }
 
@@ -399,6 +393,7 @@ export function MobilePlanner() {
             ...((d.dbFood?.length ?? 0) > 0 ? [['food', '🍽 Food & Drinks']] : []),
             ['stay', '🏨 Stay'],
             ...(scheduledPlan.items.length > 0 ? [['plan', `Your Plan (${scheduledPlan.items.length})`]] : []),
+            ...(hasFuel ? [['fuel', '⛽ Fuel']] : []),
           ] as [FilterTab, string][]).map(([t, label]) => (
             <button key={t} onClick={() => {
               setTab(t); setCatFilter('all')
@@ -809,42 +804,43 @@ export function MobilePlanner() {
           </div>
         )}
 
-        {/* ── FUEL tab ── */}
+        {/* ── FUEL tab — cheapest stations on the actual driving route ── */}
         {tab === 'fuel' && (
           <div style={{ padding: '12px 12px 0', display: 'flex', flexDirection: 'column', gap: 10 }}>
-            {fuelLoading ? (
-              <div style={{ fontSize: 13, color: '#9CA3AF', padding: '20px 0', textAlign: 'center' }}>Finding stations…</div>
+            {fuelLoading || (!drivingRoute && fuelStops.length === 0) ? (
+              <div style={{ fontSize: 13, color: '#9CA3AF', padding: '20px 0', textAlign: 'center' }}>
+                {drivingRoute ? 'Finding the cheapest stations on your route…' : 'Calculating your driving route…'}
+              </div>
             ) : fuelStops.length === 0 ? (
-              <div style={{ fontSize: 13, color: '#9CA3AF' }}>No fuel data available.</div>
-            ) : fuelStops.map((stop) => (
-              <div key={stop.label} style={{ background: '#fff', borderRadius: 18, border: '1px solid rgba(0,0,0,0.07)', padding: '14px 16px', boxShadow: '0 1px 6px rgba(0,0,0,0.05)' }}>
-                <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#9CA3AF', marginBottom: 8 }}>{stop.label}</div>
-                {stop.brandNotFound ? (
-                  <div style={{ fontSize: 12, color: '#9CA3AF' }}>
-                    No {(d.vehicleProfile as unknown as { fuel_brand?: string }).fuel_brand} stations found nearby.
+              <div style={{ fontSize: 13, color: '#9CA3AF' }}>No stations found along your route.</div>
+            ) : fuelStops.map((st, i) => {
+              const rankColor = i === 0 ? '#16A34A' : i === 1 ? '#D97706' : '#6B7280'
+              return (
+                <div key={st.id} style={{ background: '#fff', borderRadius: 18, border: i === 0 ? '1.5px solid #BBF7D0' : '1px solid rgba(0,0,0,0.07)', padding: '14px 16px', boxShadow: '0 1px 6px rgba(0,0,0,0.05)' }}>
+                  <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: rankColor, marginBottom: 8 }}>
+                    {i === 0 ? '🏆 Cheapest on route' : `#${i + 1} on route`}
                   </div>
-                ) : stop.station ? (
                   <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                    <div style={{ width: 52, height: 52, borderRadius: 12, background: '#F0FDF4', border: '1.5px solid #BBF7D0', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                      <span style={{ fontSize: 13, fontWeight: 900, color: '#16A34A', lineHeight: 1 }}>${stop.station.pricePerLitre.toFixed(3)}</span>
+                    <div style={{ width: 52, height: 52, borderRadius: 12, background: i === 0 ? '#F0FDF4' : '#FAFAF8', border: `1.5px solid ${i === 0 ? '#BBF7D0' : 'rgba(0,0,0,0.07)'}`, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                      <span style={{ fontSize: 13, fontWeight: 900, color: rankColor, lineHeight: 1 }}>${st.pricePerLitre.toFixed(3)}</span>
                       <span style={{ fontSize: 8, color: '#6B7280', marginTop: 1 }}>/litre</span>
                     </div>
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: 14, fontWeight: 700, color: '#1C1C1A', marginBottom: 2 }}>{stop.station.brand}</div>
-                      <div style={{ fontSize: 12, color: '#6B7280', marginBottom: 2 }}>{stop.station.name}</div>
-                      {stop.station.address && <div style={{ fontSize: 11, color: '#9CA3AF' }}>{stop.station.address}</div>}
-                      <div style={{ fontSize: 11, color: '#9CA3AF', marginTop: 2 }}>{stop.station.distanceKm} km away</div>
+                      <div style={{ fontSize: 14, fontWeight: 700, color: '#1C1C1A', marginBottom: 2 }}>{st.brand}</div>
+                      <div style={{ fontSize: 12, color: '#6B7280', marginBottom: 2 }}>{st.name}</div>
+                      {st.address && <div style={{ fontSize: 11, color: '#9CA3AF' }}>{st.address}</div>}
+                      <div style={{ fontSize: 11, color: '#9CA3AF', marginTop: 2 }}>
+                        {st.kmFromRoute <= 0.5 ? 'Right on your route' : `${st.kmFromRoute} km off your route`}
+                      </div>
                     </div>
-                    <a href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(stop.station.brand + ' ' + stop.station.address)}`}
-                     
-                      style={{ fontSize: 11, fontWeight: 700, color: '#fff', background: '#16A34A', padding: '7px 11px', borderRadius: 9, textDecoration: 'none', flexShrink: 0 }}>Maps ↗</a>
+                    <a href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(st.brand + ' ' + st.address)}&ll=${st.lat},${st.lng}`}
+                      target="_blank" rel="noopener noreferrer"
+                      style={{ fontSize: 11, fontWeight: 700, color: '#fff', background: rankColor, padding: '7px 11px', borderRadius: 9, textDecoration: 'none', flexShrink: 0 }}>Maps ↗</a>
                   </div>
-                ) : (
-                  <div style={{ fontSize: 12, color: '#9CA3AF' }}>No stations found nearby.</div>
-                )}
-              </div>
-            ))}
-            <div style={{ fontSize: 11, color: '#9CA3AF', textAlign: 'center', paddingBottom: 4 }}>Prices from Service Victoria — updated daily</div>
+                </div>
+              )
+            })}
+            <div style={{ fontSize: 11, color: '#9CA3AF', textAlign: 'center', paddingBottom: 4 }}>Prices from Service Victoria — updated daily · Route via OSRM</div>
             <div style={{ height: 32 }} />
           </div>
         )}

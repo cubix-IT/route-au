@@ -1,5 +1,12 @@
 # Changelog
 
+## 12 June 2026 — Real routes & fuel on route
+
+- **Real driving routes (OSRM)** — trips now fetch the actual road route, replacing straight-line × 1.3 guesses. Distance and drive-time in results are real road values. Route drawn on the map (green line).
+- **Fuel genuinely on your route** — samples the route polyline, finds stations within 2.5 km of the actual road, ranks by price. "🏆 Cheapest on route" cards in the re-enabled Fuel tab (desktop + mobile), ranked map markers (green/amber/grey), map fits to full route when Fuel tab is active.
+- **Real fuel prices in cost estimate** — trip fuel cost now uses the live cheapest on-route price (Service Vic) instead of a hardcoded ~$1.98/L table.
+- **Fixed malformed map popup links** — `google.com/maps/maps?q=` → proper `maps.google.com/maps?q=LAT,LNG+(Name)` format.
+
 ## 12 June 2026
 
 - **Data quality — purge OSM sculpture-trail and vandalism noise**

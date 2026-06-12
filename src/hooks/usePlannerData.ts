@@ -27,6 +27,7 @@ export function calcFuelCost(
   consumptionL100: number,
   evWhPerKm: number | undefined,
   isTowing: boolean,
+  realPricePerL?: number | null,
 ): string {
   const adjKm = totalKm * (isTowing ? 1.3 : 1)
   if (fuelType === 'Electric') {
@@ -34,7 +35,8 @@ export function calcFuelCost(
     return `~$${Math.round(cost)} charge`
   }
   const litres = (adjKm / 100) * consumptionL100
-  const cost = litres * (FUEL_PRICE_PER_L[fuelType] ?? 1.98)
+  // Prefer the live cheapest-on-route price (Service Vic) over the static table
+  const cost = litres * (realPricePerL ?? FUEL_PRICE_PER_L[fuelType] ?? 1.98)
   return `~$${Math.round(cost)} fuel`
 }
 
@@ -225,6 +227,7 @@ export function usePlannerData() {
   const activeItinerary = useAppStore((s) => s.activeItinerary)
   const vehicleProfile = useAppStore((s) => s.vehicleProfile)
   const userProfile = useAppStore((s) => s.userProfile)
+  const cheapestFuelPrice = useAppStore((s) => s.cheapestFuelPrice)
   const departureHour = useAppStore((s) => s.departureHour)
   const addedDiningStops = useAppStore((s) => s.addedDiningStops)
   const removeDiningStop = useAppStore((s) => s.removeDiningStop)
@@ -353,6 +356,7 @@ export function usePlannerData() {
         vehicleProfile.fuel_consumption_litres_per_100km,
         vehicleProfile.ev_consumption_wh_per_km,
         vehicleProfile.is_towing,
+        cheapestFuelPrice,
       )
     : null
 
