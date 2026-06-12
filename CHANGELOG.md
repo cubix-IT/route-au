@@ -1,5 +1,33 @@
 # Changelog
 
+## 12 June 2026
+
+- **Data quality — purge OSM sculpture-trail and vandalism noise**
+  - Deleted 94 junk rows: individual artwork nodes ("Untitled (I Love You)", "Aftermath 9-11", solar-system trail markers, statue spam), defunct places ("Sawdust Pile — no longer here")
+  - Enrich pipeline now requires Wikipedia/Wikidata notability for `tourism=artwork` POIs and skips places with defunct lifecycle notes
+  - New `scripts/clean-junk.mts` (dry-run + `--apply`) and `scripts/quality-scan.mts` for ongoing data audits
+- **Performance — 71% smaller first load**
+  - Code-split planner: maplibre-gl (1 MB), wizard, panels and modals now lazy-load; landing page JS down from 556 KB → 164 KB gzipped
+  - Planner chunks prefetch while the wizard is open — map appears instantly when the itinerary is ready
+  - Replaced `@turf/turf` kitchen-sink with 5 scoped packages
+  - Logo 469 KB → 6.6 KB (was 6250×6250px!); og-image 2.4 MB → 175 KB JPEG
+- **Resilience — network timeouts everywhere**
+  - Added `AbortSignal.timeout` to weather (10s), Photon autocomplete (6s) and fuel (10s) fetches — no more indefinite hangs on flaky regional connections
+  - Photon autocomplete failures now return empty suggestions instead of unhandled promise rejections
+  - Branded loading spinner while planner chunks load (was blank screen)
+
+## 8 June 2026 (4d26db1)
+
+- **PWA polish — iOS meta tags, fix maskable icon, clean up manifest name**
+
+## 8 June 2026 (509f10f)
+
+- **Add og:image and social share meta tags**
+
+## 8 June 2026 (c6baa27)
+
+- **Hide fuel tab and vehicle step from wizard**
+
 ## 8 June 2026 (bbc6fd5)
 
 - **Wizard step 3 two-col layout + generating screen discovery grid**

@@ -13,6 +13,7 @@ export async function fetchWeatherForCoord(
       'User-Agent': USER_AGENT,
       'Accept': 'application/json',
     },
+    signal: AbortSignal.timeout(10_000),
   })
   if (!res.ok) throw new Error('Weather fetch failed')
 

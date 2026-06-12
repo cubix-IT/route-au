@@ -91,7 +91,7 @@ function renderIndex(res: VercelResponse) {
   const title = 'Victorian Weekend Getaways — All Destinations | Unplanned Escapes'
   const desc = 'Explore 15+ Victorian regions for your next weekend escape — Yarra Valley, Mornington Peninsula, Great Ocean Road, Grampians and more.'
   const canonical = `${BASE_URL}/destinations`
-  const ogImage = `${BASE_URL}/og-image.png`
+  const ogImage = `${BASE_URL}/og-image.jpg`
 
   const jsonLd = {
     '@context': 'https://schema.org',

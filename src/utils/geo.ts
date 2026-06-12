@@ -1,11 +1,8 @@
-import {
-  point,
-  lineString,
-  buffer,
-  booleanPointInPolygon,
-  nearestPointOnLine,
-  distance,
-} from '@turf/turf'
+import { point, lineString } from '@turf/helpers'
+import { buffer } from '@turf/buffer'
+import { booleanPointInPolygon } from '@turf/boolean-point-in-polygon'
+import { nearestPointOnLine } from '@turf/nearest-point-on-line'
+import { distance } from '@turf/distance'
 import type { Feature, Polygon, MultiPolygon } from 'geojson'
 import type { Coordinate } from '@/types'
 

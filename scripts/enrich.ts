@@ -683,6 +683,18 @@ async function enrichSubDest(
     // Skip accommodation entirely — belongs in accommodation table, not enrichment
     if (isAccommodation(tags)) continue
 
+    // Individual artworks (tourism=artwork) need Wikipedia/Wikidata notability.
+    // Sculpture trails map every piece as its own node ("Untitled (I Love You)",
+    // "Aftermath 9-11", solar-system markers) — they're not destinations on their own.
+    // Galleries (tourism=gallery) are unaffected.
+    if (tags.tourism === 'artwork' && !tags.wikipedia && !tags.wikidata) continue
+
+    // Skip defunct places — OSM lifecycle notes like "No longer here Apr 2022".
+    // "demolished" deliberately excluded — heritage descriptions often mention
+    // partial demolition of buildings that still stand.
+    const DEFUNCT = /\b(no longer (here|exists?|open|operating)|permanently closed|closed permanently|closed down|burnt down|has been removed)\b/i
+    if (DEFUNCT.test(tags.description || '') || DEFUNCT.test(tags.note || '')) continue
+
     const cat = osmCategory(tags)
     if (!cat) continue
 

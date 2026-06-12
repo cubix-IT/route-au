@@ -1480,13 +1480,13 @@ function StepSummary({ effectiveDest, startDate, endDate, tripType, crewType, ve
     setLoadingFuel(true)
     const brandParam = fuelBrand && fuelBrand !== 'Any' ? `&brand=${encodeURIComponent(fuelBrand)}` : ''
     // Try midpoint first with 40km radius; fallback to near origin if empty
-    fetch(`/api/fuel?lat=${lat}&lng=${lng}&fuelType=${fuelType}&limit=3&radius=40${brandParam}`)
+    fetch(`/api/fuel?lat=${lat}&lng=${lng}&fuelType=${fuelType}&limit=3&radius=40${brandParam}`, { signal: AbortSignal.timeout(10_000) })
       .then((r) => r.json())
       .then(async (data) => {
         const stations = (data as { stations: SummaryFuelStation[] }).stations ?? []
         if (stations.length > 0) return setFuelStations(stations)
         // Midpoint (possibly over water) found nothing — try near origin
-        const fallback = await fetch(`/api/fuel?lat=${originCoord.lat}&lng=${originCoord.lng}&fuelType=${fuelType}&limit=3&radius=25${brandParam}`).then((r) => r.json())
+        const fallback = await fetch(`/api/fuel?lat=${originCoord.lat}&lng=${originCoord.lng}&fuelType=${fuelType}&limit=3&radius=25${brandParam}`, { signal: AbortSignal.timeout(10_000) }).then((r) => r.json())
         setFuelStations((fallback as { stations: SummaryFuelStation[] }).stations ?? [])
       })
       .catch(() => {})

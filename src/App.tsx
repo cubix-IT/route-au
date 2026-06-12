@@ -1,19 +1,51 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, lazy, Suspense } from 'react'
 import { Toaster } from 'react-hot-toast'
-import { PrivacyPage } from '@/components/PrivacyPage'
-import { ChangelogPage } from '@/components/ChangelogPage'
 import { Header } from '@/components/layout/Header'
-import { MapContainer } from '@/components/map/MapContainer'
-import { ProfileWizard } from '@/components/wizard/ProfileWizard'
 import { LandingPage } from '@/components/landing/LandingPage'
-import { ExperiencePanel } from '@/components/planner/ExperiencePanel'
-import { MobilePlanner } from '@/components/planner/MobilePlanner'
-import { TripSummaryPanel } from '@/components/planner/TripSummaryPanel'
 import { useOfflineSync } from '@/hooks/useOfflineSync'
 import { useAuth } from '@/hooks/useAuth'
 import { useAppStore } from '@/store/useAppStore'
-import { AuthModal } from '@/components/auth/AuthModal'
 import { VICTORIAN_CLUSTERS } from '@/data/victorianClusters'
+
+// Lazy: planner view (pulls in maplibre-gl ~750KB), wizard, modals, static pages.
+// Landing page renders without any of these.
+const PrivacyPage = lazy(() => import('@/components/PrivacyPage').then(m => ({ default: m.PrivacyPage })))
+const ChangelogPage = lazy(() => import('@/components/ChangelogPage').then(m => ({ default: m.ChangelogPage })))
+const MapContainer = lazy(() => import('@/components/map/MapContainer').then(m => ({ default: m.MapContainer })))
+const ProfileWizard = lazy(() => import('@/components/wizard/ProfileWizard').then(m => ({ default: m.ProfileWizard })))
+const ExperiencePanel = lazy(() => import('@/components/planner/ExperiencePanel').then(m => ({ default: m.ExperiencePanel })))
+const MobilePlanner = lazy(() => import('@/components/planner/MobilePlanner').then(m => ({ default: m.MobilePlanner })))
+const TripSummaryPanel = lazy(() => import('@/components/planner/TripSummaryPanel').then(m => ({ default: m.TripSummaryPanel })))
+const AuthModal = lazy(() => import('@/components/auth/AuthModal').then(m => ({ default: m.AuthModal })))
+
+// Kick off planner chunk downloads while the user is still in the wizard,
+// so the map appears instantly when the itinerary is ready.
+function prefetchPlanner() {
+  import('@/components/map/MapContainer')
+  import('@/components/planner/ExperiencePanel')
+  import('@/components/planner/MobilePlanner')
+  import('@/components/planner/TripSummaryPanel')
+}
+
+function PlannerLoading() {
+  return (
+    <div style={{
+      height: '100dvh', display: 'flex', flexDirection: 'column', gap: 16,
+      alignItems: 'center', justifyContent: 'center', background: '#F8F7F4',
+    }}>
+      <div style={{
+        width: 36, height: 36, borderRadius: '50%',
+        border: '3px solid var(--border, #E5E2DA)',
+        borderTopColor: 'var(--green, #2F6B4F)',
+        animation: 'ue-spin 0.8s linear infinite',
+      }} />
+      <span style={{ fontSize: 14, color: 'var(--text-secondary, #6B6B66)', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+        Preparing your escape…
+      </span>
+      <style>{'@keyframes ue-spin { to { transform: rotate(360deg) } }'}</style>
+    </div>
+  )
+}
 
 type View = 'landing' | 'planner'
 
@@ -59,6 +91,12 @@ function App() {
   }, [])
 
   const isWizardOpen = useAppStore((s) => s.isWizardOpen)
+
+  // Prefetch planner chunks the moment the wizard opens — by the time the
+  // user finishes the steps, maplibre and the panels are already cached.
+  useEffect(() => {
+    if (isWizardOpen) prefetchPlanner()
+  }, [isWizardOpen])
   const isAuthModalOpen = useAppStore((s) => s.isAuthModalOpen)
   const activeItinerary = useAppStore((s) => s.activeItinerary)
   const isMobile = useIsMobile()
@@ -85,14 +123,14 @@ function App() {
   }, [activeItinerary])
 
   if (window.location.pathname === '/privacy') {
-    return <PrivacyPage onBack={() => { window.history.back() }} />
+    return <Suspense fallback={null}><PrivacyPage onBack={() => { window.history.back() }} /></Suspense>
   }
   if (window.location.pathname === '/changelog') {
-    return <ChangelogPage onBack={() => { window.history.back() }} />
+    return <Suspense fallback={null}><ChangelogPage onBack={() => { window.history.back() }} /></Suspense>
   }
 
   return (
-    <>
+    <Suspense fallback={view === 'planner' ? <PlannerLoading /> : null}>
       {view === 'landing' && <LandingPage />}
 
       {view === 'planner' && (
@@ -176,7 +214,7 @@ function App() {
           },
         }}
       />
-    </>
+    </Suspense>
   )
 }
 
