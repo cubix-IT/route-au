@@ -152,7 +152,7 @@ export function MobilePlanner() {
   const originCoord = useAppStore((s) => s.originCoord)
   const mDestCoord = useAppStore((s) => s.destCoord)
   // Real driving route — usually already cached in the store from the wizard
-  const drivingRoute = useDrivingRoute(originCoord, mDestCoord)
+  const { route: drivingRoute, failed: routeFailed } = useDrivingRoute(originCoord, mDestCoord)
 
   const fetchFuel = async () => {
     if (!d.activeItinerary || !d.vehicleProfile || !hasFuel || !drivingRoute) return
@@ -163,6 +163,12 @@ export function MobilePlanner() {
     if (results.length) useAppStore.getState().setCheapestFuelPrice(Math.min(...results.map(s => s.pricePerLitre)))
     setFuelLoading(false)
   }
+
+  // Fuel tab opened before the OSRM route arrived → fetch as soon as it lands
+  useEffect(() => {
+    if (tab !== 'fuel' || !drivingRoute || fuelStops.length > 0 || fuelLoading) return
+    fetchFuel()
+  }, [drivingRoute, tab]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Weather for destination on trip date
   const destCoord = useAppStore((s) => s.destCoord)
@@ -232,21 +238,51 @@ export function MobilePlanner() {
     return { items, arrivalMins }
   }, [d.addedActivities, d.addedDiningStops, d.dbActivities, d.departureHour, d.driveHours])
 
-  // Auto-populate map pins — prefer DB data (curated), fall back to Overpass
+  // Map pins follow the active tab (was: nature-only, which is ~empty since
+  // the nature_spots cleanup — mobile maps showed no places at all)
+  const MOB_EMOJI: Record<string, string> = {
+    nature: '🌿', viewpoint: '🌄', history: '🏛️', art: '🎨', active: '🏄',
+    wildlife: '🦘', relaxation: '🧖', wellness: '♨️', beach: '🏖️',
+    entertainment: '🎵', markets: '🛒', family: '👨‍👩‍👧',
+    Winery: '🍷', Brewery: '🍺', Distillery: '🥃', Pub: '🍻',
+    Restaurant: '🍽️', Cafe: '☕', Bakery: '🥐',
+    hotel: '🏨', motel: '🏨', campsite: '⛺', cabin: '🏕️',
+  }
   useEffect(() => {
-    if (d.dbNature.length > 0) {
-      const actPins = d.dbNature
-        .filter((n) => n.lat && n.lng)
-        .slice(0, 10)
-        .map((n) => ({ id: `nature-${n.nature_spot_id}`, lat: n.lat!, lng: n.lng!, type: 'attraction' as LivePOI['type'], name: n.name }))
-      setDisplayedMapPins(actPins)
+    if (tab === 'food') {
+      setDisplayedMapPins((d.dbFood ?? []).filter(f => f.lat && f.lng).map(f => ({
+        id: String(f.food_place_id), lat: f.lat!, lng: f.lng!,
+        type: f.category, emoji: MOB_EMOJI[f.category] ?? '🍽️', name: f.name,
+      })))
       return
     }
-    if (!d.livePOIs) return
-    const ACT_TYPES: LivePOI['type'][] = ['hiking', 'viewpoint', 'attraction', 'winery', 'brewery', 'distillery', 'pub']
-    const actPins = d.livePOIs.filter((p) => ACT_TYPES.includes(p.type) && p.lat && p.lng).slice(0, 10)
-    setDisplayedMapPins(actPins.map((p) => ({ id: p.id, lat: p.lat!, lng: p.lng!, type: p.type, name: p.name })))
-  }, [d.livePOIs, d.dbNature, setDisplayedMapPins])
+    if (tab === 'stay') {
+      setDisplayedMapPins((d.accommodationPOIs ?? []).filter(a => a.lat && a.lng).map(a => ({
+        id: a.id, lat: a.lat!, lng: a.lng!,
+        type: a.type, emoji: MOB_EMOJI[a.type] ?? '🏨', name: a.name,
+      })))
+      return
+    }
+    if (tab === 'fuel') {
+      setDisplayedMapPins(fuelStops.map(st => ({
+        id: `fuel-${st.id}`, lat: st.lat, lng: st.lng,
+        type: 'fuel', emoji: '⛽',
+        name: `${st.brand} — $${st.pricePerLitre.toFixed(3)}/L (${st.isCheapestOverall ? 'cheapest on route' : st.legLabel.toLowerCase()})`,
+      })))
+      return
+    }
+    // overview / explore / plan — activities + nature
+    setDisplayedMapPins([
+      ...d.dbActivities.filter(a => a.lat && a.lng).slice(0, 20).map(a => ({
+        id: String(a.activity_id), lat: a.lat!, lng: a.lng!,
+        type: a.category, emoji: MOB_EMOJI[a.category] ?? a.emoji ?? '📍', name: a.name,
+      })),
+      ...d.dbNature.filter(n => n.lat && n.lng).map(n => ({
+        id: `nature-${n.nature_spot_id}`, lat: n.lat!, lng: n.lng!,
+        type: n.type, emoji: MOB_EMOJI[n.type] ?? '🌿', name: n.name,
+      })),
+    ])
+  }, [tab, d.dbActivities, d.dbNature, d.dbFood, d.accommodationPOIs, fuelStops, setDisplayedMapPins]) // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!d.activeItinerary) return null
 
@@ -809,7 +845,7 @@ export function MobilePlanner() {
           <div style={{ padding: '12px 12px 0', display: 'flex', flexDirection: 'column', gap: 10 }}>
             {fuelLoading || (!drivingRoute && fuelStops.length === 0) ? (
               <div style={{ fontSize: 13, color: '#9CA3AF', padding: '20px 0', textAlign: 'center' }}>
-                {drivingRoute ? 'Finding the cheapest stations on your route…' : 'Calculating your driving route…'}
+                {drivingRoute ? 'Finding the cheapest stations on your route…' : routeFailed ? 'Couldn\u2019t calculate your driving route — fuel search unavailable.' : 'Calculating your driving route…'}
               </div>
             ) : fuelStops.length === 0 ? (
               <div style={{ fontSize: 13, color: '#9CA3AF' }}>No stations found along your route.</div>

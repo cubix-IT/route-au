@@ -1496,7 +1496,7 @@ function StepSummary({ effectiveDest, startDate, endDate, tripType, crewType, ve
 
   const destCoord = effectiveDest?.coord
   // Real driving route (OSRM) — shared with map/planner via the store
-  const route = useDrivingRoute(originCoord, destCoord ?? null)
+  const { route, loading: routeLoading, failed: routeFailed } = useDrivingRoute(originCoord, destCoord ?? null)
   const straightKm = destCoord ? haversinKm(originCoord, destCoord) : 0
   const estKm = route ? Math.round(route.distanceKm) : Math.round(straightKm * 1.3)
   const estKmRound = estKm * 2
@@ -1504,11 +1504,14 @@ function StepSummary({ effectiveDest, startDate, endDate, tripType, crewType, ve
 
   useEffect(() => {
     if (skipFuel || vehicleType === 'Electric' || !destCoord) return
+    // Route still loading → keep the spinner up. Showing near-origin results
+    // now and swapping them when the route lands reads as a glitch.
+    if (routeLoading) { setLoadingFuel(true); return }
     setLoadingFuel(true)
     const search = route
       // Cheapest stations genuinely on the driving route
       ? findCheapestOnRoute(route.geometry, fuelType, fuelBrand, 3)
-      // OSRM unavailable — fall back to stations near the origin (still real roads nearby)
+      // OSRM actually failed — fall back to stations near the origin
       : fetch(`/api/fuel?lat=${originCoord.lat}&lng=${originCoord.lng}&fuelType=${fuelType}&limit=3&radius=25${fuelBrand && fuelBrand !== 'Any' ? `&brand=${encodeURIComponent(fuelBrand)}` : ''}`, { signal: AbortSignal.timeout(10_000) })
           .then((r) => r.json())
           .then((data) => (data as { stations: SummaryFuelStation[] }).stations ?? [])
@@ -1520,7 +1523,7 @@ function StepSummary({ effectiveDest, startDate, endDate, tripType, crewType, ve
       .catch(() => {})
       .finally(() => setLoadingFuel(false))
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [destCoord?.lat, destCoord?.lng, originCoord.lat, originCoord.lng, fuelType, fuelBrand, vehicleType, skipFuel, route?.key])
+  }, [destCoord?.lat, destCoord?.lng, originCoord.lat, originCoord.lng, fuelType, fuelBrand, vehicleType, skipFuel, route?.key, routeLoading, routeFailed])
 
   const cheapestPrice = fuelStations.length ? Math.min(...fuelStations.map(s => s.pricePerLitre)) : undefined
   const estCost = cheapestPrice ? Math.round(fuelUsedL * cheapestPrice) : null

@@ -120,7 +120,7 @@ function activityCategory(tags: Record<string,string>, name: string): string {
   // Public art — sculptures, murals, mosaics, installations
   if (tags.tourism === 'artwork' || /\bsculpture\b|\bmural\b|\bmosaic\b|\binstallation\b|\bstatue\b(?!.*museum)/.test(n)) return 'art'
   if (tags.tourism === 'gallery' || tags.amenity === 'arts_centre' || /gallery|art centre|art space/.test(n)) return 'art'
-  if (tags.amenity === 'marketplace' || /\bmarket\b|farmers market|night market|sunday market/.test(n)) return 'markets'
+  if (tags.amenity === 'marketplace' || /\bmarkets?\b|farmers market|night market|sunday market/.test(n)) return 'markets'
   if (tags.waterway === 'lake' || tags.waterway === 'reservoir' || /\blake\b|\breservoir\b/.test(n)) return 'nature'
   if (/wildlife|sanctuary|zoo|koala|penguin|seal|dolphin|animal park/.test(n)) return 'wildlife'
   if (tags.leisure === 'nature_reserve' || tags.boundary === 'national_park' || /national park|state park|nature reserve/.test(n)) return 'nature'

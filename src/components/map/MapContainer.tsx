@@ -27,7 +27,7 @@ export function MapContainer() {
   } = useAppStore()
 
   // Real driving route — fetched once per trip (usually already cached from the wizard)
-  const route = useDrivingRoute(activeItinerary ? originCoord : null, activeItinerary ? destCoord : null)
+  const { route } = useDrivingRoute(activeItinerary ? originCoord : null, activeItinerary ? destCoord : null)
 
   const handleMapReady = useCallback((m: maplibregl.Map) => {
     mapRef.current = m

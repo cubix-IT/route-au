@@ -195,7 +195,7 @@ export function ExperiencePanel({ hideTimeline = false }: { hideTimeline?: boole
   const [fuelLoading, setFuelLoading] = useState(false)
   const originCoord = useAppStore((s) => s.originCoord)
   // Real driving route — usually cached in the store from the wizard summary
-  const drivingRoute = useDrivingRoute(originCoord, destCoord)
+  const { route: drivingRoute, failed: routeFailed } = useDrivingRoute(originCoord, destCoord)
 
   const RESULT_LIMIT = 10
 
@@ -307,6 +307,12 @@ export function ExperiencePanel({ hideTimeline = false }: { hideTimeline?: boole
     }
     setShowAllActivities(false)
   }
+
+  // Fuel tab opened before the OSRM route arrived → fetch as soon as it lands
+  useEffect(() => {
+    if (filter !== 'fuel' || !drivingRoute || fuelStops.length > 0 || fuelLoading) return
+    fetchFuelStops().then((stops) => { if (stops) syncMapPins('fuel', [], stops) })
+  }, [drivingRoute, filter]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     syncMapPins(filter, [])
@@ -1037,7 +1043,7 @@ export function ExperiencePanel({ hideTimeline = false }: { hideTimeline?: boole
             <SectionHeader title="Cheapest Fuel On Your Route" icon="⛽" count={fuelStops.length} />
             {fuelLoading || (!drivingRoute && fuelStops.length === 0) ? (
               <div style={{ padding: '20px 0', textAlign: 'center', fontSize: 13, color: 'var(--text-muted)' }}>
-                {drivingRoute ? 'Finding the cheapest stations on your route…' : 'Calculating your driving route…'}
+                {drivingRoute ? 'Finding the cheapest stations on your route…' : routeFailed ? 'Couldn\u2019t calculate your driving route — fuel search unavailable.' : 'Calculating your driving route…'}
               </div>
             ) : fuelStops.length === 0 ? (
               <div style={{ padding: '20px 0', textAlign: 'center', fontSize: 13, color: 'var(--text-muted)' }}>

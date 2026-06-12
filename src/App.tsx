@@ -213,8 +213,12 @@ function App() {
         )
       )}
 
-      {isWizardOpen && <ProfileWizard />}
-      {isAuthModalOpen && <AuthModal />}
+      {/* Own Suspense boundaries: when these lazy chunks suspend, only the
+          (invisible) modal slot waits. Without this, the app-wide boundary
+          blanks the whole visible page for a frame while the chunk loads —
+          the "flash" on first wizard open. */}
+      {isWizardOpen && <Suspense fallback={null}><ProfileWizard /></Suspense>}
+      {isAuthModalOpen && <Suspense fallback={null}><AuthModal /></Suspense>}
 
       <Toaster
         position="bottom-right"

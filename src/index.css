@@ -121,6 +121,8 @@ html, body, #root {
 /* ── M3 EXPRESSIVE / ANDROID 17 WIZARD ────────────────────────── */
 
 .wizard-overlay {
+  /* Backdrop eases in instead of slamming to full blur in one frame */
+  animation: fadeIn 0.25s ease;
   position: fixed;
   inset: 0;
   z-index: 100;

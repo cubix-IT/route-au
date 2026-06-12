@@ -1,4 +1,12 @@
 # Changelog
+## 13 June 2026 — Smoothness & mobile fixes
+
+- **Wizard flash fixed** — lazy wizard/auth modals get their own Suspense boundaries (suspending no longer blanks the whole page for a frame); overlay backdrop eases in
+- **Fuel no longer swaps results** — summary waits for the OSRM route before searching (was: near-origin results shown, then replaced when the route landed); honest "couldn't calculate route" state when OSRM fails
+- **Mobile map pins fixed** — pins now follow the active tab (activities/food/stay/fuel); was nature-only, which has been ~empty since the June 6 cleanup
+- **Fuel tab self-heals** — opening it before the route is ready now fetches as soon as the route lands (was stuck on "Calculating…")
+- **The Amazing Mill Markets → markets** — category regex didn't match plural "Markets"; DB row hotfixed, enrich.ts fixed
+
 ## 13 June 2026 (c99d26f)
 
 - **Vehicle step back, fuel spread per leg, honest loading, landing sections**
