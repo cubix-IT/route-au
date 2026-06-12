@@ -1,5 +1,15 @@
 # Changelog
 
+## 12 June 2026 (4ebe24c)
+
+- **Minimal landing page — destination grid moves to /explore**
+  - LandingPage: hero + search only; grid section removed; browse link
+- **Real OSRM driving routes + cheapest fuel genuinely on route**
+  - New src/lib/osrmRoute.ts: fetch actual road route (geometry, km, hours)
+- **Data quality purge + 71% smaller first load + network resilience**
+  Data quality:
+- **SEO destination pages — index, region, destination with JSON-LD and deep-link CTA**
+
 ## 12 June 2026 — Landing page split
 
 - **Minimal landing page** — page 1 is now just the seasonal hero + search. The full destination grid moved to its own `/explore` page ("or browse all destinations →").
