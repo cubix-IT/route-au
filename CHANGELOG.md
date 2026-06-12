@@ -1,4 +1,11 @@
 # Changelog
+## 13 June 2026 (a2c7b45)
+
+- **Trails & Walks category, map legend, fuel reasons, Kinglake QA fixes**
+  - usePlannerData: attributes.kind==='walk' -> 'walks' display category
+- **OSM walking trails capture — Kinglake NP pilot**
+  - isWalk(): highway=path/footway admitted (pedestrian by definition);
+
 ## 14 June 2026 — Kinglake QA fixes + Trails & Walks + map legend
 
 - **Trails & Walks category** — OSM walks now appear under their own 🥾 "Trails & Walks" chip in Things to Do (DB stays `active`; remapped client-side via `attributes.kind`)
