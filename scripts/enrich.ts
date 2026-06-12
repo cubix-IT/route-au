@@ -84,6 +84,40 @@ function mapsUrl(name: string, destName: string, lat: number, lon: number, tags:
 }
 const CRAFT_TYPES = new Set(['brewery','cider','winery','wine','distillery'])
 
+// ── Walks & hikes (Kinglake pilot 2026-06-14) ────────────────────────────────
+// Real walking trails are highway=path/footway. highway=track is 4WD/fire
+// management roads — only admitted with an explicit walk-ish name.
+// Validated against Kinglake NP: catches Masons Falls Walk, Lyrebird Circuit,
+// Jehosaphat Gully, Cicada Circuit; rejects Powerline Track, Road 45, SEC
+// firelines and "(No Access)"/"(Overgrown)" tracks.
+const WALK_PATH_HIGHWAYS = new Set(['path', 'footway'])
+const WALK_NAME = /\b(walks?|walking track|nature (trail|walk)|circuit|boardwalk|board walk|falls track|lookout track|summit (track|trail|walk))\b/i
+const WALK_NOISE = /\b(road|rd|fireline|fire ?break|fire access|fire trail|powerline|power line|pipeline|easement|s\.? ?e\.? ?c\.?)\b|\b(road|track|trail) ?#? ?\d+\b|no access|overgrown|seasonally closed|management vehicle|mvo\b/i
+
+function isWalk(tags: Record<string,string>): boolean {
+  if (!tags.name || tags.name.length < 4) return false
+  if (tags.informal === 'yes') return false
+  if (tags.access === 'no' || tags.access === 'private') return false
+  if (WALK_NOISE.test(tags.name)) return false
+  // Paths and footways are pedestrian infrastructure by definition
+  if (WALK_PATH_HIGHWAYS.has(tags.highway)) return true
+  // Tracks/cycleways only with an explicit walking name or hiking grading
+  if (tags.highway === 'track' || tags.highway === 'cycleway') {
+    return WALK_NAME.test(tags.name) || !!tags.sac_scale || tags.foot === 'designated'
+  }
+  return false
+}
+
+// sac_scale → human difficulty (absent on most rural VIC trails — fall back to length)
+function walkDifficulty(sac: string | undefined, km: number): 'easy' | 'moderate' | 'hard' {
+  if (sac === 'hiking') return 'easy'
+  if (sac === 'mountain_hiking') return 'moderate'
+  if (sac) return 'hard' // demanding_mountain_hiking and above
+  return km <= 2.5 ? 'easy' : km <= 7 ? 'moderate' : 'hard'
+}
+
+const FAMILY_SURFACES = new Set(['compacted', 'gravel', 'fine_gravel', 'paved', 'asphalt', 'concrete', 'wood'])
+
 function osmCategory(tags: Record<string,string>): 'food'|'nature'|'activity'|null {
   if (FOOD_AMENITY.has(tags.amenity))    return 'food'
   if (FOOD_SHOP.has(tags.shop))          return 'food'
@@ -275,6 +309,8 @@ interface Poi {
   lat: number
   lon: number
   tags: Record<string,string>
+  /** Set on walk ways — the segment's length in km */
+  walkKm?: number
 }
 
 // Two-pass parse:
@@ -305,7 +341,7 @@ async function parsePbf(): Promise<Poi[]> {
               pois.push({ type: 'node', id: item.id, lat: item.lat, lon: item.lon, tags: item.tags })
             }
           } else if (item.type === 'way') {
-            if (isRelevant(item.tags ?? {})) {
+            if (isRelevant(item.tags ?? {}) || isWalk(item.tags ?? {})) {
               relevantWays.push({ id: item.id, tags: item.tags, refs: item.refs ?? [] })
               for (const ref of (item.refs ?? [])) neededNodeIds.add(ref)
             }
@@ -340,13 +376,20 @@ async function parsePbf(): Promise<Poi[]> {
   )
   process.stdout.write(` resolved ${nodeCoords.size.toLocaleString()}\n`)
 
-  // Compute centroids for ways
+  // Compute centroids for ways (+ segment length for walks)
   for (const way of relevantWays) {
     const coords = way.refs.map(id => nodeCoords.get(id)).filter(Boolean) as [number, number][]
     if (coords.length === 0) continue
     const lat = coords.reduce((s, c) => s + c[0], 0) / coords.length
     const lon = coords.reduce((s, c) => s + c[1], 0) / coords.length
-    pois.push({ type: 'way', id: way.id, lat, lon, tags: way.tags })
+    let walkKm: number | undefined
+    if (isWalk(way.tags) && coords.length >= 2) {
+      walkKm = 0
+      for (let i = 1; i < coords.length; i++) {
+        walkKm += haversineKm(coords[i-1][0], coords[i-1][1], coords[i][0], coords[i][1])
+      }
+    }
+    pois.push({ type: 'way', id: way.id, lat, lon, tags: way.tags, walkKm })
   }
 
   console.log(`Total POIs in Victoria: ${pois.length.toLocaleString()}`)
@@ -626,7 +669,10 @@ async function enrichSubDest(
   const MELB_LAT = -37.814, MELB_LNG = 144.963
   const distFromCBD = Math.sqrt((lat - MELB_LAT)**2 + (lng - MELB_LNG)**2) * 111
   // Tighter radius — mountain/rural roads mean 10km straight-line can be 45+ min drive
-  const radiusKm = distFromCBD < 15 ? 2 : distFromCBD < 80 ? 6 : 15
+  let radiusKm = distFromCBD < 15 ? 2 : distFromCBD < 80 ? 6 : 15
+  // Big parks span far beyond a town-sized radius — Kinglake NP is ~18km wide,
+  // and a 6km circle missed Masons Falls entirely
+  if (/national park|state park|state forest|\bprom\b|promontory/i.test(name)) radiusKm = Math.max(radiusKm, 14)
 
   const elements = nearbyPois(allPois, lat, lng, radiusKm)
   console.log(`  Found ${elements.length} POIs within ${radiusKm}km`)
@@ -635,6 +681,9 @@ async function enrichSubDest(
   const foods: any[] = []
   const nature: any[] = []
   const seenSlugs = new Set<string>()
+  // Walk segments accumulate here (one trail = many OSM way segments sharing
+  // a name) and are merged into single activities after the element loop
+  const walkSegs = new Map<string, { tags: Record<string,string>; km: number; segs: number; lat: number; lng: number; firstWayId: number }>()
 
   // Wikipedia-first: seed activities from Wikipedia Tourism/Recreation sections
   // Food & Drinks come from OSM only (OSM is reliable for cafes/pubs/wineries)
@@ -656,6 +705,22 @@ async function enrichSubDest(
     if (name_.trim().length < 4 || /^\d+$/.test(name_.trim())) continue
     // Skip closed/former/demolished places
     if (/\bclosed\b|\(closed\)|\bformer\b|\bdemolished\b|\bderelict\b|\babandon/i.test(name_)) continue
+
+    // Walking trails — accumulate segments by name, merged after the loop
+    if (el.walkKm !== undefined && isWalk(tags)) {
+      const cur = walkSegs.get(name_)
+      if (cur) {
+        cur.km += el.walkKm
+        cur.segs++
+        // Keep the richest tag set across segments
+        for (const k of ['sac_scale','surface','trail_visibility','wheelchair','dog','bicycle','foot']) {
+          if (!cur.tags[k] && tags[k]) cur.tags[k] = tags[k]
+        }
+      } else {
+        walkSegs.set(name_, { tags: { ...tags }, km: el.walkKm, segs: 1, lat: el.lat, lng: el.lon, firstWayId: el.id })
+      }
+      continue
+    }
 
     const elSlug = `osm-${el.type}-${el.id}`
     if (seenSlugs.has(elSlug)) continue
@@ -762,6 +827,48 @@ async function enrichSubDest(
       })
     }
   }
+
+  // ── Merge walk segments into single trail activities ───────────────────────
+  let walkCount = 0
+  for (const [walkName, w] of walkSegs) {
+    if (w.km < 0.3) continue // stub fragments, not a destination walk
+    const t = w.tags
+    const km = Math.round(w.km * 10) / 10
+    const difficulty = walkDifficulty(t.sac_scale, km)
+    // Family-friendly: short + formed surface (or built footway), not graded hard
+    const kidsOk = km <= 2.5 && difficulty === 'easy'
+      && (FAMILY_SURFACES.has(t.surface) || t.highway === 'footway' || /circuit|boardwalk|nature walk/i.test(walkName))
+    const noBikes = t.bicycle === 'no'
+    const dogs = t.dog === 'no' ? 'no dogs' : t.dog === 'leashed' ? 'dogs on leash' : null
+
+    const descBits = [
+      `A ${km} km ${difficulty === 'easy' ? 'easy' : difficulty === 'moderate' ? 'moderate' : 'challenging'} walking ${/circuit/i.test(walkName) ? 'circuit' : 'track'}`,
+      FAMILY_SURFACES.has(t.surface) ? `on a formed ${t.surface} surface` : t.surface ? `on ${/^[aeiou]/.test(t.surface) ? 'an' : 'a'} ${t.surface} surface` : null,
+      kidsOk ? '— well suited to families' : difficulty === 'hard' ? '— for experienced walkers' : null,
+    ].filter(Boolean).join(' ')
+    const extras = [noBikes ? 'Walkers only' : null, dogs].filter(Boolean).join(' · ')
+    const description = extras ? `${descBits}. ${extras}.` : `${descBits}.`
+
+    const walkSlug = `osm-walk-${w.firstWayId}`
+    if (seenSlugs.has(walkSlug)) continue
+    seenSlugs.add(walkSlug)
+    walkCount++
+    activities.push({
+      slug: walkSlug, sub_dest_id: subDestId, name: walkName, category: 'active', emoji: '🥾',
+      description, duration: km <= 1 ? '~30 min' : km <= 3 ? '~1 hr' : km <= 6 ? '2–3 hrs' : 'half day',
+      cost: 'free', lat: w.lat, lng: w.lng, address: null,
+      kids_ok: kidsOk, is_hidden_gem: false,
+      maps_url: `https://maps.google.com/maps?q=${w.lat},${w.lng}+(${encodeURIComponent(walkName)})`,
+      website: null, phone: null, tags: ['walk', 'hiking', t.highway].filter(Boolean), source: 'static',
+      attributes: {
+        source: 'static', kind: 'walk', walk_km: km, difficulty,
+        sac_scale: t.sac_scale || null, surface: t.surface || null,
+        wheelchair: t.wheelchair || null, dog: t.dog || null, bicycle: t.bicycle || null,
+        segments: w.segs, quality_score: t.sac_scale ? 25 : 15,
+      },
+    })
+  }
+  if (walkCount > 0) console.log(`  [walks] +${walkCount} walking trails from OSM paths`)
 
   // Pageviews quality upgrade
   for (const item of [...activities, ...nature, ...foods].filter(i => i.attributes?.wikipedia).slice(0, 10)) {
