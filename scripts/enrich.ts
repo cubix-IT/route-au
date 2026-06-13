@@ -232,9 +232,10 @@ function foodQualifies(tags: Record<string,string>): boolean {
   if (tags.amenity === 'pub' || tags.amenity === 'bar' || tags.amenity === 'restaurant') {
     return !!(tags.website || tags['contact:website'] || tags.phone || tags['contact:phone'] || tags.opening_hours)
   }
-  // Cafes and bakeries — only if notable (Wikipedia article means tourist-worthy, e.g. Beechworth Bakery)
+  // Cafes and bakeries — active businesses (have contact info or are notable).
+  // Was Wikipedia-only, which filtered out nearly every café/bakery statewide (#97).
   if (tags.amenity === 'cafe' || tags.amenity === 'bakery' || tags.shop === 'bakery' || tags.shop === 'coffee') {
-    return !!(tags.wikipedia || tags.wikidata)
+    return !!(tags.website || tags['contact:website'] || tags.phone || tags['contact:phone'] || tags.opening_hours || tags.wikipedia || tags.wikidata)
   }
   return !!(tags.website || tags['contact:website'] || tags.phone || tags['contact:phone'] || tags.opening_hours)
 }
@@ -479,7 +480,7 @@ async function fillDescriptions(destName: string, activities: any[], foods: any[
   // (Wikipedia always wins over a short OSM description tag like "A bushland haven...")
   const allItems = [
     ...activities.filter(a => !a.description || a.attributes?.wikipedia).slice(0, 25),
-    ...foods.filter(f => !f.description || f.attributes?.wikipedia).slice(0, 15),
+    ...foods.filter(f => !f.description || f.attributes?.wikipedia).slice(0, 40),
     // Nature spots without usable description — let Haiku write one
     ...nature.filter(n => !n.description || n.description.length < 20).slice(0, 10),
   ]
@@ -804,9 +805,9 @@ async function enrichSubDest(
       if (!foodQualifies(tags)) continue
       const foodCat = foodCategory(tags, name_)
       const foodDesc = tags.description || null
-      // Quality gate: generic food (restaurants/cafes/pubs/bakeries) must have a description
-      const GENERIC_FOOD = new Set(['Restaurant', 'Cafe', 'Pub', 'Bakery'])
-      if (GENERIC_FOOD.has(foodCat) && !foodDesc) continue
+      // Generic food (restaurants/cafes/pubs/bakeries) without an OSM description are kept
+      // here and given a description by fillDescriptions (Haiku); those still lacking one
+      // are dropped at upsert time below (#97). Drink venues never need a description.
       foods.push({
         slug: elSlug, sub_dest_id: subDestId, name: name_, category: foodCat,
         description: foodDesc, lat: el.lat, lng: el.lon, address,
@@ -947,8 +948,12 @@ async function enrichSubDest(
   const qualityActivities = activities.filter(a => a.description && a.description.trim().length > 20)
   // Nature: must have description now (either from OSM or filled by Wikipedia/Haiku)
   const qualityNature = nature.filter(n => n.description && n.description.trim().length > 20)
+  // Food: drink venues (wineries/breweries/distilleries) always kept; generic food
+  // (restaurants/cafes/pubs/bakeries) must have a description after enrichment (#97).
+  const DRINK_FOOD = new Set(['Winery', 'Brewery', 'Distillery'])
+  const qualityFoods = foods.filter(f => DRINK_FOOD.has(f.category) || (f.description && f.description.trim().length > 0))
   const actSlugs    = qualityActivities.map(a => a.slug)
-  const foodSlugs   = foods.map(f => f.slug)
+  const foodSlugs   = qualityFoods.map(f => f.slug)
   const natureSlugs = qualityNature.map(n => n.slug)
 
   // Delete stale records BEFORE inserting — clean slate per destination, no leftovers
@@ -962,9 +967,9 @@ async function enrichSubDest(
     if (!error) upserted += qualityActivities.length
     else console.error('  [err] activities:', error.message)
   }
-  if (foods.length > 0) {
-    const { error } = await db.from('food_places').upsert(foods, { onConflict: 'slug', ignoreDuplicates: false })
-    if (!error) upserted += foods.length
+  if (qualityFoods.length > 0) {
+    const { error } = await db.from('food_places').upsert(qualityFoods, { onConflict: 'slug', ignoreDuplicates: false })
+    if (!error) upserted += qualityFoods.length
     else console.error('  [err] food:', error.message)
   }
   if (qualityNature.length > 0) {
