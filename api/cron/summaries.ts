@@ -1,6 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { adminSupabase } from '../_lib/supabase.js'
 import { loadTrails } from '../../scripts/load-trails.js'
+import { refreshSummary } from '../../scripts/lib/generate-summary.js'
 
 // Called weekly Sunday 2am AEST (vercel.json: "0 16 * * 0")
 // - Every week: refreshes Wikipedia + Claude AI summaries (10 destinations/run)
@@ -50,14 +51,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     let toProcess: typeof allDests
     if (force) {
-      // Target destinations with no summary row, or empty summary text
+      // Target destinations with no summary row, or empty ai_summary text
       const { data: emptySummaries, error: emptyErr } = await adminSupabase
         .from('destination_summaries')
-        .select('sub_dest_id, summary')
+        .select('sub_dest_id, ai_summary')
       if (emptyErr) throw emptyErr
       const goodIds = new Set(
         (emptySummaries ?? [])
-          .filter((s) => s.summary && s.summary.trim().length > 50)
+          .filter((s) => s.ai_summary && s.ai_summary.trim().length > 50)
           .map((s) => s.sub_dest_id)
       )
       toProcess = (allDests ?? []).filter((d) => !goodIds.has(d.sub_dest_id)).slice(0, BATCH_LIMIT)
@@ -74,7 +75,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     for (const dest of toProcess) {
       try {
-        await refreshSummary(apiKey, dest.sub_dest_id, dest.name)
+        await refreshSummary(adminSupabase, apiKey, dest.sub_dest_id, dest.name)
         processed++
       } catch (e) {
         console.error(`[summaries] failed for ${dest.name}:`, e)
@@ -128,86 +129,4 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     return res.status(500).json({ error: msg })
   }
-}
-
-async function refreshSummary(apiKey: string, subDestId: number, name: string): Promise<void> {
-  if (!adminSupabase) return
-
-  // 1. Fetch Wikipedia summary
-  let wikiText = ''
-  try {
-    const wikiResp = await fetch(
-      `https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(name)}+Victoria+Australia`,
-      { signal: AbortSignal.timeout(8_000) },
-    )
-    if (wikiResp.ok) {
-      const wikiData = await wikiResp.json() as { extract?: string }
-      wikiText = wikiData.extract ?? ''
-    }
-  } catch {
-    // continue without Wikipedia
-  }
-
-  // 2. Generate AI summary via Claude Haiku (same fetch pattern as destination-summary.ts)
-  let aiSummary = wikiText
-  let bestFor: string[] = []
-
-  try {
-    const r = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01',
-        'anthropic-beta': 'prompt-caching-2024-07-31',
-        'content-type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'claude-haiku-4-5-20251001',
-        max_tokens: 250,
-        temperature: 0.4,
-        system: [
-          {
-            type: 'text',
-            text: 'You are a concise travel writer for Victoria, Australia, writing for people planning a relaxing weekend getaway. ' +
-              'Write a 2-sentence engaging travel description of the destination focused on what visitors can see, do and enjoy today. ' +
-              'Never mention bushfires, floods, disasters, death tolls, tragedies or crime — even if the context does. ' +
-              'If the context is mostly about a disaster, ignore it and write about the natural beauty and visitor experience instead. ' +
-              'Then list who this destination suits best. ' +
-              'Respond with valid JSON only, no markdown: ' +
-              '{"summary":"2-sentence description here","bestFor":["pick 3-4 from: ' +
-              'Couples, Families, Solo travellers, Nature lovers, Foodies, Wine lovers, ' +
-              'Hikers, History buffs, Beach lovers, Adventure seekers"]}',
-            cache_control: { type: 'ephemeral' },
-          },
-        ],
-        messages: [{
-          role: 'user',
-          content: `Destination: ${name}, Victoria, Australia.\n\n${wikiText ? `Context: ${wikiText.slice(0, 400)}` : ''}`,
-        }],
-      }),
-      signal: AbortSignal.timeout(12_000),
-    })
-
-    if (r.ok) {
-      const json = await r.json() as { content?: { type: string; text: string }[] }
-      const text = json.content?.[0]?.text ?? ''
-      const match = text.match(/\{[\s\S]*\}/)
-      if (match) {
-        const parsed = JSON.parse(match[0]) as { summary?: string; bestFor?: string[] }
-        aiSummary = parsed.summary ?? wikiText
-        bestFor = parsed.bestFor ?? []
-      }
-    }
-  } catch {
-    // fall back to wiki text
-  }
-
-  // 3. Upsert to destination_summaries
-  await adminSupabase.from('destination_summaries').upsert({
-    sub_dest_id: subDestId,
-    wiki_text: wikiText,
-    ai_summary: aiSummary,
-    best_for: bestFor,
-    updated_at: new Date().toISOString(),
-  }, { onConflict: 'sub_dest_id' })
 }

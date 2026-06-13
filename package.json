@@ -9,6 +9,7 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "enrich": "npx tsx --env-file=.env --env-file=.env.local scripts/enrich.ts",
+    "summaries:fill": "npx tsx --env-file=.env --env-file=.env.local scripts/fill-summaries.ts",
     "deploy": "vercel --prod --yes && npx tsx scripts/log-deploy.mts",
     "db": "npx tsx --env-file=.env --env-file=.env.local scripts/db-query.mts",
     "db:status": "npx tsx --env-file=.env --env-file=.env.local scripts/db-status.mts",
