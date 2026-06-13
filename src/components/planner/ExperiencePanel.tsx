@@ -352,7 +352,7 @@ export function ExperiencePanel({ hideTimeline = false }: { hideTimeline?: boole
           ['overview',   'Overview'],
           ['activities', 'Things to Do'],
           ...((d.dbFood?.length ?? 0) > 0 ? [['food', 'Food & Drinks']] : []),
-          ['stay', 'Stay'],
+          ['stay', 'Camping'],
           ...(d.vehicleProfile && d.vehicleProfile.fuel_type !== 'Electric' && !(d.vehicleProfile as unknown as { skip_fuel?: boolean }).skip_fuel ? [['fuel', 'Fuel']] : []),
         ]) as [string, string][]).map(([f, label]) => (
           <button key={f} onClick={() => handleFilterChange(f as FilterMode)} style={{
@@ -549,8 +549,8 @@ export function ExperiencePanel({ hideTimeline = false }: { hideTimeline?: boole
                   cursor: 'pointer', textAlign: 'left',
                 }}>
                   <div>
-                    <div style={{ fontSize: 11, fontWeight: 700, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 4 }}>Stay</div>
-                    <div style={{ fontSize: 15, fontWeight: 700, color: '#1C1B1F' }}>{accomCount} places nearby</div>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 4 }}>Camping</div>
+                    <div style={{ fontSize: 15, fontWeight: 700, color: '#1C1B1F' }}>{accomCount} sites nearby</div>
                   </div>
                   <span style={{ fontSize: 22, color: '#C4C4C4', fontWeight: 300 }}>›</span>
                 </button>
@@ -1011,8 +1011,8 @@ export function ExperiencePanel({ hideTimeline = false }: { hideTimeline?: boole
           return (
             <SectionBlock
               id="section-stay"
-              title="Where to Stay"
-              icon="🏨"
+              title="Camping & Caravan Parks"
+              icon="⛺"
               count={allAccom.length}
               loading={d.dbLoading}
               empty={!d.dbLoading && (d.accommodationPOIs ?? []).length === 0}

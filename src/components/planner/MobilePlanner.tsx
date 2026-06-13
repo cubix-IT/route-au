@@ -433,7 +433,7 @@ export function MobilePlanner() {
             ['overview', '🏠 Overview'],
             ['explore', '🗺 Explore'],
             ...((d.dbFood?.length ?? 0) > 0 ? [['food', '🍽 Food & Drinks']] : []),
-            ['stay', '🏨 Stay'],
+            ['stay', '⛺ Camping'],
             ...(scheduledPlan.items.length > 0 ? [['plan', `Your Plan (${scheduledPlan.items.length})`]] : []),
             ...(hasFuel ? [['fuel', '⛽ Fuel']] : []),
           ] as [FilterTab, string][]).map(([t, label]) => (
@@ -589,10 +589,10 @@ export function MobilePlanner() {
                       WebkitTapHighlightColor: 'transparent',
                     }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-                        <span style={{ fontSize: 32 }}>🏨</span>
+                        <span style={{ fontSize: 32 }}>⛺</span>
                         <div>
-                          <div style={{ fontSize: 11, fontWeight: 700, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 3 }}>Stay</div>
-                          <div style={{ fontSize: 15, fontWeight: 700, color: '#1C1B1F' }}>{accomCount} places nearby</div>
+                          <div style={{ fontSize: 11, fontWeight: 700, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 3 }}>Camping</div>
+                          <div style={{ fontSize: 15, fontWeight: 700, color: '#1C1B1F' }}>{accomCount} sites nearby</div>
                         </div>
                       </div>
                       <span style={{ color: '#C4C4C4', fontSize: 22, fontWeight: 300 }}>›</span>

@@ -189,12 +189,14 @@ async function fetchDestinationFromDB(
       ? supabase
           .from('accommodation')
           .select('accommodation_id,slug,name,type,description,lat,lng,address,website,phone')
+          .in('type', ['campsite', 'caravan_park'])
           .gte('lat', latMin).lte('lat', latMax)
           .gte('lng', lngMin).lte('lng', lngMax)
           .limit(100)
       : supabase
           .from('accommodation')
           .select('accommodation_id,slug,name,type,description,lat,lng,address,website,phone')
+          .in('type', ['campsite', 'caravan_park'])
           .eq('sub_dest_id', id)
           .limit(100)
     ),
