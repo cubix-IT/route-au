@@ -849,6 +849,7 @@ export function ExperiencePanel({ hideTimeline = false }: { hideTimeline?: boole
                 categoryBg={cfg.bg}
                 emoji={emoji}
                 description={f.description ?? undefined}
+                openingHours={attr.opening_hours_text ?? undefined}
                 driveMinutes={driveMin}
                 website={website}
                 mapsUrl={mapsUrl}

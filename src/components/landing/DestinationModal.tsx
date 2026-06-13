@@ -531,6 +531,7 @@ export function DestinationModal({
                       emoji={emoji}
                       description={f.description ?? undefined}
                       address={f.address ?? undefined}
+                      openingHours={attr.opening_hours_text ?? undefined}
                       mapsUrl={coordMapsUrl(f.name, f.lat, f.lng)}
                       website={website}
                       phone={f.phone ?? undefined}

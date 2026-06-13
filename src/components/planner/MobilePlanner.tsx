@@ -843,7 +843,7 @@ export function MobilePlanner() {
                       const emoji = FOOD_EMOJI[f.category] ?? '🍽️'
                       const cfg = FOOD_COLOR[f.category] ?? { color: '#374151', bg: '#F9FAFB' }
                       const cardId = String(f.food_place_id)
-                      return <ResultCard key={cardId} onMapPin={() => useAppStore.getState().setSelectedPinId(cardId)} name={f.name} categoryLabel={f.category} categoryColor={cfg.color} categoryBg={cfg.bg} emoji={emoji} description={f.description ?? undefined} website={(f.attributes as any)?.website_uri ?? f.website ?? undefined} mapsUrl={f.lat && f.lng ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(f.name + ", " + d.shortDest)}&ll=${f.lat},${f.lng}` : ""} phone={f.phone ?? undefined} driveMinutes={d.driveMinutes.get(f.slug) ?? null} expanded={expandedCardId === cardId} onExpand={() => setExpandedCardId(expandedCardId === cardId ? null : cardId)} />
+                      return <ResultCard key={cardId} onMapPin={() => useAppStore.getState().setSelectedPinId(cardId)} name={f.name} categoryLabel={f.category} categoryColor={cfg.color} categoryBg={cfg.bg} emoji={emoji} description={f.description ?? undefined} openingHours={(f.attributes as any)?.opening_hours_text ?? undefined} website={(f.attributes as any)?.website_uri ?? f.website ?? undefined} mapsUrl={f.lat && f.lng ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(f.name + ", " + d.shortDest)}&ll=${f.lat},${f.lng}` : ""} phone={f.phone ?? undefined} driveMinutes={d.driveMinutes.get(f.slug) ?? null} expanded={expandedCardId === cardId} onExpand={() => setExpandedCardId(expandedCardId === cardId ? null : cardId)} />
                     })}
                   </>
                 )}
@@ -854,7 +854,7 @@ export function MobilePlanner() {
                       const emoji = FOOD_EMOJI[f.category] ?? '🍽️'
                       const cfg = FOOD_COLOR[f.category] ?? { color: '#374151', bg: '#F9FAFB' }
                       const cardId = String(f.food_place_id)
-                      return <ResultCard key={cardId} onMapPin={() => useAppStore.getState().setSelectedPinId(cardId)} name={f.name} categoryLabel={f.category} categoryColor={cfg.color} categoryBg={cfg.bg} emoji={emoji} description={f.description ?? undefined} website={(f.attributes as any)?.website_uri ?? f.website ?? undefined} mapsUrl={f.lat && f.lng ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(f.name + ", " + d.shortDest)}&ll=${f.lat},${f.lng}` : ""} phone={f.phone ?? undefined} driveMinutes={d.driveMinutes.get(f.slug) ?? null} expanded={expandedCardId === cardId} onExpand={() => setExpandedCardId(expandedCardId === cardId ? null : cardId)} />
+                      return <ResultCard key={cardId} onMapPin={() => useAppStore.getState().setSelectedPinId(cardId)} name={f.name} categoryLabel={f.category} categoryColor={cfg.color} categoryBg={cfg.bg} emoji={emoji} description={f.description ?? undefined} openingHours={(f.attributes as any)?.opening_hours_text ?? undefined} website={(f.attributes as any)?.website_uri ?? f.website ?? undefined} mapsUrl={f.lat && f.lng ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(f.name + ", " + d.shortDest)}&ll=${f.lat},${f.lng}` : ""} phone={f.phone ?? undefined} driveMinutes={d.driveMinutes.get(f.slug) ?? null} expanded={expandedCardId === cardId} onExpand={() => setExpandedCardId(expandedCardId === cardId ? null : cardId)} />
                     })}
                   </>
                 )}

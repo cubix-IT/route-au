@@ -15,6 +15,7 @@ export interface ResultCardProps {
   reviewCount?: number
   duration?: string
   address?: string
+  openingHours?: string   // raw OSM opening_hours string (e.g. "Mo-Fr 09:00-17:00")
   openStatus?: { isOpen: boolean; nextOpen?: string } | null
   badges?: Array<{ label: string; color: string; bg: string }>
   driveMinutes?: number | null   // from OSRM — shown top-right, filters >45 min
@@ -32,6 +33,17 @@ export interface ResultCardProps {
   // Controlled expand — parent tracks which card is open
   expanded?: boolean
   onExpand?: () => void
+}
+
+// Lightly prettify an OSM opening_hours string for display (cosmetic only):
+// "Mo-Fr 09:00-17:00; Sa 09:00-13:00" → "Mon–Fri 09:00–17:00 · Sat 09:00–13:00"
+function formatHours(s: string): string {
+  return s
+    .replace(/\bMo\b/g, 'Mon').replace(/\bTu\b/g, 'Tue').replace(/\bWe\b/g, 'Wed')
+    .replace(/\bTh\b/g, 'Thu').replace(/\bFr\b/g, 'Fri').replace(/\bSa\b/g, 'Sat').replace(/\bSu\b/g, 'Sun')
+    .replace(/\s*;\s*/g, ' · ')
+    .replace(/-/g, '–')
+    .trim()
 }
 
 function StarRating({ rating, count }: { rating: number; count?: number }) {
@@ -66,7 +78,7 @@ function DriveTimeBadge({ minutes }: { minutes: number }) {
 export function ResultCard({
   name, categoryLabel, categoryColor, categoryBg,
   emoji, description, rating, reviewCount, duration, address,
-  openStatus, badges = [], driveMinutes,
+  openingHours, openStatus, badges = [], driveMinutes,
   isHiddenGem, isAdded, highlighted,
   mapsUrl, website, phone,
   onAdd, onRemove, onMapPin,
@@ -173,6 +185,11 @@ export function ResultCard({
         <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid var(--border)', display: 'flex', flexDirection: 'column', gap: 10 }} onClick={(e) => e.stopPropagation()}>
           {description && <p style={{ fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.65, margin: 0 }}>{description}</p>}
           {address && <div style={{ fontSize: 11.5, color: 'var(--text-muted)' }}>📍 {address}</div>}
+          {openingHours && (
+            <div style={{ fontSize: 11.5, color: 'var(--text-muted)', display: 'flex', gap: 5, alignItems: 'flex-start' }}>
+              <span style={{ flexShrink: 0 }}>🕒</span><span>{formatHours(openingHours)}</span>
+            </div>
+          )}
           {openStatus && (
             <div style={{ fontSize: 11.5, fontWeight: 600, color: openStatus.isOpen ? '#16A34A' : '#DC2626' }}>
               {openStatus.isOpen ? 'Open now' : `Closed${openStatus.nextOpen ? ` — opens ${openStatus.nextOpen}` : ''}`}
