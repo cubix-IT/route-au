@@ -1,4 +1,9 @@
 # Changelog
+## 13 June 2026 (000d891)
+
+- **Show food opening hours on result cards (desktop + mobile)**
+  Food places carried opening_hours_text in attributes but no card rendered
+
 ## 13 June 2026 (2affa5e)
 
 - **Show camping & caravan parks only in Stay tab — hide hotels/motels without websites**
