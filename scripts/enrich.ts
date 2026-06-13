@@ -527,7 +527,7 @@ async function fillDescriptions(destName: string, activities: any[], foods: any[
         headers: { 'x-api-key': anthropicKey, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
         body: JSON.stringify({
           model: 'claude-haiku-4-5-20251001', max_tokens: 2000, temperature: 0.2,
-          system: `You are a local travel writer for Victoria, Australia. Write one specific, vivid sentence (15-25 words) about what each place OFFERS VISITORS — the experience, activity, food, view, or atmosphere. Never mention population, history dates, or founding facts. Respond ONLY with valid JSON mapping slug to description.`,
+          system: `You are a local travel writer for Victoria, Australia. Write one specific, vivid sentence (15-25 words) about what each place OFFERS VISITORS — the experience, activity, food, view, or atmosphere. Never mention population, history dates, or founding facts. Never mention religion, politics, or any controversial topic. Respond ONLY with valid JSON mapping slug to description.`,
           messages: [{ role: 'user', content: `Places near ${destName}, Victoria:\n${itemList}\n\nJSON: {"slug":"description",...}` }],
         }),
         signal: AbortSignal.timeout(30000),
@@ -598,7 +598,7 @@ async function fetchWikipediaAttractions(destName: string, destSlug: string, sub
       body: JSON.stringify({
         model: 'claude-haiku-4-5-20251001', max_tokens: 1500, temperature: 0,
         system: `Extract named tourist attractions, recreation venues, events, and notable places from Wikipedia text about ${destName}, Victoria Australia.
-Return ONLY a JSON array: [{"name":"...","category":"history|nature|active|wildlife|art|entertainment|markets|viewpoint|beach|relaxation|wellness","description":"one vivid sentence 15-25 words about what visitors can DO or EXPERIENCE there — never population, dates, or founding facts"}]
+Return ONLY a JSON array: [{"name":"...","category":"history|nature|active|wildlife|art|entertainment|markets|viewpoint|beach|relaxation|wellness","description":"one vivid sentence 15-25 words about what visitors can DO or EXPERIENCE there — never population, dates, or founding facts, and never religion, politics, or controversial topics"}]
 Only include specific named places/events (not general descriptions). Max 12 items. Skip pubs, restaurants, cafes, wineries — those come from a separate source.`,
         messages: [{ role: 'user', content: texts.join('\n\n') }],
       }),
@@ -732,7 +732,9 @@ async function enrichSubDest(
       continue
     }
 
-    const elSlug = `osm-${el.type}-${el.id}`
+    // Slug is scoped per sub-dest so a boundary POI shared by neighbouring towns
+    // isn't reassigned to whichever town runs last (#99). seenSlugs is per-town.
+    const elSlug = `osm-${el.type}-${el.id}-${subDestId}`
     if (seenSlugs.has(elSlug)) continue
     seenSlugs.add(elSlug)
 
@@ -761,14 +763,16 @@ async function enrichSubDest(
       const stayWebsite = tags.website || tags['contact:website'] || null
       if (!stayWebsite) continue
       // elSlug was already added to seenSlugs above — same element, no re-check
-      const staySlug = `osm-${el.type}-${el.id}`
+      const staySlug = `osm-${el.type}-${el.id}-${subDestId}`
+      // Map OSM tourism types to the accommodation_type_check allowed set (#100):
+      // hotel,motel,resort,campsite,caravan_park,hostel,cabin,guest_house,bed_and_breakfast
       const stayType =
         tags.tourism === 'camp_site' ? 'campsite'
         : tags.tourism === 'caravan_site' ? 'caravan_park'
         : tags.tourism === 'chalet' || tags.tourism === 'alpine_hut' ? 'cabin'
-        : tags.tourism === 'guest_house' ? 'bnb'
+        : tags.tourism === 'guest_house' ? 'guest_house'
         : tags.tourism === 'hostel' ? 'hostel'
-        : tags.tourism === 'apartment' ? 'apartment'
+        : tags.tourism === 'apartment' ? 'cabin'
         : tags.tourism === 'motel' ? 'motel'
         : 'hotel'
       stays.push({
@@ -887,7 +891,7 @@ async function enrichSubDest(
     const extras = [noBikes ? 'Walkers only' : null, dogs].filter(Boolean).join(' · ')
     const description = extras ? `${descBits}. ${extras}.` : `${descBits}.`
 
-    const walkSlug = `osm-walk-${w.firstWayId}`
+    const walkSlug = `osm-walk-${w.firstWayId}-${subDestId}`
     if (seenSlugs.has(walkSlug)) continue
     seenSlugs.add(walkSlug)
     walkCount++
@@ -922,7 +926,7 @@ async function enrichSubDest(
   await sleep(200)
   const vhdPlaces = await fetchVhd(name, lat, lng, radiusKm)
   for (const vhd of vhdPlaces) {
-    const vhdSlug = `vhd-${vhd.id}`
+    const vhdSlug = `vhd-${vhd.id}-${subDestId}`
     if (seenSlugs.has(vhdSlug)) continue
     seenSlugs.add(vhdSlug)
     const [vLat, vLng] = vhd.latlon.split(',').map(Number)

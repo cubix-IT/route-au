@@ -26,6 +26,11 @@ npm run enrich -- --slug healesville  # single destination
 
 - **NO paid APIs without Raj explicitly approving** — Google Places caused A$1,992 bill May 2026.
 
+- **NO controversial content in descriptions — ever.** AI-generated copy must never mention
+  **religion, politics, or any controversial topic** (in addition to the existing bans on
+  disasters/death/crime and census/population/stats). Applies to all four prompts:
+  `scripts/lib/generate-summary.ts`, `api/destination-summary.ts`, and the two in `scripts/enrich.ts`.
+
 - **Never use `vercel --prod` directly** — bypasses the `deploy_log` table.
 
 - **Issue lifecycle** — In Progress → work → UAT → Raj signoff → Deploy → Close. Never close before deploy.

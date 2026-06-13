@@ -28,6 +28,7 @@ const SUMMARY_SYSTEM_PROMPT =
   'and write about the natural beauty and visitor experience instead. ' +
   'You are also strictly forbidden from mentioning census data, population ' +
   'statistics, square kilometres, elevation metrics, or historical establishment dates. ' +
+  'Never mention religion, politics, or any controversial topic. ' +
   'Focus entirely on atmospheric charm, landscape features, local culinary notes, ' +
   'and the emotional feeling of escaping to this specific place. ' +
   'Then list who this destination suits best. ' +

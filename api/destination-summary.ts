@@ -12,6 +12,7 @@ const SYSTEM_PROMPT =
   'establishment dates. Focus entirely on the atmospheric charm, landscape ' +
   'features, local culinary notes, and the emotional feeling of escaping to ' +
   'this specific town. ' +
+  'Never mention religion, politics, or any controversial topic. ' +
   'Respond exclusively in valid JSON format: ' +
   '{"summary":"2-sentence sensory description here","bestFor":["pick 3-4 from: ' +
   'Couples, Families, Solo travellers, Nature lovers, Foodies, Wine lovers, ' +
