@@ -1,4 +1,9 @@
 # Changelog
+## 13 June 2026 (2affa5e)
+
+- **Show camping & caravan parks only in Stay tab — hide hotels/motels without websites**
+  Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>
+
 ## 14 June 2026 — HOTFIX: planner crash + DMS coordinate links
 
 - **Planner crash fixed** — map legend's `legendEntries` referenced `visiblePins` before its declaration (TDZ "Cannot access 'te' before initialization"); legend now derives from all pins (so hidden types stay re-enableable) and is declared in the right order
