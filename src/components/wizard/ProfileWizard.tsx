@@ -16,7 +16,7 @@ import type { MatchedDest, TripInterest } from '@/data/victorianClusters.ts'
 import type {
   TripType, CrewType, VehicleType, FuelType,
   AccommodationPreference, VibeTag, DiningPref,
-  HikingIntensity, DietaryReq, KidsAge, Coordinate,
+  HikingIntensity, KidsAge, Coordinate,
 } from '@/types'
 
 const season = getCurrentSeason()
@@ -154,7 +154,6 @@ export function ProfileWizard() {
     return 8               // evening/night — planning for tomorrow, default 8am
   })
   const [diningPrefs, setDiningPrefs] = useState<DiningPref[]>([])
-  const [dietary] = useState<DietaryReq[]>([])
   const [vehicleType, setVehicleType] = useState<VehicleType>('AWD')
   const [fuelType, setFuelType] = useState<FuelType>('Unleaded95')
   const fuelBrand = 'Any'
@@ -283,7 +282,6 @@ export function ProfileWizard() {
       max_daily_drive_time: (tripType === 'day' ? maxDriveHours : dailyDriveHours) * 60,
       preferred_vibe: vibes.length > 0 ? vibes : ['Lookouts' as VibeTag],
       hiking_intensity: 'Moderate' as HikingIntensity,
-      dietary_requirements: dietary,
       accommodation_preference: accommodation,
       off_grid_capability: { water_capacity_liters: partySize * 8, auxiliary_battery_days: 2 },
       party_size: partySize,
